@@ -1,0 +1,16 @@
+{
+    "$schema": "../gen/schemas/desktop-capability.json",
+    "identifier": "default",
+    "description": "开启窗口控制和拖动权限",
+    "windows": [
+        "main"
+    ],
+    "permissions": [
+        "core:default",
+        "core:window:allow-minimize",
+        "core:window:allow-toggle-maximize",
+        "core:window:allow-close",
+        "core:window:allow-destroy",
+        "core:window:allow-start-dragging"
+    ]
+}

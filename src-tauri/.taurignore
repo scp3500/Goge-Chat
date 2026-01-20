@@ -1,0 +1,8 @@
+# 忽略数据库及其所有临时文件，防止触发重启 [cite: 2026-01-19]
+alice_data.db*
+*.db-shm
+*.db-wal
+*.db-journal
+
+# 忽略编译产物
+target/

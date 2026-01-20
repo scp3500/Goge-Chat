@@ -1,0 +1,45 @@
+# --- 基础日志与依赖 ---
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# --- 编辑器相关 ---
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Rust / Tauri 特有 (必须添加) ---
+# Rust 编译生成的二进制文件和缓存，这个文件夹通常有几百MB甚至数GB
+/src-tauri/target/
+
+# Tauri 生成的临时构建产物
+src-tauri/gen/
+src-tauri/bin/
+
+# --- 安全与环境配置 ---
+# 如果你之后在项目中使用了 .env 文件来存储 Gemini 或 DeepSeek 的 API Key
+# 务必确保它们不被上传到 GitHub 这种公开平台
+.env
+.env.local
+.env.*.local
+
+# --- 其它 ---
+# macOS 系统文件
+.DS_Store
