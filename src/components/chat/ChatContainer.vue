@@ -1,23 +1,22 @@
 <script setup>
 import { ref, watch, computed, nextTick } from "vue";
-import { invoke, Channel } from "@tauri-apps/api/core";
+import { storeToRefs } from "pinia";
+import { useChatStore } from "../../stores/chat"; // 确保路径正确
 
 // 引用同级组件
 import MessageList from "./MessageList.vue";
 import ChatInput from "./ChatInput.vue";
 
-const props = defineProps(["currentId", "sessions"]);
-const emit = defineEmits(["scroll-update"]);
+const chatStore = useChatStore();
+// 使用 storeToRefs 保持响应式
+const { activeId, currentMessages, isGenerating, activeSession } = storeToRefs(chatStore);
 
-const messages = ref([]);
 const messageListRef = ref(null);
-const isGenerating = ref(false);
 
-const currentSession = computed(() => {
-  const found = props.sessions?.find((s) => s.id === props.currentId);
-  return found || null;
-});
-
+/**
+ * 💡 触发滚动逻辑
+ * 虽然逻辑移到了 Store，但操作 DOM（滚动条）依然是 UI 层的职责
+ */
 const triggerScroll = async () => {
   await nextTick();
   if (messageListRef.value?.scrollToBottom) {
@@ -25,106 +24,62 @@ const triggerScroll = async () => {
   }
 };
 
+/**
+ * 🩺 手术改动原因：
+ * 1. 移除本地 messages ref，改用 store.currentMessages。
+ * 2. 移除 handleStop 本地实现，直接调用 store.stopGeneration()。
+ * 3. 移除 handleSend 复杂的 Channel 逻辑，封装进 store.sendMessage()。
+ */
+
 const handleStop = async () => {
-  isGenerating.value = false;
-  console.log("🛑 正在向后端发送物理中断指令...");
-  try {
-    await invoke("stop_ai_generation");
-  } catch (err) {
-    console.error("后端中断失败:", err);
-  }
+  await chatStore.stopGeneration();
 };
 
+const handleSend = async (text) => {
+  // 调用 Store 的发送方法，并在发送后触发滚动
+  await chatStore.sendMessage(text);
+  triggerScroll();
+};
+
+// 监听 activeId 变化，加载历史记录
 watch(
-  () => props.currentId,
+  activeId,
   async (newId) => {
-    if (newId !== null) {
-      try {
-        if (isGenerating.value) await handleStop();
-        const history = await invoke("get_messages", { sessionId: newId });
-        messages.value =
-          history && history.length > 0
-            ? history
-            : [{ role: "assistant", content: "你好！我是 GoleChat。" }];
-      } catch (err) {
-        console.error("[前端排查] 调用 get_messages 失败:", err);
-      }
+    if (newId) {
+      await chatStore.loadMessages(newId);
+      triggerScroll();
     }
   },
   { immediate: true }
 );
 
-async function handleSend(text) {
-  if (!props.currentId || !text.trim() || isGenerating.value) return;
-  try {
-    await invoke("reset_ai_generation");
-  } catch (e) {}
-  isGenerating.value = true;
+// 监听消息变化（用于 AI 回复时的实时滚动）
+watch(
+  () => currentMessages.value?.length,
+  () => triggerScroll(),
+  { deep: true }
+);
 
-  try {
-    await invoke("save_message", {
-      sessionId: props.currentId,
-      role: "user",
-      content: text,
-    });
-    messages.value.push({ role: "user", content: text });
-
-    // ✨ 【关键修复】：将空字符串改为 __LOADING__ 标识符
-    messages.value.push({ role: "assistant", content: "__LOADING__" });
-    triggerScroll();
-
-    const onEvent = new Channel();
-    let aiFullContent = "";
-
-    onEvent.onmessage = (chunk) => {
-      if (!isGenerating.value) return;
-
-      const lastMsg = messages.value[messages.value.length - 1];
-      
-      // ✨ 收到第一个 chunk 时，瞬间抹除加载标识
-      if (lastMsg.content === "__LOADING__") {
-        lastMsg.content = "";
-      }
-
-      lastMsg.content += chunk;
-      aiFullContent += chunk;
-
-      triggerScroll();
-    };
-
-    await invoke("ask_ai", {
-      msg: messages.value.slice(0, -1),
-      onEvent,
-    });
-
-    if (aiFullContent.trim().length > 0) {
-      await invoke("save_message", {
-        sessionId: props.currentId,
-        role: "assistant",
-        content: aiFullContent,
-      });
-      console.log("💾 已强行持久化截断内容");
-    }
-  } catch (error) {
-    console.error("[前端排查] 对话过程出错:", error);
-  } finally {
-    isGenerating.value = false;
+// 为父组件或外部暴露更新位置的方法（如果需要）
+const handleScrollUpdate = (pos) => {
+  if (activeId.value) {
+    chatStore.updateSessionScroll(activeId.value, pos);
   }
-}
+};
 </script>
 
 <template>
   <main class="chat-main-layout">
     <div class="message-list-wrapper">
-      <Transition name="list-fade">
+      <Transition name="list-fade" mode="out-in">
         <MessageList
-          v-if="currentId"
-          :key="currentId"
-          :messages="messages"
-          :sessionId="currentId"
-          :initialScrollPos="currentSession?.last_scroll_pos || 0"
+          v-if="activeId"
+          :key="activeId"
+          :messages="currentMessages"
+          :sessionId="activeId"
+          :initialScrollPos="activeSession?.last_scroll_pos || 0"
           ref="messageListRef"
-          @update-pos="(pos) => $emit('scroll-update', currentId, pos)"
+          @update-pos="handleScrollUpdate"
         />
       </Transition>
     </div>
@@ -140,6 +95,7 @@ async function handleSend(text) {
 </template>
 
 <style scoped>
+/* 保持原有样式不变，遵循最小改动原则 */
 .chat-main-layout {
   display: flex;
   flex-direction: column;
@@ -162,20 +118,18 @@ async function handleSend(text) {
   padding: 0;
   z-index: 10;
   background: var(--bg-main, #131314);
-  box-shadow: none !important;
-  border: none !important;
-  outline: none !important;
   border-top-left-radius: 48px;
   overflow: hidden;
 }
 
-.list-fade-enter-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+.list-fade-enter-active,
+.list-fade-leave-active {
+  transition: opacity 0.2s ease;
 }
 
-.list-fade-enter-from {
+.list-fade-enter-from,
+.list-fade-leave-to {
   opacity: 0;
-  transform: translateY(10px);
 }
 
 :deep(.message-list-wrapper > *) {

@@ -18,13 +18,16 @@ pub struct ChatRequest {
 /// 会话元数据：项目的灵魂支柱
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Session {
-    /// 数据库自增 ID
-    pub id: i64,
+    /// ✨ 【核心修复】：数据库 ID 在传输层统一使用 String
+    /// 这样可以完美对接前端 Pinia Store，并规避 JS 处理大整数的精度问题
+    pub id: String, 
+    
     /// 会话标题，默认为“新对话”
     pub title: String,
-    /// 【新增】记录用户上次翻到的滚动位置（单位：像素）
-    /// 使用 i32 足够存储数百万条对话的高度，且在前端 DOM 对应 scrollTop
+    
+    /// 记录用户上次翻到的滚动位置（单位：像素）
     pub last_scroll_pos: i32,
-    /// 【建议新增】最后活跃时间，用于侧边栏按时间倒序排列
+    
+    /// 最后活跃时间，用于侧边栏按时间倒序排列
     pub updated_at: String,
 }

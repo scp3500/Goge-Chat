@@ -1,17 +1,16 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useChatStore } from "../../stores/chat"; // 🩺 路径根据实际存放位置调整
 
-const props = defineProps({
-  isGenerating: {
-    type: Boolean,
-    default: false
-  }
-});
+const chatStore = useChatStore();
+// ✨ 直接从 Store 获取状态，不再依赖父组件 Props
+const { isGenerating } = storeToRefs(chatStore);
 
 const inputMsg = ref("");
 const textareaRef = ref(null);
-const emit = defineEmits(['send', 'stop']);
 
+// 💡 自动调节高度逻辑（保留，这是 UI 层的纯粹职责）
 const adjustHeight = () => {
   const el = textareaRef.value;
   if (!el) return;
@@ -23,20 +22,31 @@ watch(inputMsg, () => {
   nextTick(adjustHeight);
 });
 
-const handleAction = () => {
-  if (props.isGenerating) {
-    emit('stop');
+/**
+ * 🩺 手术点：逻辑重组
+ * 直接调用 chatStore 的 Action，不再需要 emit 给父组件
+ */
+const handleAction = async () => {
+  if (isGenerating.value) {
+    await chatStore.stopGeneration();
   } else {
     if (!inputMsg.value.trim()) return;
-    emit('send', inputMsg.value);
-    inputMsg.value = "";
+    
+    const msgToProcess = inputMsg.value;
+    inputMsg.value = ""; // 立即清空，提升交互反馈感
+    
+    // 重置高度
     nextTick(() => {
       if (textareaRef.value) textareaRef.value.style.height = 'auto';
     });
+
+    // 调用 Store 执行发送（包括 IPC 通信、状态变更、持久化）
+    await chatStore.sendMessage(msgToProcess);
   }
 };
 
 const onKeydown = (e) => {
+  // 💡 支持 Shift + Enter 换行，Enter 直接发送
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     handleAction();
@@ -79,21 +89,19 @@ const onKeydown = (e) => {
 </template>
 
 <style scoped>
+/* ✨ 保持你原本的高质量样式，不做改动 */
 .input-area { 
-  /* ✨ 核心修复 1：彻底切掉边缘多余空间，直接填满父容器宽度 */
   padding: 0; 
   width: 100%;
   background: transparent !important; 
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 底部留出间距，确保气泡不贴底，同时不遮挡左侧圆角 */
   padding-bottom: 20px; 
   padding-top: 10px;
 }
 
 .input-wrapper { 
-  /* ✨ 核心修复 2：调整气泡占比，让非对话框部分变透明 */
   width: 90%; 
   max-width: 880px; 
   background: #25262b; 
@@ -120,20 +128,16 @@ const onKeydown = (e) => {
   outline: none; 
   font-size: 15px; 
   line-height: 1.5;
-  /* ✨ 核心修复 3：三重封锁，彻底杀掉右侧白方块 */
   resize: none !important; 
   appearance: none !important;
   -webkit-appearance: none !important;
-  
   max-height: 200px;
   font-family: inherit;
   overflow-y: auto; 
 }
 
-/* ✨ 暴力清理 Webkit 原生手柄伪元素 */
 .chat-input::-webkit-resizer {
   display: none !important;
-  background: transparent;
 }
 
 .action-btn { 

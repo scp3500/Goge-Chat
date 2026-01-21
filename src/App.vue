@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
 
+// 导入组件 - 请确保路径与你的目录结构一致
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
 import SideBar from "./components/SideBar.vue";
@@ -17,10 +18,13 @@ const isMaximized = ref(false);
 const showSettings = ref(false); 
 
 onMounted(async () => {
+    // 并行初始化配置和聊天数据
     await Promise.all([
         configStore.init(),
         chatStore.loadData()
     ]);
+    
+    // 初始化窗口状态并监听变化
     isMaximized.value = await appWindow.isMaximized();
     await appWindow.onResized(async () => {
         isMaximized.value = await appWindow.isMaximized();
@@ -51,9 +55,6 @@ onMounted(async () => {
           <ChatContainer 
             v-if="chatStore.activeId !== null"
             :key="chatStore.activeId"
-            :currentId="chatStore.activeId" 
-            :sessions="chatStore.historyList"
-            @scroll-update="chatStore.syncScroll"
           />
           
           <div v-else class="empty-chat">
@@ -68,16 +69,63 @@ onMounted(async () => {
 </template>
 
 <style>
-html, body, #app { overflow: hidden !important; height: 100%; margin: 0; background: transparent; }
+/* 全局基础重置 */
+html, body, #app { 
+  overflow: hidden !important; 
+  height: 100%; 
+  margin: 0; 
+  background: transparent; 
+}
+
+/* 视图切换动画 */
 .view-fade-enter-active, .view-fade-leave-active { transition: all 0.25s ease; }
 .view-fade-enter-from { opacity: 0; transform: translateX(10px); }
 .view-fade-leave-to { opacity: 0; transform: translateX(-10px); }
 </style>
 
 <style scoped>
-.app-layout { display: flex; flex-direction: column; height: 100vh; background: var(--bg-main, #131314); color: #e3e3e3; overflow: hidden; }
-.app-layout.is-maximized { border-radius: 0; }
-.content-area { flex: 1; position: relative; overflow: hidden; }
-.main-view { display: flex; width: 100%; height: 100%; }
-.empty-chat { flex: 1; display: flex; align-items: center; justify-content: center; color: #555; }
+.app-layout { 
+  display: flex; 
+  flex-direction: column; 
+  height: 100vh; 
+  background: var(--bg-main, #131314); 
+  color: #e3e3e3; 
+  
+  /* ✨ 核心修复：非最大化时的圆角 */
+  border-radius: 12px; 
+  /* ✨ 核心修复：防止子元素溢出圆角边界 */
+  overflow: hidden; 
+  
+  /* 增加一个极其微妙的边框，提升质感 */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+  transition: border-radius 0.2s ease;
+}
+
+/* 窗口最大化时，平滑切换回直角 */
+.app-layout.is-maximized { 
+  border-radius: 0; 
+  border: none;
+}
+
+.content-area { 
+  flex: 1; 
+  position: relative; 
+  overflow: hidden; 
+}
+
+.main-view { 
+  display: flex; 
+  width: 100%; 
+  height: 100%; 
+}
+
+.empty-chat { 
+  flex: 1; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  color: #555; 
+  font-size: 0.9rem;
+}
 </style>
