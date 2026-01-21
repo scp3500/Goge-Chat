@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { useConfigService } from './services/configService';
 // 注意：暂时保留文件名，逻辑上它已经是一个 Full Page 了
-import SettingsModal from "./components/SettingsModal.vue"; 
+import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
 import SideBar from "./components/SideBar.vue";
 import ChatContainer from "./components/chat/ChatContainer.vue";

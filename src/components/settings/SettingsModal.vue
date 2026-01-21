@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'; // 【致命缺失：必须补上这行】
-import { useConfigService } from '../services/configService';
+import { useConfigService } from '../../services/configService';
 
 // 1. 注入配置服务
 const configStore = useConfigService();
