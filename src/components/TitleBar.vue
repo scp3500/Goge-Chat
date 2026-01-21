@@ -117,6 +117,6 @@ const openSettings = () => {
   -webkit-app-region: no-drag;
 }
 .control-btn:hover { background: #333; color: white; }
-.settings-btn:hover { color: #5865f2; }
+.settings-btn:hover { color: white; }
 .close-btn:hover { background: #c42b1c !important; }
 </style>

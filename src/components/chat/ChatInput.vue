@@ -154,7 +154,7 @@ const onKeydown = (e) => {
 }
 
 .action-btn.is-stop {
-  background: #ff4d4f;
+  background: #ADD8E6;
   color: #fff;
 }
 
