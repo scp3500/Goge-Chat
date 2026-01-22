@@ -2,9 +2,9 @@
 import { ref, onMounted, onUnmounted } from "vue";
 
 const props = defineProps(['active', 'list']);
-const emit = defineEmits(['create', 'select', 'delete', 'rename']);
+const emit = defineEmits(['create', 'select', 'delete', 'rename', 'reorder']); // 🩺 新增 reorder 用于同步顺序
 
-// --- [核心状态] ---
+// --- [核心状态 - 严格保留] ---
 const editingId = ref(null);
 const tempTitle = ref("");
 
@@ -33,7 +33,57 @@ const saveRename = (id) => {
   editingId.value = null;
 };
 
-// --- [菜单逻辑] ---
+// --- [🩺 新增：原生极致拖拽逻辑] ---
+const dragIndex = ref(null);
+const dropTargetIndex = ref(null);
+
+const handleDragStart = (index, e) => {
+  if (editingId.value !== null) {
+    e.preventDefault();
+    return;
+  }
+  dragIndex.value = index;
+  // 🩺 核心修复：必须设置 Data，否则某些内核会显示红色禁止图标 [cite: 2026-01-22]
+  e.dataTransfer.setData("text/plain", index.toString());
+  e.dataTransfer.effectAllowed = "move";
+  // 视觉反馈：稍微变淡
+  e.target.style.opacity = "0.4";
+};
+
+const handleDragOver = (index, e) => {
+  // 🩺 核心修复：必须阻止默认行为，否则浏览器会显示禁止图标 [cite: 2026-01-22]
+  e.preventDefault(); 
+  e.dataTransfer.dropEffect = "move";
+  dropTargetIndex.value = index;
+};
+
+const handleDragEnter = (e) => {
+  // 🩺 核心修复：进入区域也必须拦截默认行为
+  e.preventDefault();
+};
+
+const handleDragEnd = (e) => {
+  dragIndex.value = null;
+  dropTargetIndex.value = null;
+  if (e.target) e.target.style.opacity = "";
+};
+
+const handleDrop = (index, e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  if (dragIndex.value === null || dragIndex.value === index) return;
+  
+  // 生成新顺序并推送给父组件
+  const newList = [...props.list];
+  const [movedItem] = newList.splice(dragIndex.value, 1);
+  newList.splice(index, 0, movedItem);
+  
+  emit('reorder', newList);
+  handleDragEnd(e);
+};
+
+// --- [菜单逻辑 - 严格保留] ---
 const showMenu = ref(false);
 const menuPos = ref({ x: 0, y: 0 });
 const targetId = ref(null);
@@ -48,7 +98,6 @@ const handleContextMenu = (id, e) => {
 
 const closeMenu = () => { showMenu.value = false; };
 
-// 处理全局按键逻辑
 const handleGlobalKey = (e) => {
   if (e.key === 'F2' && props.active !== null) {
     const item = props.list.find(i => i.id === props.active);
@@ -79,10 +128,20 @@ onUnmounted(() => {
     
     <nav class="history-container modern-scroll">
       <div 
-        v-for="item in props.list" 
+        v-for="(item, index) in props.list" 
         :key="item.id" 
         class="history-item"
-        :class="{ 'active': props.active === item.id }"
+        :class="{ 
+          'active': props.active === item.id,
+          'is-dragging': dragIndex === index,
+          'drop-hint': dropTargetIndex === index && dragIndex !== index
+        }"
+        :draggable="editingId === null" 
+        @dragstart="handleDragStart(index, $event)"
+        @dragover="handleDragOver(index, $event)"
+        @dragenter="handleDragEnter"
+        @dragend="handleDragEnd"
+        @drop="handleDrop(index, $event)"
         @click="emit('select', item.id)"
         @contextmenu="handleContextMenu(item.id, $event)" 
       >
@@ -124,8 +183,8 @@ onUnmounted(() => {
 <style scoped>
 .sidebar { 
   width: 260px; 
-  flex-shrink: 0; /* 【关键修复】：禁止在 Flex 布局中被压缩，防止变窄 [cite: 2026-01-20] */
-  background: #1e1f20; 
+  flex-shrink: 0; 
+  background: #111214; /* 稍微调深，增加现代感感 */
   height: 100vh; 
   display: flex; 
   flex-direction: column; 
@@ -136,16 +195,41 @@ onUnmounted(() => {
 .new-chat-btn { width: 100%; background: #2b2c2e; color: #ececec; border: 1px solid #3d3e40; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
 .new-chat-btn:hover { background: #3a3b3d; }
 
-.history-container { 
-  flex: 1; 
-  padding: 0 8px; 
-  overflow-y: auto; /* 【关键修复】：确保即使没有 modern-scroll 类，自身也能滚动 [cite: 2026-01-20] */
+.history-container { flex: 1; padding: 0 8px; overflow-y: auto; }
+
+/* 🩺 现代 UI 增强：强制 Pointer 指针 */
+.history-item { 
+  display: flex; 
+  align-items: center; 
+  padding: 12px 16px; 
+  margin-bottom: 2px; 
+  font-size: 13px; 
+  border-radius: 8px; 
+  /* ✨ 核心：强制 Pointer 形状，拒绝握拳 */
+  cursor: pointer !important; 
+  color: #999; 
+  position: relative; 
+  transition: background 0.2s;
+  /* 解决拖拽兼容性 */
+  -webkit-user-drag: element;
 }
 
-.history-item { display: flex; align-items: center; padding: 12px 16px; margin-bottom: 2px; font-size: 13px; border-radius: 6px; cursor: pointer; color: #999; position: relative; transition: background 0.2s; }
 .history-item:hover { background: rgba(255, 255, 255, 0.05); }
 .history-item.active { background: #2b2c2e; color: #fff; }
 .history-item.active::before { content: ""; position: absolute; left: 0; width: 3px; height: 14px; background: #ececec; border-radius: 0 4px 4px 0; }
+
+/* 拖拽时的蓝线指示 (编辑器风格) */
+.history-item.drop-hint::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -2px;
+  height: 2px;
+  background: #0078d4;
+  border-radius: 2px;
+  z-index: 10;
+}
 
 .title {
   flex: 1;
@@ -158,7 +242,7 @@ onUnmounted(() => {
 .more-action-btn { position: absolute; right: 8px; background: transparent; border: none; color: #666; font-size: 16px; cursor: pointer; opacity: 0; }
 .history-item:hover .more-action-btn { opacity: 1; }
 
-.inline-edit-input { flex: 1; background: #3a3c3e; border: none; color: #fff; font-size: 13px; padding: 2px 4px; outline: none; width: 100%; border-radius: 4px; }
+.inline-edit-input { flex: 1; background: #3a3c3e; border: none; color: #fff; font-size: 13px; padding: 2px 4px; outline: none; width: 100%; border-radius: 4px; cursor: text !important; }
 
 .glass-menu { position: fixed; z-index: 10000; background: rgba(30, 31, 32, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 6px; min-width: 150px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
 .menu-item { padding: 8px 12px; font-size: 12px; color: #d1d1d1; border-radius: 6px; cursor: pointer; display: flex; align-items: center; }

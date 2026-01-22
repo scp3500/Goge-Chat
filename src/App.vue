@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue"; // 🩺 引入 onUnmounted
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
@@ -17,7 +17,19 @@ const chatStore = useChatStore();
 const isMaximized = ref(false); 
 const showSettings = ref(false); 
 
+/**
+ * 🩺 核心修复：全局拦截函数
+ * 阻止窗口级别的默认行为，彻底消除红色禁止图标
+ */
+const handleGlobalDragOver = (e) => {
+  e.preventDefault(); 
+};
+
 onMounted(async () => {
+    // 🩺 注入全局监听
+    window.addEventListener('dragover', handleGlobalDragOver, false);
+    window.addEventListener('drop', handleGlobalDragOver, false);
+
     // 并行初始化配置和聊天数据
     await Promise.all([
         configStore.init(),
@@ -30,10 +42,21 @@ onMounted(async () => {
         isMaximized.value = await appWindow.isMaximized();
     });
 });
+
+// 🩺 严谨起见，卸载时移除监听
+onUnmounted(() => {
+    window.removeEventListener('dragover', handleGlobalDragOver);
+    window.removeEventListener('drop', handleGlobalDragOver);
+});
 </script>
 
 <template>
-  <div class="app-layout" :class="{ 'is-maximized': isMaximized }">
+  <div 
+    class="app-layout" 
+    :class="{ 'is-maximized': isMaximized }"
+    @dragover.prevent
+    @drop.prevent
+  >
     <TitleBar 
       :is-settings="showSettings" 
       @open-settings="showSettings = true" 
@@ -50,6 +73,7 @@ onMounted(async () => {
             @select="id => chatStore.activeId = id" 
             @delete="id => chatStore.deleteSession(id)" 
             @rename="chatStore.renameSession"
+            @reorder="newList => chatStore.historyList = newList" 
           />
           
           <ChatContainer 
@@ -69,7 +93,7 @@ onMounted(async () => {
 </template>
 
 <style>
-/* 全局基础重置 */
+/* ... 全局基础重置保持不变 ... */
 html, body, #app { 
   overflow: hidden !important; 
   height: 100%; 
@@ -77,32 +101,30 @@ html, body, #app {
   background: transparent; 
 }
 
-/* 视图切换动画 */
+/* ... 视图切换动画保持不变 ... */
 .view-fade-enter-active, .view-fade-leave-active { transition: all 0.25s ease; }
 .view-fade-enter-from { opacity: 0; transform: translateX(10px); }
 .view-fade-leave-to { opacity: 0; transform: translateX(-10px); }
 </style>
 
 <style scoped>
+/* ... 你的样式 100% 保留 ... */
 .app-layout { 
   display: flex; 
   flex-direction: column; 
   height: 100vh; 
   background: var(--bg-main, #131314); 
   color: #e3e3e3; 
-  
-  /* ✨ 核心修复：非最大化时的圆角 */
   border-radius: 12px; 
-  /* ✨ 核心修复：防止子元素溢出圆角边界 */
   overflow: hidden; 
-  
-  /* 增加一个极其微妙的边框，提升质感 */
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-sizing: border-box;
   transition: border-radius 0.2s ease;
+  
+  /* 🩺 增加视觉稳定性补丁 */
+  user-select: none;
 }
 
-/* 窗口最大化时，平滑切换回直角 */
 .app-layout.is-maximized { 
   border-radius: 0; 
   border: none;

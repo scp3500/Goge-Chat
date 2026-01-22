@@ -69,8 +69,8 @@ pub fn run() {
 
             // AI 交互
             commands::ai::ask_ai,
-            stop_ai_generation,  // ✨ 【新增暴露】
-            reset_ai_generation, // ✨ 【新增暴露】
+            stop_ai_generation, 
+            reset_ai_generation,
 
             // 数据库 CRUD 指令
             commands::db_cmd::get_sessions,
@@ -78,7 +78,8 @@ pub fn run() {
             commands::db_cmd::delete_session,
             commands::db_cmd::get_messages,
             commands::db_cmd::save_message,
-            commands::db_cmd::update_session_title,
+            // 🩺 关键手术点：将 update_session_title 改为 rename_session
+            commands::db_cmd::rename_session, 
             commands::db_cmd::update_session_scroll 
         ])
         .run(tauri::generate_context!())

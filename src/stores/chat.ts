@@ -9,7 +9,7 @@ export const useChatStore = defineStore('chat', () => {
     const activeId = ref<string | null>(null);
     const currentMessages = ref<any[]>([]);
     const isGenerating = ref(false);
-    const isLoading = ref(false); // ✨ 新增：标记是否正在从数据库加载历史记录
+    const isLoading = ref(false);
 
     // --- 计算属性 (Getters) ---
     const activeSession = computed(() =>
@@ -18,13 +18,8 @@ export const useChatStore = defineStore('chat', () => {
 
     // --- 会话管理 Actions ---
 
-    /**
-     * 手术点 1：统一切换逻辑
-     * 侧边栏点击时请直接调用这个方法，而不是直接修改 activeId
-     */
     const switchSession = async (sessionId: string) => {
         if (activeId.value === sessionId) return;
-
         activeId.value = sessionId;
         await loadMessages(sessionId);
     };
@@ -34,7 +29,6 @@ export const useChatStore = defineStore('chat', () => {
             const sessions = await chatApi.getSessions();
             historyList.value = sessions;
             if (sessions.length > 0 && activeId.value === null) {
-                // 默认加载第一个
                 await switchSession(sessions[0].id);
             }
         } catch (e) {
@@ -51,28 +45,61 @@ export const useChatStore = defineStore('chat', () => {
                 last_scroll_pos: 0
             });
             activeId.value = newId;
-            // 创建新会话，直接初始化
             currentMessages.value = [{ role: "assistant", content: "你好！我是 GoleChat。" }];
         } catch (e) {
             console.error("创建失败", e);
         }
     };
 
-    // --- 消息管理 Actions ---
+    /**
+     * 🩺 手术点 1：补全删除逻辑
+     */
+    const deleteSession = async (sessionId: string) => {
+        try {
+            // 1. 调用 Rust 后端删除数据库记录
+            await invoke("delete_session", { sessionId });
+
+            // 2. 更新本地 UI 列表
+            historyList.value = historyList.value.filter(s => s.id !== sessionId);
+
+            // 3. 自动切换逻辑：如果删掉的是当前对话
+            if (activeId.value === sessionId) {
+                if (historyList.value.length > 0) {
+                    await switchSession(historyList.value[0].id);
+                } else {
+                    activeId.value = null;
+                    currentMessages.value = [];
+                }
+            }
+        } catch (e) {
+            console.error("删除会话失败:", e);
+        }
+    };
 
     /**
-     * 手术点 2：优化加载逻辑，解决跳变
+     * 🩺 手术点 2：补全重命名逻辑
      */
+    const renameSession = async (id: string, newTitle: string) => {
+        try {
+            // 1. 同步内存状态
+            const session = historyList.value.find(s => s.id === id);
+            if (session) {
+                session.title = newTitle;
+            }
+            // 2. 同步数据库
+            await invoke("rename_session", { id, title: newTitle });
+        } catch (e) {
+            console.error("重命名失败:", e);
+        }
+    };
+
+    // --- 消息管理 Actions ---
+
     const loadMessages = async (sessionId: string) => {
-        // 1. 立即同步清空，解决“残留旧对话”导致的跳变
         currentMessages.value = [];
         isLoading.value = true;
-
         try {
-            // 2. 向 Rust 请求数据
             const history = await invoke<any[]>("get_messages", { sessionId });
-
-            // 3. 只有当用户还没切走时，才更新数据（防止竞态）
             if (activeId.value === sessionId) {
                 currentMessages.value = history && history.length > 0
                     ? history
@@ -85,7 +112,6 @@ export const useChatStore = defineStore('chat', () => {
         }
     };
 
-    // --- 消息流处理 (保持原样) ---
     const sendMessage = async (text: string) => {
         if (!activeId.value || !text.trim() || isGenerating.value) return;
 
@@ -153,11 +179,13 @@ export const useChatStore = defineStore('chat', () => {
         activeId,
         currentMessages,
         isGenerating,
-        isLoading, // 暴露给 UI 展现加载态
+        isLoading,
         activeSession,
         loadData,
-        switchSession, // 暴露新的切换方法
+        switchSession,
         createSession,
+        deleteSession, // ✨ 必须暴露
+        renameSession, // ✨ 必须暴露
         loadMessages,
         sendMessage,
         stopGeneration,
