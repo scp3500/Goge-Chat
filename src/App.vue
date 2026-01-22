@@ -7,7 +7,7 @@ import { useChatStore } from './stores/chat';
 // 导入组件 - 请确保路径与你的目录结构一致
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
-import SideBar from "./components/SideBar.vue";
+import SideBar from "./components/sidebar/SideBar.vue";
 import ChatContainer from "./components/chat/ChatContainer.vue";
 
 const appWindow = getCurrentWindow();
