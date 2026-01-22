@@ -222,7 +222,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 :deep(.markdown-body tr:last-child td) { border-bottom: none; }
 :deep(.markdown-body tr:nth-child(even)) { background-color: rgba(255, 255, 255, 0.02); }
 
-:deep(.markdown-body :not(pre) > code) { color: #ffffff !important; background-color: rgba(255, 255, 255, 0.1) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; padding: 0.15em 0.4em !important; border-radius: 6px !important; font-family: inherit !important; font-weight: 500 !important; }
+:deep(.markdown-body :not(pre) > code) { color: #C2C5C3 !important; background-color: rgba(255, 255, 255, 0.1) !important; border: 0px solid rgba(255, 255, 255, 0.2) !important; padding: 0.15em 0.4em !important; border-radius: 6px !important; font-family: inherit !important; font-weight: 500 !important; }
 
 /* 🚩 代码高亮颜色 */
 :deep(.hljs-keyword) { color: #569cd6; }

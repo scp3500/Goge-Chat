@@ -1,49 +1,71 @@
 @import "./scrollbar.css";
-/* 引入程序员神级字体 */
+/* 引入 JetBrains Mono 作为备选，虽然我们将优先使用 Cascadia */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* 💡 提示：如果你的电脑没有安装 Cascadia Code，
+   可以通过 https://github.com/microsoft/cascadia-code 下载，
+   或者它会回退到 Consolas。
+*/
 
 :root {
     /* ========================================================
-       GoleChat 动态缩放设计系统 (v2.1 - Minimalist Edition)
+       GoleChat 设计系统 - VS Code Dark+ Edition
        ======================================================== */
 
-    /* 1. 色彩基准 */
-    --bg-main: #131314;
-    --bg-sidebar: #1e1e1e;
-    --bg-input: #252526;
+    /* 1. 色彩基准 (VS Code 风格背景) */
+    --bg-main: #1e1e1e;
+    /* VS Code 编辑器默认背景 */
+    --bg-sidebar: #252526;
+    /* VS Code 侧边栏背景 */
+    --bg-input: #3c3c3c;
+    /* VS Code 输入框/搜索框背景 */
     --bg-code: #1e1e1e;
+    /* 代码块背景与主背景一致，或微调为 #181818 以突出 */
 
-    /* 2. 语法高亮 Token */
+    /* 2. 语法高亮 Token (1:1 复刻 VS Code Dark+ 主题) */
     --token-keyword: #569cd6;
-    --token-string: #ce9178;
+    /* 蓝色: function, var */
+    --token-control: #c586c0;
+    /* [新增] 粉紫色: import, return, if, for */
+    --token-type: #4ec9b0;
+    /* [新增] 蓝绿色: Class, Interface, Type */
     --token-fn: #dcdcaa;
+    /* 黄色: functionName() */
+    --token-string: #ce9178;
+    /* 橙红色: "string" */
+    --token-number: #b5cea8;
+    /* [新增] 浅绿色: 123, true, null */
     --token-comment: #6a9955;
+    /* 绿色: // comment */
     --token-var: #9cdcfe;
+    /* 浅蓝: variable */
     --token-operator: #d4d4d4;
+    /* 灰白: +, =, : */
+    --token-html-tag: #808080;
+    /* 灰色: <tag> */
 
-    /* 3. 【核心调优】字号与行距 */
-    --font-size-base: 15px;
-    /* 🚩 基准从 16px 下调至 15px，提升精致感 */
+    /* 3. 字号与行距 */
+    --font-size-base: 16px;
     --font-ratio: 1.5;
-    /* 🚩 行距从 1.6 压缩至 1.5，增加信息密度 */
 
     --font-size-chat: var(--font-size-base);
     --font-size-input: var(--font-size-base);
-    --font-size-code: 13.5px;
-    /* 🚩 代码同步微调，增加单位面积代码量 */
+    --font-size-code: 16px;
+    /* VS Code 默认代码通常比 UI 字体略小一点点 */
 
-    /* 4. 标题分级字号 (Modular Scale) */
+    /* 4. 标题字号 */
     --h1-size: 1.4em;
-    /* 不再巨大，仅比正文稍大且加粗 */
     --h2-size: 1.25em;
     --h3-size: 1.15em;
 
     /* 5. 界面交互色 */
     --accent-color: #0078d4;
-    --border-color: rgba(255, 255, 255, 0.1);
+    /* VS Code 品牌蓝 */
+    --border-color: #3e3e42;
+    /* VS Code 分割线颜色 */
 }
 
-/* 全局重置与基础应用 */
+/* 全局重置 */
 html,
 body,
 #app {
@@ -52,25 +74,19 @@ body,
     height: 100%;
     width: 100%;
     background-color: var(--bg-main);
-    color: #e3e3e3;
+    color: #cccccc;
+    /* VS Code 默认文字颜色 */
     overflow: hidden;
-
     font-size: var(--font-size-base);
     line-height: var(--font-ratio);
-
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-
-    /* 🚩 默认开启文本选择 */
     user-select: text;
     -webkit-user-select: text;
 }
 
 /* ========================================================
-   核心交互控制：修复复制权限与 UI 锁定
+   核心交互控制
    ======================================================== */
-
 .chat-main-layout,
 .message-list-wrapper,
 .markdown-body,
@@ -103,15 +119,14 @@ textarea {
 }
 
 /* ========================================================
-   Markdown 渲染定制 (克制化排版)
+   Markdown 渲染定制
    ======================================================== */
-
 .markdown-body {
     font-size: var(--font-size-chat) !important;
     line-height: var(--font-ratio) !important;
 }
 
-/* 🚩 标题降级：取消底边线，压低字号 */
+/* 标题样式 */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {
@@ -119,8 +134,7 @@ textarea {
     margin-bottom: 0.6em;
     font-weight: 600;
     line-height: 1.3;
-    color: #ffffff;
-    /* 标题用纯白以示区分 */
+    color: #e8e8e8;
 }
 
 .markdown-body h1 {
@@ -137,7 +151,6 @@ textarea {
     font-size: var(--h3-size) !important;
 }
 
-/* 段落间距微调，让对话更紧凑 */
 .markdown-body p,
 .markdown-body ul,
 .markdown-body ol {
@@ -145,55 +158,110 @@ textarea {
     margin-bottom: 0.8em;
 }
 
-/* 核心：代码块渲染逻辑 */
+/* ========================================================
+   🚩 核心：代码块渲染逻辑 (VS Code 风格)
+   ======================================================== */
 pre,
 .code-block-wrapper {
     background-color: var(--bg-code) !important;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 6px;
+    /* VS Code 的圆角比较小 */
     padding: 1rem;
     margin: 1rem 0;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+
+    /* 🚩 字体栈更新：Cascadia Code 优先，其次 Consolas */
+    font-family: 'Consolas', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace !important;
     font-variant-ligatures: contextual;
+    /* 开启连字 */
 }
 
 code {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+    font-family: 'Consolas', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace !important;
     font-size: var(--font-size-code);
 }
 
-/* 行内代码样式 */
+/* 行内代码样式 `code` */
 :not(pre)>code {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.08);
     color: #ce9178;
-    padding: 0.2em 0.4em;
+    /* 使用字符串颜色，或者用 #d7ba7d (VS Code 黄) */
+    padding: 0.1em 0.4em;
     border-radius: 4px;
 }
 
-/* 语法高亮 Token */
+/* ========================================================
+   🚩 语法高亮映射 (Highlight.js -> VS Code Dark+)
+   ======================================================== */
+
+/* 1. 蓝色：关键字 (function, class, var) */
 .hljs-keyword,
 .token.keyword {
     color: var(--token-keyword);
 }
 
+/* 2. 粉紫色：控制流 (return, if, else, import, from) 
+   注意：highlight.js 有时把这些也算作 keyword，取决于解析器，
+   但 built_in 有时会用这个颜色 */
+.hljs-built_in,
+.token.builtin {
+    color: var(--token-keyword);
+    /* 或者试用 var(--token-control) */
+}
+
+/* 3. 橙红色：字符串 */
 .hljs-string,
 .token.string {
     color: var(--token-string);
 }
 
+/* 4. 绿色：注释 */
 .hljs-comment,
+.hljs-quote,
 .token.comment {
     color: var(--token-comment);
 }
 
+/* 5. 黄色：函数调用 */
 .hljs-function,
+.hljs-title,
+.hljs-attr,
 .token.function {
     color: var(--token-fn);
 }
 
+/* 6. 浅蓝：变量 */
 .hljs-variable,
+.hljs-subst,
 .token.variable {
     color: var(--token-var);
+}
+
+/* 7. 蓝绿色：类名、类型 (VS Code 特征) */
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ {
+    color: var(--token-type);
+}
+
+/* 8. 浅绿色：数字、布尔值 (VS Code 特征) */
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+    color: var(--token-number);
+}
+
+/* 9. 粉色：特殊关键字/元数据 (VS Code 特征) */
+.hljs-meta,
+.hljs-section {
+    color: var(--token-control);
+}
+
+/* 10. 标签 (HTML Tag) */
+.hljs-tag,
+.hljs-name {
+    color: var(--token-keyword);
 }
 
 .hljs-operator,
@@ -201,7 +269,7 @@ code {
     color: var(--token-operator);
 }
 
-/* 强制表单元素同步字号与行高 */
+/* 表单元素重置 */
 input,
 textarea,
 button {
@@ -213,24 +281,33 @@ button {
 }
 
 /* ========================================================
-   滚动条与容器控制
+   滚动条 (仿 VS Code 风格)
    ======================================================== */
-
 .no-scrollbar-container::-webkit-scrollbar {
     display: none;
 }
 
 pre::-webkit-scrollbar {
-    height: 5px;
-    /* 更细的滚动条 */
-    width: 5px;
+    height: 10px;
+    /* VS Code 的横向滚动条稍厚一点，方便拖动 */
+    width: 10px;
 }
 
+/* 滚动条轨道：透明 */
+pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* 滚动条滑块：深灰色 */
 pre::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    background: #424242;
+    border-radius: 0;
+    /* VS Code 滚动条是直角的，或者很小的圆角 */
+    border: 2px solid var(--bg-code);
+    /* 制造 padding 效果 */
 }
 
+/* 悬停变亮 */
 pre::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: #4f4f4f;
 }
