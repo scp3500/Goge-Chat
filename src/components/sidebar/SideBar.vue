@@ -68,21 +68,24 @@ const toggleSidebar = () => {
 <style scoped>
 .sidebar { 
   /* 🚩 展开模式：物理宽度三重锁死 */
-  width: 300px; 
-  min-width: 300px;
-  max-width: 300px;
+  width: 260px; 
+  min-width: 260px;
+  max-width: 260px;
   
-  --collapsed-width: 72px;
+  --collapsed-width: 80px;
 
   /* 动力学曲线：确保缩放极其顺滑 */
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
-  background: #111214; 
+  background: #1e1e1f; 
   height: 100vh; 
   display: flex; 
   flex-direction: column; 
-  border-right: 1px solid #2a2b2d; 
-  /*user-select: none;*/
-  /* 🛡️ 核心：切掉所有溢出内容，这是防止“收起来还能选”的第一道防线 */
+  
+  /* --- 🩺 手术位置：彻底删除这一行 --- */
+  /* border-right: 1px solid #2a2b2d; */ 
+  /* ---------------------------------- */
+
+  /* 🛡️ 核心：切掉所有溢出内容 */
   overflow: hidden; 
   box-sizing: border-box; 
   flex-shrink: 0; 
@@ -110,20 +113,19 @@ const toggleSidebar = () => {
   transition: opacity 0.2s ease;
 }
 
-/* 🚩 核心“模式切换”黑科技：
-   当侧边栏缩小时，强制让子组件内部那些“没用”的元素完全丧失交互和视觉占位 */
+/* 🚩 核心“模式切换”黑科技 */
 .sidebar.is-collapsed :deep(.btn-text),
 .sidebar.is-collapsed :deep(.header-search-container),
 .sidebar.is-collapsed :deep(.title-text),
 .sidebar.is-collapsed :deep(.more-btn) {
-  display: none !important; /* 物理移除 */
-  pointer-events: none;    /* 禁止点击 */
+  display: none !important;
+  pointer-events: none;
   opacity: 0;
 }
 
 .sidebar-footer { 
   padding: 16px 20px 16px 28px; 
-  border-top: 1px solid #2a2b2d; 
+  border-top: none; 
   font-size: 10px; 
   color: #555; 
   text-align: left; 

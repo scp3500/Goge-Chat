@@ -5,7 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 const appWindow = getCurrentWindow();
 const isMaximized = ref(false);
 
-// 1. 【新增】接收来自 App.vue 的状态，判断当前是否在设置页
+// 1. 接收来自 App.vue 的状态，判断当前是否在设置页
 defineProps({
   isSettings: {
     type: Boolean,
@@ -13,7 +13,7 @@ defineProps({
   }
 });
 
-// 2. 【新增】增加 back-home 信号
+// 2. 增加 back-home 信号
 const emit = defineEmits(['open-settings', 'back-home']);
 
 const updateMaximizedState = async () => {
@@ -86,7 +86,18 @@ const openSettings = () => {
 </template>
 
 <style scoped>
-.titlebar { height: 35px; background: #1e1f20; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; -webkit-app-region: drag; }
+.titlebar { 
+  height: 35px; 
+  /* --- 🩺 手术：同步侧边栏背景色 --- */
+  background: #1e1e1f; 
+  /* ------------------------------ */
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 0 10px; 
+  -webkit-app-region: drag; 
+}
+
 .window-title { font-size: 12px; color: #888; flex: 1; display: flex; align-items: center; }
 
 /* 返回按钮样式 */
@@ -96,7 +107,7 @@ const openSettings = () => {
   gap: 6px;
   background: transparent;
   border: none;
-  color: #5865f2; /* 醒目的品牌色 */
+  color: #5865f2;
   font-size: 12px;
   font-weight: bold;
   cursor: pointer;

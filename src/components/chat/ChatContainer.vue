@@ -15,7 +15,6 @@ const messageListRef = ref(null);
 
 /**
  * 💡 触发滚动逻辑
- * 虽然逻辑移到了 Store，但操作 DOM（滚动条）依然是 UI 层的职责
  */
 const triggerScroll = async () => {
   await nextTick();
@@ -24,19 +23,11 @@ const triggerScroll = async () => {
   }
 };
 
-/**
- * 🩺 手术改动原因：
- * 1. 移除本地 messages ref，改用 store.currentMessages。
- * 2. 移除 handleStop 本地实现，直接调用 store.stopGeneration()。
- * 3. 移除 handleSend 复杂的 Channel 逻辑，封装进 store.sendMessage()。
- */
-
 const handleStop = async () => {
   await chatStore.stopGeneration();
 };
 
 const handleSend = async (text) => {
-  // 调用 Store 的发送方法，并在发送后触发滚动
   await chatStore.sendMessage(text);
   triggerScroll();
 };
@@ -53,14 +44,14 @@ watch(
   { immediate: true }
 );
 
-// 监听消息变化（用于 AI 回复时的实时滚动）
+// 监听消息变化
 watch(
   () => currentMessages.value?.length,
   () => triggerScroll(),
   { deep: true }
 );
 
-// 为父组件或外部暴露更新位置的方法（如果需要）
+// 为父组件或外部暴露更新位置的方法
 const handleScrollUpdate = (pos) => {
   if (activeId.value) {
     chatStore.updateSessionScroll(activeId.value, pos);
@@ -95,13 +86,19 @@ const handleScrollUpdate = (pos) => {
 </template>
 
 <style scoped>
-/* 保持原有样式不变，遵循最小改动原则 */
 .chat-main-layout {
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: var(--bg-main, #131314);
+  background: #1e1e1f; /* 浅色底座（侧边栏同色） */
+  
+  /* --- 🛠️ 悬浮控制旋钮 1：外圈留白 --- */
+  /* 增大这个值，岛屿就会缩小，悬浮感增强 */
+  padding: 5px 5px; 
+  /* ---------------------------------- */
+  
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -111,14 +108,25 @@ const handleScrollUpdate = (pos) => {
   display: flex;
   flex-direction: column;
   position: relative;
+  background: #131314; /* 岛屿深色 */
+  
+  /* --- 🛠️ 悬浮控制旋钮 2：顶部圆角 --- */
+  border-top-left-radius: 12px; 
+  border-top-right-radius: 12px; 
+  /* ---------------------------------- */
 }
 
 .chat-input-wrapper {
   flex-shrink: 0;
   padding: 0;
   z-index: 10;
-  background: var(--bg-main, #131314);
-  border-top-left-radius: 48px;
+  background: #131314; /* 必须与 wrapper 一致，确保岛屿是一体的 */
+  
+  /* --- 🛠️ 悬浮控制旋钮 3：底部圆角 --- */
+  border-bottom-left-radius: 12px; 
+  border-bottom-right-radius: 12px; 
+  /* ---------------------------------- */
+  
   overflow: hidden;
 }
 

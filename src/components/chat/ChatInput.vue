@@ -1,16 +1,14 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useChatStore } from "../../stores/chat"; // 🩺 路径根据实际存放位置调整
+import { useChatStore } from "../../stores/chat"; 
 
 const chatStore = useChatStore();
-// ✨ 直接从 Store 获取状态，不再依赖父组件 Props
 const { isGenerating } = storeToRefs(chatStore);
 
 const inputMsg = ref("");
 const textareaRef = ref(null);
 
-// 💡 自动调节高度逻辑（保留，这是 UI 层的纯粹职责）
 const adjustHeight = () => {
   const el = textareaRef.value;
   if (!el) return;
@@ -22,31 +20,21 @@ watch(inputMsg, () => {
   nextTick(adjustHeight);
 });
 
-/**
- * 🩺 手术点：逻辑重组
- * 直接调用 chatStore 的 Action，不再需要 emit 给父组件
- */
 const handleAction = async () => {
   if (isGenerating.value) {
     await chatStore.stopGeneration();
   } else {
     if (!inputMsg.value.trim()) return;
-    
     const msgToProcess = inputMsg.value;
-    inputMsg.value = ""; // 立即清空，提升交互反馈感
-    
-    // 重置高度
+    inputMsg.value = ""; 
     nextTick(() => {
       if (textareaRef.value) textareaRef.value.style.height = 'auto';
     });
-
-    // 调用 Store 执行发送（包括 IPC 通信、状态变更、持久化）
     await chatStore.sendMessage(msgToProcess);
   }
 };
 
 const onKeydown = (e) => {
-  // 💡 支持 Shift + Enter 换行，Enter 直接发送
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     handleAction();
@@ -62,7 +50,7 @@ const onKeydown = (e) => {
         v-model="inputMsg" 
         rows="1"
         @keydown="onKeydown"
-        placeholder="给 Alice 发送消息..." 
+        placeholder="发送消息..." 
         class="chat-input modern-scroll" 
       ></textarea>
       
@@ -89,34 +77,46 @@ const onKeydown = (e) => {
 </template>
 
 <style scoped>
-/* ✨ 保持你原本的高质量样式，不做改动 */
 .input-area { 
+  /* --- 🩺 样式手术：定义宽度变量 --- */
+  --input-width-percent: 80%; /* 👈 核心控制点：修改这个百分比即可控制左右边距 */
+  /* ------------------------------- */
+  
   padding: 0; 
   width: 100%;
   background: transparent !important; 
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 20px; 
-  padding-top: 10px;
+  padding-bottom: 24px; 
+  padding-top: 8px;
 }
 
 .input-wrapper { 
-  width: 90%; 
-  max-width: 880px; 
-  background: #25262b; 
+  /* 使用变量控制宽度，自动成比例 */
+  width: var(--input-width-percent); 
+  
+  /* 建议给一个舒适的上限，防止在 4K 屏上拉得太长导致阅读困难 */
+  max-width: 800px; 
+  
+  background: #1c1c1e; 
+  border: none; 
+  box-shadow: none; 
   display: flex; 
   align-items: flex-end; 
-  padding: 10px 14px; 
-  border-radius: 16px; 
-  border: 1px solid rgba(255, 255, 255, 0.08); 
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  padding: 10px 16px; 
+  border-radius: 12px; 
+  transition: all 0.2s ease;
 }
 
+/* 🩺 改动原因说明：
+ * 1. 引入 --input-width-percent 变量：将宽度从 90% 降至 80%，左右边距会自动从 5% 扩大到 10%。
+ * 2. 移除固定的 margin 设置：通过父级的 align-items: center 配合宽度百分比，实现完美的居中比例缩放。
+ */
+
 .input-wrapper:focus-within { 
-  border-color: rgba(255, 255, 255, 0.3); 
-  background: #2c2d33;
+  background: #252527;
+  border: none; 
 }
 
 .chat-input { 
@@ -129,8 +129,6 @@ const onKeydown = (e) => {
   font-size: 15px; 
   line-height: 1.5;
   resize: none !important; 
-  appearance: none !important;
-  -webkit-appearance: none !important;
   max-height: 200px;
   font-family: inherit;
   overflow-y: auto; 
@@ -141,8 +139,8 @@ const onKeydown = (e) => {
 }
 
 .action-btn { 
-  background: #fff; 
-  color: #000; 
+  background: transparent; 
+  color: #888; 
   border: none; 
   width: 32px;
   height: 32px;
@@ -157,14 +155,19 @@ const onKeydown = (e) => {
   flex-shrink: 0;
 }
 
+.input-wrapper:has(.chat-input:not(:placeholder-shown)) .action-btn {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .action-btn.is-stop {
-  background: #ADD8E6;
+  background: #ff4d4f;
   color: #fff;
 }
 
 .action-btn:disabled { 
   opacity: 0.15; 
-  background: #888;
+  background: transparent;
 }
 
 .modern-scroll::-webkit-scrollbar { width: 4px; }
