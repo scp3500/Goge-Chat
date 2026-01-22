@@ -1,11 +1,10 @@
 <script setup>
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue';
-import { Marked } from 'marked'; 
-import { markedHighlight } from "marked-highlight";
 import { debounce } from 'lodash-es';
-import hljs from 'highlight.js';
-import DOMPurify from 'dompurify'; 
 import { useChatStore } from "../../stores/chat"; 
+import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG } from '../../constants/icons';
+import { renderMarkdown } from '../../services/markdown';
+import { useScrollRestore } from './composables/useScrollRestore';
 
 const props = defineProps(['messages', 'sessionId', 'initialScrollPos']);
 const emit = defineEmits(['update-pos', 'refresh']);
@@ -13,16 +12,9 @@ const emit = defineEmits(['update-pos', 'refresh']);
 const chatStore = useChatStore();
 const scrollRef = ref(null);
 const isRestoring = ref(false); 
+const { performRestore } = useScrollRestore();
 
-// --- 🚩 核心资产：图标库 (严格顺序：刷新、复制、更多) ---
-const REFRESH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>`;
-const COPY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-const MORE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>`;
-const CHECK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-
-/**
- * ✨ 复制逻辑 (保持原样)
- */
+// 💡 统一复制函数
 const doCopy = async (text, el) => {
   try {
     await navigator.clipboard.writeText(text);
@@ -36,102 +28,46 @@ const doCopy = async (text, el) => {
   } catch (err) { console.error('复制失败', err); }
 };
 
-/**
- * 🚩 代码块按钮注入：实现真正的 Sticky 吸附
- */
+// 💡 保持原功能的按钮注入
 const injectCodeButtons = () => {
   nextTick(() => {
-    // 仅查找未处理的 pre
     const pres = document.querySelectorAll('.markdown-body pre:not(.has-copy-btn)');
     pres.forEach(pre => {
       pre.classList.add('has-copy-btn');
       const btn = document.createElement('button');
       btn.className = 'code-copy-btn';
       btn.innerHTML = COPY_SVG;
-      // 捕获 pre 内部 code 的纯文本
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        doCopy(pre.innerText.trim(), btn);
-      };
-      // 使用 prepend 插入，配合 flex-column 确保其在最上方参与 sticky 布局
+      btn.onclick = (e) => { e.stopPropagation(); doCopy(pre.innerText.trim(), btn); };
       pre.prepend(btn);
     });
   });
 };
 
-/**
- * ✨ 配置解析实例 (逻辑 100% 完整)
- */
-const customMarked = new Marked(
-  markedHighlight({
-    langPrefix: 'hljs language-',
-    highlight(code, lang) {
-      const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-      return hljs.highlight(code, { language }).value;
-    }
-  })
-);
-customMarked.setOptions({ breaks: true, gfm: true });
-
-// 安全渲染包装
-const renderMarkdown = (content) => {
-  const rawHtml = customMarked.parse(content || '');
-  return DOMPurify.sanitize(rawHtml);
-};
-
-/**
- * ✨ 滚动控制与暴露
- */
-const scrollToBottom = () => {
-  if (isRestoring.value || !scrollRef.value) return;
-  scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
-};
-defineExpose({ scrollToBottom });
+// 💡 暴露给父组件的滚动方法
+defineExpose({ scrollToBottom: () => {
+  if (!isRestoring.value && scrollRef.value) scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
+}});
 
 const handleScroll = debounce((e) => {
   if (isRestoring.value || !props.sessionId || chatStore.isLoading) return;
-  const currentPos = Math.floor(e.target.scrollTop);
-  chatStore.updateSessionScroll(props.sessionId, currentPos);
-  emit('update-pos', currentPos);
+  chatStore.updateSessionScroll(props.sessionId, Math.floor(e.target.scrollTop));
+  emit('update-pos', Math.floor(e.target.scrollTop));
 }, 300);
 
-// 监听消息变化实时注入按钮
-watch(() => props.messages, () => injectCodeButtons(), { deep: true });
+// 核心监听：数据变化触发按钮注入
+watch(() => props.messages, injectCodeButtons, { deep: true });
 
-/**
- * 🛠️ 坐标恢复探针 (逻辑锁死，绝不缺失)
- */
+// 核心监听：切换会话触发坐标恢复
 watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
   if (!newId || loading) return;
-  
   isRestoring.value = true;
-
-  const performRestore = async (retryCount = 0) => {
-    await nextTick();
-    
-    if (props.messages && props.messages.length > 0 && scrollRef.value) {
-      await nextTick(); 
-      const targetPos = props.initialScrollPos || 0;
-      
-      setTimeout(() => {
-        if (!scrollRef.value) return;
-        scrollRef.value.scrollTop = targetPos;
-
-        if (Math.abs(scrollRef.value.scrollTop - targetPos) > 5 && targetPos > 0 && retryCount < 8) {
-          performRestore(retryCount + 1);
-        } else {
-          setTimeout(() => { isRestoring.value = false; }, 100);
-        }
-      }, 50);
-      injectCodeButtons();
-    } else if (retryCount < 15) {
-      setTimeout(() => performRestore(retryCount + 1), 50);
-    } else {
-      isRestoring.value = false;
-    }
-  };
-
-  performRestore();
+  
+  if (props.messages?.length > 0) {
+    await performRestore(scrollRef.value, props.initialScrollPos || 0);
+    injectCodeButtons();
+  }
+  
+  setTimeout(() => { isRestoring.value = false; }, 500);
 }, { immediate: true });
 
 onMounted(() => {
@@ -139,9 +75,7 @@ onMounted(() => {
   injectCodeButtons();
 });
 
-onUnmounted(() => {
-  scrollRef.value?.removeEventListener('scroll', handleScroll);
-});
+onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 </script>
 
 <template>
