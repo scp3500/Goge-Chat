@@ -14,7 +14,7 @@ const scrollRef = ref(null);
 const isRestoring = ref(false); 
 
 /**
- * ✨ 配置解析实例 (保持你的逻辑)
+ * ✨ 配置解析实例 (保持原有逻辑)
  */
 const customMarked = new Marked(
   markedHighlight({
@@ -41,47 +41,45 @@ defineExpose({ scrollToBottom });
  * ✨ 位置保存
  */
 const handleScroll = debounce((e) => {
-  if (isRestoring.value || !props.sessionId) return;
+  // 🩺 只有在非恢复状态且非加载状态时才记录位置，防止跳变时误记录 0
+  if (isRestoring.value || !props.sessionId || chatStore.isLoading) return;
   const currentPos = Math.floor(e.target.scrollTop);
   chatStore.updateSessionScroll(props.sessionId, currentPos);
   emit('update-pos', currentPos);
 }, 300);
 
 /**
- * 🛠️ 【深度修复】：坐标恢复探针 (严格保留你的重试逻辑)
+ * 🛠️ 【深度修复】：坐标恢复探针
+ * 逻辑改动：增加对 chatStore.isLoading 的监听，确保“数据搬完”后再开始探针
  */
-watch(() => props.sessionId, async (newId) => {
-  if (!newId) return;
+watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
+  // 只有当 ID 存在，且 Store 已经完成从 Rust 的数据加载时才执行
+  if (!newId || loading) return;
   
   isRestoring.value = true;
 
   const performRestore = async (retryCount = 0) => {
-    // 🩺 等待 Vue 数据同步
     await nextTick();
     
     if (props.messages && props.messages.length > 0 && scrollRef.value) {
-      // 🩺 再次等待，确保 v-html 已经将 Markdown 转化为 DOM
       await nextTick(); 
       
       const targetPos = props.initialScrollPos || 0;
       
-      // ✨ 增加一个微小的延时（50ms），避开代码高亮库对 DOM 的初始扫描期
       setTimeout(() => {
         if (!scrollRef.value) return;
         
         scrollRef.value.scrollTop = targetPos;
 
-        // 验证机制：如果没滚上去，继续尝试
+        // 验证机制
         if (Math.abs(scrollRef.value.scrollTop - targetPos) > 5 && targetPos > 0 && retryCount < 8) {
           performRestore(retryCount + 1);
         } else {
-          // 成功恢复或到达上限，稍微延长锁定时间确保布局彻底稳定
           setTimeout(() => { isRestoring.value = false; }, 100);
         }
       }, 50);
 
     } else if (retryCount < 15) {
-      // 消息还在加载中，继续探查
       setTimeout(() => performRestore(retryCount + 1), 50);
     } else {
       isRestoring.value = false;
@@ -102,8 +100,8 @@ onUnmounted(() => {
 
 <template>
   <div class="message-display modern-scroll" ref="scrollRef">
-    <Transition name="list-fade" mode="out-in">
-      <div :key="sessionId" class="scroll-content-wrapper">
+    <Transition name="list-fade">
+      <div v-if="!chatStore.isLoading" :key="sessionId" class="scroll-content-wrapper">
         <div v-for="(m, i) in messages" :key="i" 
              class="message-row" 
              :class="String(m.role || 'user').toLowerCase()">
@@ -130,11 +128,10 @@ onUnmounted(() => {
   display: flex; 
   flex-direction: column; 
   overflow-y: auto; 
+  position: relative; /* 新增：为绝对定位提供参考 */
   
-  /* ✨ 【关键修复】：彻底禁用滚动锚定，防止浏览器自作聪明跳到代码块 */
+  /* ✨ 【关键修复】：彻底禁用滚动锚定 */
   overflow-anchor: none !important; 
-  
-  /* 确保切换时不要有平滑动画，防止干扰坐标设置 */
   scroll-behavior: auto !important; 
 }
 
@@ -145,21 +142,24 @@ onUnmounted(() => {
   width: 100%; 
   max-width: 900px; 
   margin: 0 auto; 
+  /* 确保切换时内容不超出容器导致滚动条抖动 */
+  backface-visibility: hidden;
 }
 
-/* ✨ 现代转场动画：模糊 + 渐变 */
+/* ✨ 现代转场动画 */
 .list-fade-enter-active {
-  transition: all 0.4s ease-out;
+  transition: all 0.3s ease-out;
+}
+.list-fade-leave-active {
+  /* 🩺 修复点：离开时不占位，防止两个列表同时存在导致撑开容器高度 */
+  position: absolute;
+  width: 100%;
+  opacity: 0;
 }
 .list-fade-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(10px);
   filter: blur(4px);
-}
-.list-fade-enter-to {
-  opacity: 1;
-  transform: translateY(0);
-  filter: blur(0);
 }
 
 .message-row { display: flex; width: 100%; animation: fadeIn 0.3s ease-out; }
@@ -198,7 +198,7 @@ onUnmounted(() => {
   30% { transform: translateY(-6px); opacity: 1; background-color: #fff; } 
 }
 
-/* Markdown 样式 */
+/* Markdown 样式 (保持原有) */
 .markdown-body { 
   font-size: 16px; 
   line-height: 1.7; 
@@ -206,7 +206,7 @@ onUnmounted(() => {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
 }
 
-/* ✨ Markdown 表格现代样式 */
+/* ✨ Markdown 表格现代样式 (保持原有) */
 :deep(.markdown-body table) {
   width: 100%;
   border-collapse: separate;
