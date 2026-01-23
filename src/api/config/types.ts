@@ -10,7 +10,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
     fontSize: 16,
     lineRatio: 1.7,
-    themeColor: '#202124',
+    themeColor: '#1E1F20',
     scrollbarWidth: 12,
     apiKey: ''
 };

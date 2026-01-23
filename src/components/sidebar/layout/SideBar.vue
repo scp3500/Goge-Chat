@@ -5,7 +5,7 @@
  */
 import { ref } from 'vue';
 import SideBarHeader from './SideBarHeader.vue';
-import NewChatBtn from './NewChatBtn.vue'; 
+import NewChatBtn from '../NewChatBtn.vue';
 import HistoryList from './HistoryList.vue';
 
 const props = defineProps({
@@ -76,7 +76,7 @@ const toggleSidebar = () => {
 
   /* 动力学曲线：确保缩放极其顺滑 */
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
-  background: #1e1e1f; 
+  background: var(--bg-main); 
   height: 100vh; 
   display: flex; 
   flex-direction: column; 

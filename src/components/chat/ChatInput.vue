@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, nextTick, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useChatStore } from "../../stores/chat"; 
+import { useChatStore } from "../../stores/chat";
+import { STOP_SVG, SEND_SVG, PLUS_SVG } from '../../constants/icons'; 
 
 const chatStore = useChatStore();
 const { isGenerating } = storeToRefs(chatStore);
@@ -9,15 +10,18 @@ const { isGenerating } = storeToRefs(chatStore);
 const inputMsg = ref("");
 const textareaRef = ref(null);
 
-const adjustHeight = () => {
-  const el = textareaRef.value;
-  if (!el) return;
-  el.style.height = 'auto';
-  el.style.height = (el.scrollHeight > 200 ? 200 : el.scrollHeight) + 'px';
+// --- 🔧 高度自动伸缩逻辑 ---
+const autoResize = () => {
+  const element = textareaRef.value;
+  if (!element) return;
+  element.style.height = 'auto'; 
+  element.style.height = element.scrollHeight + 'px';
 };
 
 watch(inputMsg, () => {
-  nextTick(adjustHeight);
+  nextTick(() => {
+    autoResize();
+  });
 });
 
 const handleAction = async () => {
@@ -26,10 +30,16 @@ const handleAction = async () => {
   } else {
     if (!inputMsg.value.trim()) return;
     const msgToProcess = inputMsg.value;
-    inputMsg.value = ""; 
+    inputMsg.value = "";
+    
+    // 发送后重置高度
     nextTick(() => {
-      if (textareaRef.value) textareaRef.value.style.height = 'auto';
+        if(textareaRef.value) {
+            textareaRef.value.style.height = 'auto'; 
+            textareaRef.value.style.height = '24px'; 
+        }
     });
+    
     await chatStore.sendMessage(msgToProcess);
   }
 };
@@ -40,134 +50,193 @@ const onKeydown = (e) => {
     handleAction();
   }
 };
+
+const handleAttachClick = () => {
+  console.log('Attach button clicked');
+};
+
+onMounted(() => {
+  autoResize();
+});
 </script>
 
 <template>
   <div class="input-area">
     <div class="input-wrapper">
-      <textarea 
-        ref="textareaRef"
-        v-model="inputMsg" 
-        rows="1"
-        @keydown="onKeydown"
-        placeholder="发送消息..." 
-        class="chat-input modern-scroll" 
-      ></textarea>
       
-      <button 
-        class="action-btn" 
-        @click="handleAction" 
-        :class="{ 'is-stop': isGenerating }"
-        :disabled="!isGenerating && !inputMsg.trim()"
-      >
-        <template v-if="isGenerating">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12" rx="2" />
-          </svg>
-        </template>
-        <template v-else>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </template>
-      </button>
+      <div class="text-input-section">
+        <textarea
+          ref="textareaRef"
+          v-model="inputMsg"
+          @keydown="onKeydown"
+          placeholder="发送消息..."
+          class="chat-input modern-scroll"
+          rows="1" 
+        ></textarea>
+      </div>
+
+      <div class="tools-section">
+        <div class="tools-left">
+          <button
+            class="icon-btn attach-btn"
+            @click="handleAttachClick"
+            title="添加文件/图片"
+          >
+            <span v-html="PLUS_SVG"></span>
+          </button>
+        </div>
+
+        <div class="tools-right">
+          <button
+            class="icon-btn action-btn"
+            @click="handleAction"
+            :class="{ 'is-stop': isGenerating }"
+            :disabled="!isGenerating && !inputMsg.trim()"
+          >
+            <template v-if="isGenerating">
+              <span v-html="STOP_SVG"></span>
+            </template>
+            <template v-else>
+              <span v-html="SEND_SVG"></span>
+            </template>
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
 
 <style scoped>
-.input-area { 
-  /* --- 🩺 样式手术：定义宽度变量 --- */
-  --input-width-percent: 80%; /* 👈 核心控制点：修改这个百分比即可控制左右边距 */
-  /* ------------------------------- */
-  
-  padding: 0; 
+.input-area {
   width: 100%;
-  background: transparent !important; 
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-bottom: 24px; 
-  padding-top: 8px;
+  justify-content: center;
+  padding: 10px 0 20px 0;
+  background: transparent;
 }
 
-.input-wrapper { 
-  /* 使用变量控制宽度，自动成比例 */
-  width: var(--input-width-percent); 
+.input-wrapper {
+  /* --- 📍 [修改宽度] 这里控制输入框的胖瘦 --- */
+  width: 85%;      /* 之前是 95%，改小一点 */
+  max-width: 800px; /* 之前是 900px，限制最大宽度 */
+  /* -------------------------------------- */
   
-  /* 建议给一个舒适的上限，防止在 4K 屏上拉得太长导致阅读困难 */
-  max-width: 800px; 
-  
-  background: #1c1c1e; 
+  background: var(--bg-input); 
+  border-radius: 30px;
+  padding: 16px 20px 10px 20px; 
+  display: flex;
+  flex-direction: column;
+  gap: 12px; 
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   border: none; 
-  box-shadow: none; 
-  display: flex; 
-  align-items: flex-end; 
-  padding: 10px 16px; 
-  border-radius: 12px; 
+}
+
+.input-wrapper:focus-within {
+  background: var(--bg-input-focus);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+.text-input-section {
+  width: 100%;
+  display: flex;
+  padding: 0 2px; 
+}
+
+.chat-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-color-white);
+  font-size: 16px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+  height: 24px; 
+  min-height: 24px;
+  max-height: 200px;
+  overflow-y: hidden; 
+  transition: none;
+}
+
+.chat-input:not([style*="height: auto"]) {
+  overflow-y: auto;
+}
+
+.tools-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-top: 10px;
+  padding-bottom: 5px; 
+}
+
+/* --- 按钮基础样式 --- */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: transparent; 
+  color: var(--text-color-white);
   transition: all 0.2s ease;
 }
 
-/* 🩺 改动原因说明：
- * 1. 引入 --input-width-percent 变量：将宽度从 90% 降至 80%，左右边距会自动从 5% 扩大到 10%。
- * 2. 移除固定的 margin 设置：通过父级的 align-items: center 配合宽度百分比，实现完美的居中比例缩放。
- */
-
-.input-wrapper:focus-within { 
-  background: #252527;
-  border: none; 
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
-.chat-input { 
-  flex: 1; 
-  background: transparent; 
-  border: none; 
-  color: #fff; 
-  padding: 8px 4px; 
-  outline: none; 
-  font-size: 15px; 
-  line-height: 1.5;
-  resize: none !important; 
-  max-height: 200px;
-  font-family: inherit;
-  overflow-y: auto; 
+.attach-btn {
+  opacity: 0.6;
+}
+.attach-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1); 
+  opacity: 1;
 }
 
-.chat-input::-webkit-resizer {
-  display: none !important;
+/* --- 发送/停止 按钮逻辑 --- */
+
+/* 1. 默认状态 (Send) - 幽灵模式 */
+.action-btn {
+  background-color: transparent; /* 平时透明 */
+  color: white;
+  opacity: 1; 
+  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
 }
 
-.action-btn { 
-  background: transparent; 
-  color: #888; 
-  border: none; 
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  margin-left: 8px;
-  margin-bottom: 2px;
-  cursor: pointer; 
-  transition: all 0.2s; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center;
-  flex-shrink: 0;
+.action-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1); /* 悬停显示白圆 */
+  transform: scale(1.05); 
 }
 
-.input-wrapper:has(.chat-input:not(:placeholder-shown)) .action-btn {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+/* 2. 禁用状态 (Disabled) */
+.action-btn:disabled {
+  opacity: 0.3; 
+  background-color: transparent !important; 
+  cursor: default; /* 标准箭头，无禁止符号 */
 }
 
+/* 3. 停止状态 (Stop) - 实体常驻模式 */
 .action-btn.is-stop {
-  background: #ff4d4f;
-  color: #fff;
+  color: #818cf8; /* 薰衣草紫文字 */
+  
+  /* 关键修改：默认显示蓝紫色背景，而不是透明 */
+  background-color: rgba(165,195,245, 0.2); 
+  opacity: 1; 
 }
 
-.action-btn:disabled { 
-  opacity: 0.15; 
-  background: transparent;
+.action-btn.is-stop:hover {
+  /* 悬停时加深背景 */
+  background-color: rgba(165, 195, 245, 0.35); 
 }
 
 .modern-scroll::-webkit-scrollbar { width: 4px; }

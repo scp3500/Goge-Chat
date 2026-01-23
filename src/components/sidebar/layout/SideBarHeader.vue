@@ -4,6 +4,7 @@
  * 职责：管理侧边栏折叠开关，并在展开模式下提供极简搜索功能。
  */
 import { ref, nextTick, watch } from 'vue';
+import { MENU_SVG, SEARCH_SVG } from '../../../constants/icons.ts';
 
 const props = defineProps({
   isCollapsed: { type: Boolean, default: false }
@@ -49,23 +50,12 @@ const handleInput = (e) => {
 
 <template>
   <header class="sidebar-header" :class="{ 'is-collapsed': isCollapsed }">
-    <button class="icon-btn menu-btn" @click="emit('toggle')" title="切换侧边栏">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="3" y1="12" x2="21" y2="12"></line>
-        <line x1="3" y1="6" x2="21" y2="6"></line>
-        <line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-    </button>
+    <button class="icon-btn menu-btn" @click="emit('toggle')" title="切换侧边栏" v-html="MENU_SVG"></button>
 
     <div v-if="!isCollapsed" class="header-search-container">
       <Transition name="search-expand" mode="out-in">
         <div v-if="isSearching" class="search-input-wrapper">
-          <span class="search-icon-inner">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </span>
+          <span class="search-icon-inner" v-html="SEARCH_SVG"></span>
           <input 
             ref="inputRef"
             v-model="searchQuery"
@@ -77,12 +67,7 @@ const handleInput = (e) => {
           <button class="close-btn" @click="toggleSearch">✕</button>
         </div>
         
-        <button v-else class="icon-btn search-trigger" @click="toggleSearch">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </button>
+        <button v-else class="icon-btn search-trigger" @click="toggleSearch" v-html="SEARCH_SVG"></button>
       </Transition>
     </div>
   </header>
@@ -110,7 +95,7 @@ const handleInput = (e) => {
   background: transparent;
   border: none;
   /* 🚩 使用纯白色调，极简风格 */
-  color: #ffffff; 
+  color: var(--text-color-white);
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
@@ -158,33 +143,33 @@ const handleInput = (e) => {
   box-sizing: border-box;
 }
 
-.search-icon-inner { 
+.search-icon-inner {
   display: flex;
-  color: #ffffff;
-  margin-right: 8px; 
-  opacity: 0.6; 
+  color: var(--text-color-white);
+  margin-right: 8px;
+  opacity: 0.6;
 }
 
 input {
   flex: 1;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--text-color-white);
   font-size: 13px;
   outline: none;
   min-width: 0;
 }
 
-.close-btn { 
-  background: transparent; 
-  border: none; 
-  color: #9aa0a6; 
-  cursor: pointer; 
-  padding: 4px; 
-  font-size: 14px; 
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
 }
 
-.close-btn:hover { color: #ffffff; }
+.close-btn:hover { color: var(--text-color-white); }
 
 /* 搜索框动画：平滑淡入 */
 .search-expand-enter-active,

@@ -1,0 +1,63 @@
+/* 全局重置 */
+html,
+body,
+#app {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    background-color: var(--bg-main);
+    color: #cccccc;
+    /* 更柔和的护眼颜色 */
+    overflow: hidden;
+    font-size: var(--font-size-base);
+    line-height: var(--font-ratio);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* ========================================================
+   核心交互控制
+   ======================================================== */
+.chat-main-layout,
+.message-list-wrapper,
+.markdown-body,
+.user-text,
+.message-row,
+pre,
+code {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    cursor: text;
+}
+
+.sidebar,
+.icon-btn,
+.new-chat-pill,
+.sidebar-footer,
+.menu-btn,
+.search-trigger,
+.action-area,
+.close-btn {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    cursor: pointer;
+}
+
+input,
+textarea {
+    user-select: text !important;
+    cursor: text;
+}
+
+/* 表单元素重置 */
+input,
+textarea,
+button {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    outline: none;
+    border: none;
+}

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'; // 【致命缺失：必须补上这行】
 import { useConfigService } from '../../services/configService';
+import { EYE_OPEN_SVG, EYE_CLOSED_SVG } from '../../constants/icons.ts';
 
 // 1. 注入配置服务
 const configStore = useConfigService();
@@ -13,18 +14,37 @@ const emit = defineEmits(['close']);
 const themes = ['#202124', '#1b1b1f', '#0f0f10', '#2c2c32'];
 
 // 3. 布局控制变量
-const activeCategory = ref('models'); 
+const activeCategory = ref('models');
 const activeProvider = ref('deepseek');
 
-// 4. 保存并返回逻辑
-const handleDone = async () => {
-  try {
-    await configStore.updateConfig(settings);
-    emit('close'); 
-  } catch (e) {
-    console.error("保存配置失败:", e);
+// 4. API Key 显示控制
+const showApiKey = ref(false);
+
+// 5. 供应商状态管理
+const providers = ref([
+  { id: 'deepseek', name: 'DeepSeek', icon: '🐋', status: 'on' },
+  { id: 'openai', name: 'OpenAI', icon: '🤖', status: 'off' }
+]);
+
+// 6. 切换供应商状态
+const toggleProviderStatus = (providerId) => {
+  const provider = providers.value.find(p => p.id === providerId);
+  if (provider) {
+    provider.status = provider.status === 'on' ? 'off' : 'on';
   }
 };
+
+// 7. DeepSeek 下的常见供应商列表
+const deepseekProviders = [
+  { id: 'deepseek-chat', name: 'DeepSeek Chat', icon: '🧠', status: 'on' },
+  { id: 'claude', name: 'Claude', icon: '🦜', status: 'off' },
+  { id: 'gemini', name: 'Gemini', icon: '💎', status: 'off' },
+  { id: 'gpt4', name: 'GPT-4', icon: '🤖', status: 'off' },
+  { id: 'llama', name: 'Llama', icon: '🦙', status: 'off' },
+  { id: 'qwen', name: 'Qwen', icon: '🐑', status: 'off' }
+];
+
+
 </script>
 
 <template>
@@ -64,21 +84,29 @@ const handleDone = async () => {
       </div>
       
       <div class="list-container modern-scroll">
-        <div class="list-item" :class="{ active: activeProvider === 'deepseek' }" @click="activeProvider = 'deepseek'">
+        <div
+          v-for="provider in providers"
+          :key="provider.id"
+          class="list-item"
+          :class="{ active: activeProvider === provider.id }"
+          @click="activeProvider = provider.id"
+        >
           <div class="item-left">
-            <span class="p-icon">🐋</span>
-            <span class="p-name">DeepSeek</span>
+            <span class="p-icon">{{ provider.icon }}</span>
+            <span class="p-name">{{ provider.name }}</span>
           </div>
-          <span class="status-tag on">ON</span>
-        </div>
-        
-        <div class="list-item" style="opacity: 0.5; cursor: not-allowed;">
-          <div class="item-left">
-            <span class="p-icon">🤖</span>
-            <span class="p-name">OpenAI</span>
+          <div class="item-right">
+            <button
+              class="toggle-btn"
+              :class="{ on: provider.status === 'on' }"
+              @click.stop="toggleProviderStatus(provider.id)"
+            >
+              <span class="toggle-slider"></span>
+            </button>
+            <span class="status-tag" :class="provider.status">{{ provider.status === 'on' ? 'ON' : 'OFF' }}</span>
           </div>
-          <span class="status-tag off">OFF</span>
         </div>
+
       </div>
     </section>
 
@@ -87,10 +115,11 @@ const handleDone = async () => {
         
         <header class="detail-header">
           <div class="header-info">
-            <h2>{{ activeProvider === 'deepseek' ? 'DeepSeek' : '配置详情' }}</h2>
-          </div>
-          <div class="header-actions">
-            <button class="done-nav-btn" @click="handleDone">保存并返回</button>
+            <h2>{{
+              activeProvider === 'deepseek' ? 'DeepSeek' :
+              activeProvider === 'openai' ? 'OpenAI' :
+              '配置详情'
+            }}</h2>
           </div>
         </header>
 
@@ -101,15 +130,20 @@ const handleDone = async () => {
             </div>
             <div class="input-row">
               <div class="input-box">
-                <input 
-                  type="text" 
-                  v-model="settings.apiKey" 
-                  placeholder="在此输入您的 sk-..." 
+                <input
+                  :type="showApiKey ? 'text' : 'password'"
+                  v-model="settings.apiKey"
+                  placeholder="在此输入您的 sk-..."
                   @change="configStore.updateConfig(settings)"
                 />
+                <button
+                  class="eye-btn"
+                  @click="showApiKey = !showApiKey"
+                  v-html="showApiKey ? EYE_OPEN_SVG : EYE_CLOSED_SVG"
+                ></button>
               </div>
             </div>
-            <p class="hint">密钥已设为明文显示，方便核对。</p>
+            <p class="hint">点击眼睛图标切换显示/隐藏密钥。</p>
           </div>
 
           <div class="config-group" v-if="activeCategory === 'appearance'">
@@ -155,17 +189,24 @@ const handleDone = async () => {
 .list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; }
 .list-item.active { background: #2b2d31; }
 .item-left { display: flex; align-items: center; gap: 12px; }
+.item-right { display: flex; align-items: center; gap: 8px; }
 .p-name { font-size: 14px; font-weight: 500; }
 .status-tag.on { background: rgba(46, 204, 113, 0.15); color: #2ecc71; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+.status-tag.off { background: rgba(255, 255, 255, 0.05); color: #888; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+.toggle-btn { width: 36px; height: 20px; background: #555; border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.3s; }
+.toggle-btn.on { background: #2ecc71; }
+.toggle-slider { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
+.toggle-btn.on .toggle-slider { left: 18px; }
 .detail-panel { flex: 1; background: #1e1f22; overflow-y: auto; }
 .detail-container { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-.done-nav-btn { background: #5865f2; color: white; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
 .settings-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .control-item { margin-bottom: 24px; }
 .control-item label { display: block; font-size: 13px; color: #b5bac1; margin-bottom: 12px; }
-.input-box { background: #131314; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 16px; }
-.input-box input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-family: monospace; }
+.input-box { background: #131314; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
+.input-box input { background: transparent; border: none; color: #fff; outline: none; flex: 1; font-family: monospace; }
+.eye-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
+.eye-btn:hover { color: #fff; }
 .theme-grid { display: flex; gap: 12px; }
 .theme-item { width: 36px; height: 36px; border-radius: 10px; cursor: pointer; border: 2px solid transparent; }
 .theme-item.active { border-color: #5865f2; transform: scale(1.1); }

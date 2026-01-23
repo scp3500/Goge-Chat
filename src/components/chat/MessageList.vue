@@ -2,7 +2,7 @@
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { debounce } from 'lodash-es';
 import { useChatStore } from "../../stores/chat"; 
-import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG } from '../../constants/icons';
+import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG } from '../../constants/icons.ts';
 import { renderMarkdown } from '../../services/markdown';
 import { useScrollRestore } from './composables/useScrollRestore';
 
@@ -26,6 +26,11 @@ const doCopy = async (text, el) => {
       el.classList.remove('copied');
     }, 2000);
   } catch (err) { console.error('复制失败', err); }
+};
+
+// 💡 格式化用户文本，每30个字符换行
+const formatUserText = (text) => {
+  return text.replace(/(.{30})/g, '$1\n');
 };
 
 // 💡 保持原功能的按钮注入
@@ -86,7 +91,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
              class="message-row" :class="String(m.role || 'user').toLowerCase()">
           
           <div v-if="m.role === 'user'" class="message-bubble">
-            <div class="user-text">{{ m.content }}</div>
+            <div class="user-text">{{ formatUserText(m.content) }}</div>
           </div>
 
           <div v-else class="assistant-content-wrapper">
@@ -158,7 +163,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   display: block; 
   overflow-x: auto !important;
   overflow-y: hidden;
-  background-color: #1e1e1e !important; 
+  background-color: var(--bg-code) !important; 
   padding: 1.2rem; 
   padding-right: 3.5rem;
   border-radius: 12px; 
@@ -195,7 +200,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 
 /* --- 基础 UI 框架 --- */
 .message-display { flex: 1; padding: 40px 6% 60px 6%; display: flex; flex-direction: column; overflow-y: auto; position: relative; overflow-anchor: none !important; scroll-behavior: auto !important; }
-.scroll-content-wrapper { display: flex; flex-direction: column; gap: 48px; width: 100%; max-width: 900px; margin: 0 auto; backface-visibility: hidden; }
+.scroll-content-wrapper { display: flex; flex-direction: column; gap: 48px; width: 100%; margin: 0 auto; backface-visibility: hidden; }
 
 .list-fade-enter-active { transition: all 0.3s ease-out; }
 .list-fade-leave-active { position: absolute; width: 100%; opacity: 0; }
@@ -205,7 +210,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 .message-row.user { justify-content: flex-end; }
-.message-row.user .message-bubble { background: #3c4043; padding: 14px 20px; border-radius: 20px 20px 4px 20px; color: #fff; max-width: 80%; word-wrap: break-word; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
 
 .typing-indicator { display: flex; align-items: center; gap: 6px; padding: 10px 0; background: transparent !important; width: fit-content; }
 .typing-indicator span { width: 6px; height: 6px; background-color: rgba(255, 255, 255, 0.25); border-radius: 50%; animation: sophisticated-bounce 1.4s infinite ease-in-out; }
@@ -224,12 +228,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 
 :deep(.markdown-body :not(pre) > code) { color: #C2C5C3 !important; background-color: rgba(255, 255, 255, 0.1) !important; border: 0px solid rgba(255, 255, 255, 0.2) !important; padding: 0.15em 0.4em !important; border-radius: 6px !important; font-family: inherit !important; font-weight: 500 !important; }
 
-/* 🚩 代码高亮颜色 */
-:deep(.hljs-keyword) { color: #569cd6; }
-:deep(.hljs-string) { color: #ce9178; }
-:deep(.hljs-comment) { color: #6a9955; }
-:deep(.hljs-function), :deep(.hljs-title), :deep(.hljs-title.function_) { color: #dcdcaa; }
-:deep(.hljs-variable), :deep(.hljs-attr) { color: #9cdcfe; }
+/* 🚩 代码高亮颜色已在main.css中定义 */
 
 .modern-scroll::-webkit-scrollbar { width: 6px; }
 .modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }

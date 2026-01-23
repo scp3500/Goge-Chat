@@ -7,7 +7,7 @@ import { useChatStore } from './stores/chat';
 // 导入组件 - 请确保路径与你的目录结构一致
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
-import SideBar from "./components/sidebar/SideBar.vue";
+import SideBar from "./components/sidebar/layout/SideBar.vue";
 import ChatContainer from "./components/chat/ChatContainer.vue";
 
 const appWindow = getCurrentWindow();
@@ -113,7 +113,7 @@ html, body, #app {
   display: flex; 
   flex-direction: column; 
   height: 100vh; 
-  background: var(--bg-main, #131314); 
+  background: var(--bg-main, #1e1e1f); 
   color: #e3e3e3; 
   border-radius: 12px; 
   overflow: hidden; 

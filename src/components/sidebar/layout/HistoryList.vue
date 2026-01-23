@@ -4,7 +4,7 @@
  * 职责：过滤历史条目，并管理右键菜单与编辑状态。
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import HistoryItem from './HistoryItem.vue';
+import HistoryItem from '../components/HistoryItem.vue';
 
 // 🚩 核心：增加 isCollapsed 接收，用于控制窄模式显示
 const props = defineProps(['list', 'active', 'filter', 'isCollapsed']);

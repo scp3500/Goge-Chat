@@ -51,6 +51,10 @@ watch(
   { deep: true }
 );
 
+
+
+
+
 // 为父组件或外部暴露更新位置的方法
 const handleScrollUpdate = (pos) => {
   if (activeId.value) {
@@ -91,7 +95,7 @@ const handleScrollUpdate = (pos) => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: #1e1e1f; /* 浅色底座（侧边栏同色） */
+  background: var(--bg-main); /* 浅色底座（侧边栏同色） */
   
   /* --- 🛠️ 悬浮控制旋钮 1：外圈留白 --- */
   /* 增大这个值，岛屿就会缩小，悬浮感增强 */
@@ -108,11 +112,11 @@ const handleScrollUpdate = (pos) => {
   display: flex;
   flex-direction: column;
   position: relative;
-  background: #131314; /* 岛屿深色 */
-  
+  background: var(--bg-chat-island); /* 岛屿深色 */
+
   /* --- 🛠️ 悬浮控制旋钮 2：顶部圆角 --- */
-  border-top-left-radius: 12px; 
-  border-top-right-radius: 12px; 
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
   /* ---------------------------------- */
 }
 
@@ -120,13 +124,13 @@ const handleScrollUpdate = (pos) => {
   flex-shrink: 0;
   padding: 0;
   z-index: 10;
-  background: #131314; /* 必须与 wrapper 一致，确保岛屿是一体的 */
-  
+  background: var(--bg-chat-island); /* 必须与 wrapper 一致，确保岛屿是一体的 */
+
   /* --- 🛠️ 悬浮控制旋钮 3：底部圆角 --- */
-  border-bottom-left-radius: 12px; 
-  border-bottom-right-radius: 12px; 
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
   /* ---------------------------------- */
-  
+
   overflow: hidden;
 }
 

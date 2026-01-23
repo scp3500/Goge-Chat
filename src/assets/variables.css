@@ -1,0 +1,76 @@
+@import "./scrollbar.css";
+/* 引入 JetBrains Mono 作为备选，虽然我们将优先使用 Cascadia */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* 💡 提示：如果你的电脑没有安装 Cascadia Code，
+   可以通过 https://github.com/microsoft/cascadia-code 下载，
+   或者它会回退到 Consolas。
+*/
+
+:root {
+    /* ========================================================
+       GoleChat 设计系统 - VS Code Dark+ Edition
+       ======================================================== */
+
+    /* 1. 色彩基准 (基于 Vue 组件实际使用颜色) */
+    --bg-main: #1E1F20;
+    /* 主背景 (侧边栏、标题栏、聊天底座) */
+    --bg-sidebar: #1E1F20;
+    /* 侧边栏背景 */
+    --bg-chat-island: #171718;
+    /* 聊天岛屿深色背景 */
+    --bg-input: #1c1c1e;
+    /* 输入框背景 */
+    --bg-input-focus: #252527;
+    /* 输入框聚焦背景 */
+    --bg-code: #1e1e1e;
+    /* 代码块背景 */
+
+    /* 2. 语法高亮 Token (1:1 复刻 VS Code Dark+ 主题) */
+    --token-keyword: #569cd6;
+    /* 蓝色: function, var */
+    --token-control: #c586c0;
+    /* [新增] 粉紫色: import, return, if, for */
+    --token-type: #4ec9b0;
+    /* [新增] 蓝绿色: Class, Interface, Type */
+    --token-fn: #dcdcaa;
+    /* 黄色: functionName() */
+    --token-string: #ce9178;
+    /* 橙红色: "string" */
+    --token-number: #b5cea8;
+    /* [新增] 浅绿色: 123, true, null */
+    --token-comment: #6a9955;
+    /* 绿色: // comment */
+    --token-var: #9cdcfe;
+    /* 浅蓝: variable */
+    --token-operator: #d4d4d4;
+    /* 灰白: +, =, : */
+    --token-html-tag: #808080;
+    /* 灰色: <tag> */
+
+    /* 3. 字号与行距 */
+    --font-size-base: 16px;
+    --font-ratio: 1.5;
+
+    --font-size-chat: var(--font-size-base);
+    --font-size-input: var(--font-size-base);
+    --font-size-code: 16px;
+    /* VS Code 默认代码通常比 UI 字体略小一点点 */
+
+    /* 4. 标题字号 */
+    --h1-size: 1.4em;
+    --h2-size: 1.25em;
+    --h3-size: 1.15em;
+
+    /* 5. 界面交互色 */
+    --accent-color: #0078d4;
+    /* VS Code 品牌蓝 */
+    --border-color: #3e3e42;
+    /* VS Code 分割线颜色 */
+
+    /* 6. 文本颜色 */
+    --text-color: #cccccc;
+    /* 主文本颜色 */
+    --text-color-white: #fff;
+    /* 白色文本 */
+}

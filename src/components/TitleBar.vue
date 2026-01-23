@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { HOME_SVG, SETTINGS_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, CLOSE_SVG } from '../constants/icons.ts';
 
 const appWindow = getCurrentWindow();
 const isMaximized = ref(false);
@@ -47,40 +48,29 @@ const openSettings = () => {
     <div class="window-title">
       <span v-if="!isSettings" class="app-name">Goge Chat</span>
       
-      <button 
-        v-else 
-        class="back-btn" 
+      <button
+        v-else
+        class="back-btn"
         @click="$emit('back-home')"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        <span>返回首页</span>
-      </button>
+        title="返回首页"
+        v-html="HOME_SVG"
+      ></button>
     </div>
     
     <div class="window-controls">
-      <button 
-        v-if="!isSettings" 
-        @click.stop="openSettings" 
-        class="control-btn settings-btn" 
+      <button
+        v-if="!isSettings"
+        @click.stop="openSettings"
+        class="control-btn settings-btn"
         title="设置"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-      </button>
+        v-html="SETTINGS_SVG"
+      ></button>
 
-      <button @click.stop="minimizeWin" class="control-btn">
-        <svg width="12" height="1"><rect width="12" height="1" fill="currentColor"/></svg>
-      </button>
+      <button @click.stop="minimizeWin" class="control-btn" v-html="MINIMIZE_SVG"></button>
 
-      <button @click.stop="toggleMaximizeWin" class="control-btn">
-        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0h10v10H0z" fill="none" stroke="currentColor" stroke-width="1"/></svg>
-      </button>
+      <button @click.stop="toggleMaximizeWin" class="control-btn" v-html="MAXIMIZE_SVG"></button>
 
-      <button @click.stop="closeWin" class="control-btn close-btn">
-        <svg width="10" height="10"><path d="M0 0l10 10M10 0L0 10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
-      </button>
+      <button @click.stop="closeWin" class="control-btn close-btn" v-html="CLOSE_SVG"></button>
     </div>
   </header>
 </template>
@@ -89,7 +79,7 @@ const openSettings = () => {
 .titlebar { 
   height: 35px; 
   /* --- 🩺 手术：同步侧边栏背景色 --- */
-  background: #1e1e1f; 
+  background: var(--bg-main); 
   /* ------------------------------ */
   display: flex; 
   justify-content: space-between; 
@@ -107,7 +97,7 @@ const openSettings = () => {
   gap: 6px;
   background: transparent;
   border: none;
-  color: #5865f2;
+  color: var(--text-color-white);
   font-size: 12px;
   font-weight: bold;
   cursor: pointer;
@@ -117,8 +107,8 @@ const openSettings = () => {
   transition: all 0.2s;
 }
 .back-btn:hover {
-  background: rgba(88, 101, 242, 0.15);
-  color: #7289da;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-color-white);
 }
 
 .window-controls { display: flex; height: 100%; align-items: center; -webkit-app-region: no-drag; }

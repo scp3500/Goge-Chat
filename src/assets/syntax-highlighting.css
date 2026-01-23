@@ -1,0 +1,78 @@
+/* ========================================================
+   🚩 语法高亮映射 (Highlight.js -> VS Code Dark+)
+   ======================================================== */
+
+/* 1. 蓝色：关键字 (function, class, var) */
+.hljs-keyword,
+.token.keyword {
+    color: var(--token-keyword);
+}
+
+/* 2. 粉紫色：控制流 (return, if, else, import, from)
+   注意：highlight.js 有时把这些也算作 keyword，取决于解析器，
+   但 built_in 有时会用这个颜色 */
+.hljs-built_in,
+.token.builtin {
+    color: var(--token-keyword);
+    /* 或者试用 var(--token-control) */
+}
+
+/* 3. 橙红色：字符串 */
+.hljs-string,
+.token.string {
+    color: var(--token-string);
+}
+
+/* 4. 绿色：注释 */
+.hljs-comment,
+.hljs-quote,
+.token.comment {
+    color: var(--token-comment);
+}
+
+/* 5. 黄色：函数调用 */
+.hljs-function,
+.hljs-title,
+.hljs-attr,
+.token.function {
+    color: var(--token-fn);
+}
+
+/* 6. 浅蓝：变量 */
+.hljs-variable,
+.hljs-subst,
+.token.variable {
+    color: var(--token-var);
+}
+
+/* 7. 蓝绿色：类名、类型 (VS Code 特征) */
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ {
+    color: var(--token-type);
+}
+
+/* 8. 浅绿色：数字、布尔值 (VS Code 特征) */
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+    color: var(--token-number);
+}
+
+/* 9. 粉色：特殊关键字/元数据 (VS Code 特征) */
+.hljs-meta,
+.hljs-section {
+    color: var(--token-control);
+}
+
+/* 10. 标签 (HTML Tag) */
+.hljs-tag,
+.hljs-name {
+    color: var(--token-keyword);
+}
+
+.hljs-operator,
+.token.operator {
+    color: var(--token-operator);
+}

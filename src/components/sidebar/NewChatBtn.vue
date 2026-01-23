@@ -27,9 +27,9 @@ defineEmits(['click']);
 </template>
 
 <style scoped>
-.action-area { 
+.action-area {
   /* 🚩 稍微缩小容器左边距，为负 margin 提供更多腾挪空间 */
-  padding: 4px 16px 4px 22px; 
+  padding: 4px 16px 4px 22px;
   width: 100%;
   box-sizing: border-box;
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
@@ -43,23 +43,23 @@ defineEmits(['click']);
 
 .new-chat-pill {
   width: 100%;
-  height: 40px; 
+  height: 40px;
   background: transparent;
-  border: 1px solid transparent; 
-  color: #9aa0a6;
-  border-radius: 8px; 
+  border: 1px solid transparent;
+  color: var(--text-color);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
-  
+
   /* 🚩 增加负 margin，让 hover 时的背景更靠左 */
-  margin-left: -6px; 
+  margin-left: -6px;
 }
 
 .new-chat-pill:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--text-color-white);
 }
 
 /* 窄模式回归物理中心 */
