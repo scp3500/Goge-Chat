@@ -7,13 +7,16 @@ import { ref } from 'vue';
 import SideBarHeader from './SideBarHeader.vue';
 import NewChatBtn from '../NewChatBtn.vue';
 import HistoryList from './HistoryList.vue';
+import { useChatStore } from '../../../stores/chat';
+
+const chatStore = useChatStore();
 
 const props = defineProps({
   active: { type: [String, Number, null], default: null },
   list: { type: Array, default: () => [] }
 });
 
-const emit = defineEmits(['create', 'select', 'delete', 'rename', 'reorder']);
+const emit = defineEmits(['create', 'select', 'delete', 'rename', 'reorder', 'newFolder']);
 
 // 侧边栏折叠状态：true = 72px 窄模式, false = 300px 展开模式
 const isCollapsed = ref(false); 
@@ -40,12 +43,13 @@ const toggleSidebar = () => {
     />
 
     <div class="main-content-wrapper">
-      <NewChatBtn 
-        :is-collapsed="isCollapsed" 
-        @click="emit('create')" 
+      <NewChatBtn
+        :is-collapsed="isCollapsed"
+        @click="emit('create')"
+        @new-folder="emit('newFolder')"
       />
       
-      <HistoryList 
+      <HistoryList
         :is-collapsed="isCollapsed"
         :list="props.list" 
         :active="props.active"

@@ -6,6 +6,8 @@ export interface ChatSession {
     id: string;
     title: string;
     last_scroll_pos?: number;
+    sort_order?: number;
+    folder_id?: string | null;
 }
 
 export const chatApi = {
@@ -19,5 +21,8 @@ export const chatApi = {
     deleteSession: (id: string) => invoke('delete_session', { id }),
 
     /** 重命名 */
-    renameSession: (id: string, title: string) => invoke('update_session_title', { id, title }),
+    renameSession: (id: string, title: string) => invoke('rename_session', { id, title }),
+
+    /** 更新排序 */
+    updateSessionsOrder: (orders: [string, number][]) => invoke('update_sessions_order', { orders }),
 };

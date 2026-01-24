@@ -22,10 +22,28 @@ pub async fn ask_ai(
     }
 
     let client = reqwest::Client::new();
-    let payload = ChatRequest { 
-        model: "deepseek-chat".to_string(), 
-        messages: msg, 
-        stream: true 
+    // 检查最后一条用户消息是否包含推理标志，或者直接根据某种约定判断
+    // 这里我们可以根据传入的消息内容是否带有特定的前缀或元数据来决定模型
+    let is_reasoning = msg.iter().any(|m| m.role == "user" && m.content.starts_with("[REASON]"));
+    
+    let model = if is_reasoning {
+        "deepseek-reasoner"
+    } else {
+        "deepseek-chat"
+    };
+
+    // 预处理消息，移除内部标记
+    let mut clean_msgs = msg.clone();
+    for m in clean_msgs.iter_mut() {
+        if m.role == "user" && m.content.starts_with("[REASON]") {
+            m.content = m.content.replace("[REASON]", "");
+        }
+    }
+
+    let payload = ChatRequest {
+        model: model.to_string(),
+        messages: clean_msgs,
+        stream: true
     };
 
     // 3. 【请求执行】
@@ -62,9 +80,17 @@ pub async fn ask_ai(
 
             if let Some(data) = line.strip_prefix("data: ") {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
-                        // 5. 【流式推送】给前端
-                        on_event.send(content.to_string()).map_err(|e| e.to_string())?;
+                    let choice = &json["choices"][0];
+                    let delta = &choice["delta"];
+                    
+                    // 处理普通内容
+                    if let Some(content) = delta["content"].as_str() {
+                        on_event.send(format!("c:{}", content)).map_err(|e| e.to_string())?;
+                    }
+                    
+                    // 处理推理内容 (DeepSeek R1)
+                    if let Some(reasoning) = delta["reasoning_content"].as_str() {
+                        on_event.send(format!("r:{}", reasoning)).map_err(|e| e.to_string())?;
                     }
                 }
             }

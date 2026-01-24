@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct Message {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
 }
 
 /// AI 请求封装：完美对接 OpenAI/DeepSeek 格式协议
@@ -13,6 +15,8 @@ pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
     pub stream: bool,
+    // DeepSeek 官方 API 暂无特殊的 reasoning 开关，通常通过模型名区分
+    // 但我们可以预留扩展位
 }
 
 /// 会话元数据：项目的灵魂支柱
@@ -27,7 +31,22 @@ pub struct Session {
     
     /// 记录用户上次翻到的滚动位置（单位：像素）
     pub last_scroll_pos: i32,
+
+    /// 排序顺序
+    pub sort_order: i32,
     
     /// 最后活跃时间，用于侧边栏按时间倒序排列
     pub updated_at: String,
+
+    /// 归属文件夹 ID
+    pub folder_id: Option<String>,
+}
+
+/// 文件夹结构
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Folder {
+    pub id: String,
+    pub name: String,
+    pub sort_order: i32,
+    pub is_collapsed: bool,
 }

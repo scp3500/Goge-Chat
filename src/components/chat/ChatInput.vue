@@ -2,10 +2,10 @@
 import { ref, nextTick, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
-import { STOP_SVG, SEND_SVG, PLUS_SVG } from '../../constants/icons'; 
+import { STOP_SVG, SEND_SVG, PLUS_SVG, BRAIN_SVG } from '../../constants/icons';
 
 const chatStore = useChatStore();
-const { isGenerating } = storeToRefs(chatStore);
+const { isGenerating, useReasoning } = storeToRefs(chatStore);
 
 const inputMsg = ref("");
 const textareaRef = ref(null);
@@ -55,6 +55,10 @@ const handleAttachClick = () => {
   console.log('Attach button clicked');
 };
 
+const handleThinkClick = () => {
+  useReasoning.value = !useReasoning.value;
+};
+
 onMounted(() => {
   autoResize();
 });
@@ -76,13 +80,21 @@ onMounted(() => {
       </div>
 
       <div class="tools-section">
-        <div class="tools-left">
+        <div class="tools-left" style="display: flex; align-items: center; gap: 4px;">
           <button
             class="icon-btn attach-btn"
             @click="handleAttachClick"
             title="添加文件/图片"
           >
             <span v-html="PLUS_SVG"></span>
+          </button>
+          <button
+            class="icon-btn attach-btn"
+            @click="handleThinkClick"
+            :title="useReasoning ? '关闭深度思考' : '开启深度思考'"
+            :class="{ 'active-think': useReasoning }"
+          >
+            <span v-html="BRAIN_SVG"></span>
           </button>
         </div>
 
@@ -122,18 +134,14 @@ onMounted(() => {
   max-width: 800px; /* 之前是 900px，限制最大宽度 */
   /* -------------------------------------- */
   
-  background: var(--bg-input); 
+  background: var(--bg-input-focus);
   border-radius: 30px;
-  padding: 16px 20px 10px 20px; 
+  padding: 16px 20px 10px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px; 
+  gap: 12px;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  border: none; 
-}
-
-.input-wrapper:focus-within {
-  background: var(--bg-input-focus);
+  border: none;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
 }
 
@@ -184,7 +192,7 @@ onMounted(() => {
   justify-content: center;
   cursor: pointer;
   border: none;
-  background: transparent; 
+  background: transparent;
   color: var(--text-color-white);
   transition: all 0.2s ease;
 }
@@ -199,7 +207,12 @@ onMounted(() => {
   opacity: 0.6;
 }
 .attach-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1); 
+  background-color: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+
+.attach-btn.active-think {
+  color: #818cf8;
   opacity: 1;
 }
 
@@ -209,13 +222,13 @@ onMounted(() => {
 .action-btn {
   background-color: transparent; /* 平时透明 */
   color: white;
-  opacity: 1; 
+  opacity: 1;
   transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
 }
 
 .action-btn:hover:not(:disabled) {
   background-color: rgba(255, 255, 255, 0.1); /* 悬停显示白圆 */
-  transform: scale(1.05); 
+  transform: scale(1.05);
 }
 
 /* 2. 禁用状态 (Disabled) */

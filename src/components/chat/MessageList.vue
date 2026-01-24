@@ -2,7 +2,7 @@
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { debounce } from 'lodash-es';
 import { useChatStore } from "../../stores/chat"; 
-import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG } from '../../constants/icons.ts';
+import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG, BRAIN_SVG } from '../../constants/icons.ts';
 import { renderMarkdown } from '../../services/markdown';
 import { useScrollRestore } from './composables/useScrollRestore';
 
@@ -13,6 +13,26 @@ const chatStore = useChatStore();
 const scrollRef = ref(null);
 const isRestoring = ref(false); 
 const { performRestore } = useScrollRestore();
+
+// 💡 展开/折叠推理过程
+const expandedReasoning = ref(new Set());
+const toggleReasoning = (index) => {
+  if (expandedReasoning.value.has(index)) {
+    expandedReasoning.value.delete(index);
+  } else {
+    expandedReasoning.value.add(index);
+  }
+};
+
+// 自动展开包含推理内容的最后一条消息
+const autoExpandLastReasoning = () => {
+  if (!props.messages) return;
+  props.messages.forEach((m, i) => {
+    if (m.reasoning_content && m.reasoning_content.trim()) {
+      expandedReasoning.value.add(i);
+    }
+  });
+};
 
 // 💡 统一复制函数
 const doCopy = async (text, el) => {
@@ -70,6 +90,7 @@ watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading
   if (props.messages?.length > 0) {
     await performRestore(scrollRef.value, props.initialScrollPos || 0);
     injectCodeButtons();
+    autoExpandLastReasoning();
   }
   
   setTimeout(() => { isRestoring.value = false; }, 500);
@@ -95,13 +116,33 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
           </div>
 
           <div v-else class="assistant-content-wrapper">
-            <template v-if="m.content === '__LOADING__'">
+            <template v-if="m.content === '__LOADING__' && !m.reasoning_content">
               <div class="typing-indicator"><span></span><span></span><span></span></div>
             </template>
             <template v-else>
-              <div v-html="renderMarkdown(m.content)" class="markdown-body"></div>
+              <!-- 🧠 推理过程展示 -->
+              <div v-if="m.reasoning_content" class="reasoning-container">
+                <div class="reasoning-status" @click="toggleReasoning(i)">
+                  <span class="status-icon" v-html="BRAIN_SVG"></span>
+                  <span class="status-text">{{ m.content === '__LOADING__' ? '正在思考...' : '思考过程' }}</span>
+                  <span class="status-arrow" :class="{ 'is-expanded': expandedReasoning.has(i) }">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </span>
+                </div>
+                <Transition name="collapse">
+                  <div v-if="expandedReasoning.has(i)" class="reasoning-content">
+                    <div class="reasoning-inner">{{ m.reasoning_content }}</div>
+                  </div>
+                </Transition>
+              </div>
+
+              <!-- 正文内容 -->
+              <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body"></div>
+              <div v-else-if="m.reasoning_content" class="typing-indicator small"><span></span><span></span><span></span></div>
               
-              <div class="msg-action-bar-bottom">
+              <div v-if="m.content !== '__LOADING__'" class="msg-action-bar-bottom">
                 <button class="action-btn" title="重新生成" @click="emit('refresh', m)" v-html="REFRESH_SVG"></button>
                 <button class="action-btn" title="复制全文" @click="e => doCopy(m.content, e.currentTarget)" v-html="COPY_SVG"></button>
                 <button class="action-btn" title="更多" v-html="MORE_SVG"></button>
@@ -152,9 +193,9 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   transition: all 0.2s;
 }
 
-.action-btn:hover { 
-  color: #ffffff; 
-  background: rgba(255, 255, 255, 0.06); 
+.action-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* 🚩 代码块：确保滚动条显示 */
@@ -218,6 +259,96 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 @keyframes sophisticated-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.3; } 30% { transform: translateY(-6px); opacity: 1; background-color: #fff; } }
 
 .markdown-body { font-size: 16px; line-height: 1.7; color: #e3e3e3; }
+
+/* 🧠 推理过程样式 - 现代化重构 */
+.reasoning-container {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.reasoning-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  border-radius: 6px;
+  width: fit-content;
+  transition: all 0.2s ease;
+}
+
+.reasoning-status:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.status-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  color: #818cf8;
+}
+
+.status-arrow {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.6;
+}
+
+.status-arrow.is-expanded {
+  transform: rotate(180deg);
+}
+
+.reasoning-content {
+  margin-top: 4px;
+  padding-left: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 现代化左侧线条 */
+.reasoning-content::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.reasoning-inner {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: pre-wrap;
+  padding: 4px 0 8px 0;
+}
+
+.collapse-enter-active, .collapse-leave-active {
+  transition: all 0.3s ease-out;
+  max-height: 500px;
+}
+.collapse-enter-from, .collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-bottom: 0;
+}
+
+.typing-indicator.small {
+  padding: 5px 0;
+}
+.typing-indicator.small span {
+  width: 4px;
+  height: 4px;
+}
 
 /* 🚩 表格样式 */
 :deep(.markdown-body table) { width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5rem 0; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; overflow: hidden; }

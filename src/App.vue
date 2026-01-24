@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue"; // 🩺 引入 onUnmounted
+import { ref, onMounted, onUnmounted } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
 
-// 导入组件 - 请确保路径与你的目录结构一致
+// 导入组件
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
 import SideBar from "./components/sidebar/layout/SideBar.vue";
@@ -18,8 +18,27 @@ const isMaximized = ref(false);
 const showSettings = ref(false); 
 
 /**
+ * 🕵️‍♂️ 【新增】数据侦探：监听 Store 的每一次变化
+ * 只要标题变脏，立刻报警并打印堆栈
+ */
+chatStore.$subscribe((mutation, state) => {
+    // 扫描整个列表，看是否有标题包含 "import" 或 "c:"
+    const dirtySession = state.historyList.find(s => 
+        s.title && (s.title.includes('import') || s.title.includes('c:'))
+    );
+    
+    if (dirtySession) {
+        console.group("🚨 抓到了！标题被污染了！");
+        console.error("脏标题内容:", dirtySession.title);
+        console.error("触发这次修改的操作类型:", mutation.type);
+        console.error("具体的 Mutation 信息:", mutation); 
+        console.trace("堆栈追踪 (谁触发的修改？)");
+        console.groupEnd();
+    }
+});
+
+/**
  * 🩺 核心修复：全局拦截函数
- * 阻止窗口级别的默认行为，彻底消除红色禁止图标
  */
 const handleGlobalDragOver = (e) => {
   e.preventDefault(); 
@@ -43,7 +62,7 @@ onMounted(async () => {
     });
 });
 
-// 🩺 严谨起见，卸载时移除监听
+// 🩺 卸载时移除监听
 onUnmounted(() => {
     window.removeEventListener('dragover', handleGlobalDragOver);
     window.removeEventListener('drop', handleGlobalDragOver);
@@ -70,12 +89,13 @@ onUnmounted(() => {
             :active="chatStore.activeId" 
             :list="chatStore.historyList" 
             @create="chatStore.createSession" 
-            @select="id => chatStore.activeId = id" 
-            @delete="id => chatStore.deleteSession(id)" 
+            @select="id => chatStore.switchSession(id)"
+            @delete="id => chatStore.deleteSession(id)"
             @rename="chatStore.renameSession"
-            @reorder="newList => chatStore.historyList = newList" 
+            @reorder="newList => chatStore.reorderSessions(newList)"
+            @reorder-folders="newList => chatStore.reorderFolders(newList)"
+            @new-folder="chatStore.createFolder('新建文件夹')"
           />
-          
           <ChatContainer 
             v-if="chatStore.activeId !== null"
             :key="chatStore.activeId"

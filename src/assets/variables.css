@@ -72,5 +72,5 @@
     --text-color: #cccccc;
     /* 主文本颜色 */
     --text-color-white: #fff;
-    /* 白色文本 */
+    /* 在浅色模式下，原本的白色文本应变为深色 */
 }

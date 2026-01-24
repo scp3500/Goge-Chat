@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
-const props = defineProps(['item', 'isActive', 'isEditingId']);
+const props = defineProps(['item', 'isActive', 'isEditingId', 'isCollapsed']);
 const emit = defineEmits(['select', 'rename', 'enter-edit', 'contextmenu']);
 
 const tempTitle = ref(props.item.title);
@@ -25,7 +25,11 @@ const handleRename = () => {
 <template>
   <div
     class="history-item"
-    :class="{ 'active': isActive, 'editing': isEditingId === item.id }"
+    :class="{
+      'active': isActive,
+      'editing': isEditingId === item.id,
+      'collapsed': isCollapsed
+    }"
     @click="$emit('select', item.id)"
     @contextmenu.prevent="$emit('contextmenu', item.id, $event)"
   >
@@ -41,7 +45,7 @@ const handleRename = () => {
         @blur="handleRename"
         @click.stop
       />
-      <span v-else class="title-text">{{ item.title }}</span>
+      <span v-else class="title-text">{{ item.title?.replace(/^[cr]:/g, '') }}</span>
     </div>
 
     <button v-if="!isEditingId" class="more-btn" @click.stop="$emit('contextmenu', item.id, $event)">⋯</button>
@@ -56,6 +60,7 @@ const handleRename = () => {
   
   height: 40px;
   margin: 2px 8px;
+  width: auto;
   padding-right: 12px;
   border-radius: 8px;
   display: flex;
@@ -68,6 +73,18 @@ const handleRename = () => {
 
 .history-item:hover { background: rgba(255, 255, 255, 0.05); color: #e8eaed; }
 .history-item.active { background: rgba(255, 255, 255, 0.1); color: var(--accent-white); }
+
+.history-item.collapsed {
+  margin: 2px 0;
+  width: 40px;
+  justify-content: center;
+  padding-right: 0;
+}
+
+.history-item.collapsed .content-wrapper {
+  padding-left: 0;
+  justify-content: center;
+}
 
 .active-indicator {
   position: absolute;
@@ -94,7 +111,8 @@ const handleRename = () => {
 }
 
 .title-text {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

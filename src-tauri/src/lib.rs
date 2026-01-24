@@ -14,9 +14,37 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::State;
 
+// ✨ 【新增导入】：用于 HTTP 请求
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use crate::models::Message; // 假设 Message 在 models 模块中定义
+
 // ✨ 【新增状态】：定义全局中断标志位
 pub struct GoleState {
     pub stop_flag: Arc<AtomicBool>,
+}
+
+// --- 辅助结构体：用于 generate_title 的 API 请求与响应 ---
+#[derive(Serialize)]
+struct TitleChatRequest {
+    model: String,
+    messages: Vec<Message>,
+    stream: bool,
+}
+
+#[derive(Deserialize)]
+struct APIResponse {
+    choices: Vec<APIChoice>,
+}
+
+#[derive(Deserialize)]
+struct APIChoice {
+    message: APIMessage,
+}
+
+#[derive(Deserialize)]
+struct APIMessage {
+    content: String,
 }
 
 // ✨ 【新增指令 1】：强制变红灯
@@ -33,6 +61,65 @@ async fn reset_ai_generation(state: State<'_, GoleState>) -> Result<(), String> 
     state.stop_flag.store(false, Ordering::Relaxed);
     println!("🟢 状态已重置，绿灯亮起");
     Ok(())
+}
+
+// ✨ 【核心新增指令 3】：源头生成标题 (Blocking Mode)
+// 彻底解决流式传输带来的协议头污染问题
+#[tauri::command]
+async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<String, String> {
+    println!("🦀 Rust 后端: 正在请求 AI 生成标题 (非流式)...");
+
+    // 1. 【动态读取】加载配置
+    let config = commands::config_cmd::load_config(app).await?;
+    
+    // 2. 【安全校验】
+    if config.api_key.trim().is_empty() {
+        return Err("API Key 未配置，请前往设置页面填写".to_string());
+    }
+
+    let api_key = config.api_key;
+    let base_url = "https://api.deepseek.com/chat/completions";
+    let model = "deepseek-chat";
+
+    let client = Client::new();
+
+    let request_body = TitleChatRequest {
+        model: model.to_string(),
+        messages: msg,
+        stream: false, // 🔥 关键：关闭流式
+    };
+
+    // 发送请求
+    let response = client.post(base_url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("网络请求失败: {}", e))?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!("API 报错: {}", error_text));
+    }
+
+    // 解析 JSON
+    let api_res: APIResponse = response.json().await
+        .map_err(|e| format!("JSON 解析失败: {}", e))?;
+
+    // 提取内容
+    let raw_content = api_res.choices.first()
+        .map(|c| c.message.content.clone())
+        .unwrap_or_else(|| "新对话".to_string());
+
+    // 🧹 Rust 级基础清洗 (去掉换行和前后空格)
+    let clean_title = raw_content
+        .replace("\n", "")
+        .trim()
+        .to_string();
+
+    println!("✨ 后端生成标题完成: {}", clean_title);
+    Ok(clean_title)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -71,6 +158,7 @@ pub fn run() {
             commands::ai::ask_ai,
             stop_ai_generation, 
             reset_ai_generation,
+            generate_title, // 👈 记得在这里注册！
 
             // 数据库 CRUD 指令
             commands::db_cmd::get_sessions,
@@ -78,9 +166,16 @@ pub fn run() {
             commands::db_cmd::delete_session,
             commands::db_cmd::get_messages,
             commands::db_cmd::save_message,
-            // 🩺 关键手术点：将 update_session_title 改为 rename_session
-            commands::db_cmd::rename_session, 
-            commands::db_cmd::update_session_scroll 
+            commands::db_cmd::rename_session,
+            commands::db_cmd::update_session_scroll,
+            commands::db_cmd::update_sessions_order,
+            commands::db_cmd::get_folders,
+            commands::db_cmd::create_folder,
+            commands::db_cmd::delete_folder,
+            commands::db_cmd::rename_folder,
+            commands::db_cmd::move_session_to_folder,
+            commands::db_cmd::update_folder_collapsed,
+            commands::db_cmd::update_folders_order,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");
