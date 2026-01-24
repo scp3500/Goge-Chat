@@ -36,10 +36,11 @@ const toggleSidebar = () => {
     class="sidebar" 
     :class="{ 'is-collapsed': isCollapsed }"
   >
-    <SideBarHeader 
-      :is-collapsed="isCollapsed" 
-      @toggle="toggleSidebar" 
+    <SideBarHeader
+      :is-collapsed="isCollapsed"
+      @toggle="toggleSidebar"
       @search="handleSearch"
+      @new-folder="emit('newFolder')"
     />
 
     <div class="main-content-wrapper">

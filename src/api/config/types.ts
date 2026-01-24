@@ -4,6 +4,7 @@ export interface AppSettings {
     themeColor: string;
     scrollbarWidth: number;
     apiKey: string;
+    useReasoning: boolean;
 }
 
 // 提供一组默认值，防止空指针
@@ -12,5 +13,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     lineRatio: 1.7,
     themeColor: '#1E1F20',
     scrollbarWidth: 12,
-    apiKey: ''
+    apiKey: '',
+    useReasoning: false
 };

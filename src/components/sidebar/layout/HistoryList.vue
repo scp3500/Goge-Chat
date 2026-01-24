@@ -60,13 +60,58 @@ const closeMenu = () => {
 const onSessionMove = async (evt, targetFolderId) => {
   if (evt.added) {
     const session = evt.added.element;
+    const newIndex = evt.added.newIndex;
+    
+    // 1. 更新内存中的 folder_id
+    session.folder_id = targetFolderId;
     await chatStore.moveSessionToFolder(session.id, targetFolderId);
+    
+    // 2. 获取当前文件夹（或未分类区域）的所有 session
+    const currentSubList = props.list.filter(s => s.folder_id === targetFolderId);
+    
+    // 3. 将被添加的元素从原数组中过滤掉（因为它可能还在旧位置）并插入到新位置
+    const otherSessionsInSubList = currentSubList.filter(s => s.id !== session.id);
+    otherSessionsInSubList.splice(newIndex, 0, session);
+    
+    // 4. 调用内部重排序逻辑，统一更新全局列表
+    handleInternalReorder(otherSessionsInSubList, targetFolderId);
+  } else if (evt.moved) {
+    // 处理同一列表内的移动
+    const currentSubList = props.list.filter(s => s.folder_id === targetFolderId);
+    handleInternalReorder(currentSubList, targetFolderId);
   }
 };
 
-const onReorder = () => {
-  // 当任何容器内的顺序发生变化时，通知父级同步整个 list 的 sort_order
-  emit('reorder', props.list);
+const handleInternalReorder = (updatedSubList, folderId) => {
+  // 确保子列表中的所有 session 都标记了正确的 folder_id
+  updatedSubList.forEach(s => {
+    s.folder_id = folderId;
+  });
+
+  // 构造新的完整列表顺序
+  const newList = [];
+  
+  // 1. 遍历所有文件夹
+  chatStore.folders.forEach(folder => {
+    if (folder.id === folderId) {
+      // 如果是当前正在排序的文件夹，使用更新后的子列表
+      newList.push(...updatedSubList);
+    } else {
+      // 否则保持原有子列表
+      const folderSessions = props.list.filter(s => s.folder_id === folder.id);
+      newList.push(...folderSessions);
+    }
+  });
+  
+  // 2. 处理未分类列表
+  if (folderId === null) {
+    newList.push(...updatedSubList);
+  } else {
+    const unclassified = props.list.filter(s => !s.folder_id);
+    newList.push(...unclassified);
+  }
+
+  emit('reorder', newList);
 };
 
 onMounted(() => { window.addEventListener('click', closeMenu); });
@@ -116,7 +161,8 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
           <!-- 文件夹内的对话 (独立数据源：仅该文件夹的 session) -->
           <div v-if="!folder.is_collapsed" class="folder-items">
             <draggable
-              :list="props.list.filter(s => s.folder_id === folder.id)"
+              :model-value="props.list.filter(s => s.folder_id === folder.id)"
+              @update:model-value="val => handleInternalReorder(val, folder.id)"
               item-key="id"
               handle=".history-item"
               group="sessions"
@@ -124,7 +170,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
               drag-class="drag-item-active"
               class="drag-list"
               :animation="200"
-              @change="e => onSessionMove(e, folder.id) || onReorder()"
+              @change="e => onSessionMove(e, folder.id)"
             >
               <template #item="{ element: item }">
                 <HistoryItem
@@ -146,7 +192,8 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
 
     <!-- 2. 外部对话区域 (独立数据源：仅 folder_id 为空的 session) -->
     <draggable
-      :list="props.list.filter(s => !s.folder_id)"
+      :model-value="props.list.filter(s => !s.folder_id)"
+      @update:model-value="val => handleInternalReorder(val, null)"
       item-key="id"
       handle=".history-item"
       group="sessions"
@@ -155,7 +202,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
       drag-class="drag-item-active"
       class="drag-list unclassified-list"
       :animation="200"
-      @change="e => onSessionMove(e, null) || onReorder()"
+      @change="e => onSessionMove(e, null)"
     >
       <template #item="{ element: item }">
         <HistoryItem

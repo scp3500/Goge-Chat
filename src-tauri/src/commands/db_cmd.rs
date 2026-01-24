@@ -93,7 +93,9 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
         let content: String = row.get(1)?;
         let reasoning_content: Option<String> = row.get(2)?;
         
-        println!("DB Load: role={}, content_len={}, has_reasoning={}", role, content.len(), reasoning_content.is_some());
+        if reasoning_content.is_some() {
+            println!("✅ DB Load: role={}, content_len={}, reasoning_len={}", role, content.len(), reasoning_content.as_ref().map(|r| r.len()).unwrap_or(0));
+        }
         
         Ok(Message {
             role,
@@ -103,6 +105,7 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
     }).map_err(|e| e.to_string())?;
     let mut m = Vec::new();
     for res in iter { m.push(res.map_err(|e| e.to_string())?); }
+    println!("📊 Total messages loaded: {}", m.len());
     Ok(m)
 }
 

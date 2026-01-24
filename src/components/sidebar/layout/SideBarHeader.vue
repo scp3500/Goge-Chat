@@ -4,13 +4,13 @@
  * 职责：管理侧边栏折叠开关，并在展开模式下提供极简搜索功能。
  */
 import { ref, nextTick, watch } from 'vue';
-import { MENU_SVG, SEARCH_SVG } from '../../../constants/icons.ts';
+import { MENU_SVG, SEARCH_SVG, FOLDER_PLUS_SVG } from '../../../constants/icons.ts';
 
 const props = defineProps({
   isCollapsed: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['toggle', 'search']);
+const emit = defineEmits(['toggle', 'search', 'newFolder']);
 
 const isSearching = ref(false);
 const searchQuery = ref("");
@@ -53,6 +53,12 @@ const handleInput = (e) => {
     <button class="icon-btn menu-btn" @click="emit('toggle')" title="切换侧边栏" v-html="MENU_SVG"></button>
 
     <div v-if="!isCollapsed" class="header-search-container">
+      <button
+        class="icon-btn folder-btn"
+        title="新建文件夹"
+        @click="emit('newFolder')"
+        v-html="FOLDER_PLUS_SVG"
+      ></button>
       <Transition name="search-expand" mode="out-in">
         <div v-if="isSearching" class="search-input-wrapper">
           <span class="search-icon-inner" v-html="SEARCH_SVG"></span>
@@ -128,6 +134,7 @@ const handleInput = (e) => {
   align-items: center;
   justify-content: flex-end;
   min-width: 0;
+  gap: 4px;
 }
 
 .search-input-wrapper {

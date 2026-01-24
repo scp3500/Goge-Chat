@@ -66,20 +66,21 @@ onMounted(() => {
 
 <template>
   <div class="input-area">
-    <div class="input-wrapper">
+    <div class="input-wrapper" @click="textareaRef?.focus()">
       
       <div class="text-input-section">
         <textarea
           ref="textareaRef"
           v-model="inputMsg"
           @keydown="onKeydown"
+          @click.stop
           placeholder="发送消息..."
           class="chat-input modern-scroll"
-          rows="1" 
+          rows="1"
         ></textarea>
       </div>
 
-      <div class="tools-section">
+      <div class="tools-section" @click.stop>
         <div class="tools-left" style="display: flex; align-items: center; gap: 4px;">
           <button
             class="icon-btn attach-btn"
@@ -143,6 +144,7 @@ onMounted(() => {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
   border: none;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  cursor: text;
 }
 
 .text-input-section {

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { chatApi, type ChatSession } from '../api/chat';
 import { invoke, Channel } from "@tauri-apps/api/core";
+import { useConfigStore } from './config';
 
 export interface Folder {
     id: string;
@@ -17,13 +18,23 @@ export const useChatStore = defineStore('chat', () => {
     const activeId = ref<string | null>(null);
     const currentMessages = ref<any[]>([]);
     const isGenerating = ref(false);
-    const useReasoning = ref(false); // 是否使用推理功能
     const isLoading = ref(false);
+
+    // 使用 config store 中的推理设置
+    const configStore = useConfigStore();
 
     // --- 计算属性 (Getters) ---
     const activeSession = computed(() =>
         historyList.value.find(s => s.id === activeId.value) || null
     );
+
+    const useReasoning = computed({
+        get: () => configStore.settings.useReasoning,
+        set: (value: boolean) => {
+            console.log("🧠 useReasoning changed:", value);
+            configStore.updateConfig({ useReasoning: value });
+        }
+    });
 
     // --- 会话管理 Actions ---
 
@@ -110,7 +121,15 @@ export const useChatStore = defineStore('chat', () => {
     const createFolder = async (name: string) => {
         try {
             const id = await invoke<string>("create_folder", { name });
-            folders.value.push({ id, name, sort_order: 0, is_collapsed: false });
+            // 🚩 新建文件夹默认置顶 (unshift) 且默认折叠 (is_collapsed: true)
+            folders.value.unshift({ id, name, sort_order: 0, is_collapsed: true });
+            
+            // 同步折叠状态到数据库
+            try {
+                await invoke("update_folder_collapsed", { id, collapsed: true });
+            } catch (err) {
+                console.error("同步文件夹折叠状态失败:", err);
+            }
         } catch (e) {
             console.error("创建文件夹失败:", e);
         }
@@ -164,17 +183,35 @@ export const useChatStore = defineStore('chat', () => {
     // --- 消息管理 Actions ---
 
     const loadMessages = async (sessionId: string) => {
-        currentMessages.value = [];
+        // 🔧 修复：只在真正需要时清空，避免在加载过程中显示空白
         isLoading.value = true;
         try {
             const history = await invoke<any[]>("get_messages", { sessionId });
+            console.log("📥 Frontend received messages:", {
+                count: history?.length || 0,
+                messages: history?.map(m => ({ role: m.role, contentLen: m.content.length, hasReasoning: !!m.reasoning_content }))
+            });
+            // 只在确认是当前会话时才更新消息
             if (activeId.value === sessionId) {
-                currentMessages.value = history && history.length > 0
-                    ? history.map(m => ({
-                        ...m,
-                        reasoning_content: m.reasoning_content || ""
-                    }))
+                const newMessages = history && history.length > 0
+                    ? history.map(m => {
+                        if (m.reasoning_content) {
+                            console.log("✅ Message with reasoning:", { role: m.role, has_reasoning: !!m.reasoning_content, reasoning_len: m.reasoning_content.length });
+                        }
+                        return {
+                            ...m,
+                            reasoning_content: m.reasoning_content || null
+                        };
+                    })
                     : [{ role: "system", content: "你是一个简洁专业的 AI 助手。" }];
+                
+                // 原子性更新：一次性替换整个数组，避免中间状态
+                currentMessages.value = newMessages;
+                
+                console.log("📊 Current messages after load:", {
+                    count: currentMessages.value.length,
+                    messages: currentMessages.value.map(m => ({ role: m.role, contentLen: m.content.length }))
+                });
             }
         } catch (err) {
             console.error("获取消息失败:", err);
@@ -200,44 +237,60 @@ export const useChatStore = defineStore('chat', () => {
             currentMessages.value.push({
                 role: "assistant",
                 content: "__LOADING__",
-                reasoning_content: ""
+                reasoning_content: null
             });
 
             const onEvent = new Channel<string>();
             let aiFullContent = "";
             let aiFullReasoning = "";
-
             onEvent.onmessage = (data) => {
                 if (!isGenerating.value) return;
                 const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
                 // 这里保持流式解析，因为需要实时给用户展示打字机效果
-                const type = data.substring(0, 2);
-                const content = data.substring(2);
-
-                if (type === "c:") {
+                if (data.startsWith("c:")) {
+                    const content = data.substring(2);
                     if (lastMsg.content === "__LOADING__") {
                         lastMsg.content = "";
                     }
                     lastMsg.content += content;
                     aiFullContent += content;
-                } else if (type === "r:") {
+                } else if (data.startsWith("r:")) {
+                    const content = data.substring(2);
                     if (!lastMsg.reasoning_content) lastMsg.reasoning_content = "";
                     lastMsg.reasoning_content += content;
                     aiFullReasoning += content;
                 }
             };
 
-            const msgsToSend = currentMessages.value.slice(0, -1).map((m, idx) => {
+            const msgsToSend = currentMessages.value.slice(0, -1).map((m) => {
                 const cleanMsg = {
                     role: m.role,
-                    content: m.content,
-                    reasoning_content: m.reasoning_content || undefined
+                    content: m.content
                 };
-                if (idx === currentMessages.value.length - 2 && useReasoning.value) {
-                    cleanMsg.content = `[REASON]${m.content}`;
-                }
                 return cleanMsg;
+            });
+            
+            console.log("📤 Messages to send before reasoning:", {
+                count: msgsToSend.length,
+                useReasoning: useReasoning.value,
+                messages: msgsToSend.map(m => ({ role: m.role, contentLen: m.content.length }))
+            });
+            
+            // 🔧 修复：在构建完整消息列表后，找到最后一条用户消息并添加推理标记
+            if (useReasoning.value) {
+                for (let i = msgsToSend.length - 1; i >= 0; i--) {
+                    if (msgsToSend[i].role === "user") {
+                        console.log("🧠 Adding [REASON] to message at index", i);
+                        msgsToSend[i].content = `[REASON]${msgsToSend[i].content}`;
+                        break;
+                    }
+                }
+            }
+            
+            console.log("📤 Messages to send after reasoning:", {
+                count: msgsToSend.length,
+                messages: msgsToSend.map(m => ({ role: m.role, contentLen: m.content.length, hasReason: m.content.startsWith('[REASON]') }))
             });
 
             await invoke("ask_ai", {
@@ -250,7 +303,7 @@ export const useChatStore = defineStore('chat', () => {
                     sessionId,
                     role: "assistant",
                     content: aiFullContent,
-                    reasoning_content: aiFullReasoning || null,
+                    reasoning_content: aiFullReasoning.trim().length > 0 ? aiFullReasoning : null,
                 });
 
                 // 检查是否需要自动总结标题
@@ -327,8 +380,9 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     const reorderSessions = async (newList: ChatSession[]) => {
-        historyList.value = newList;
-        const orders: [string, number][] = newList.map((s, index) => [s.id, index]);
+        // 使用 map 确保我们只取必要的字段，并且维持传入的物理顺序
+        historyList.value = [...newList];
+        const orders: [string, number][] = historyList.value.map((s, index) => [s.id, index]);
         try {
             await chatApi.updateSessionsOrder(orders);
         } catch (e) {

@@ -24,11 +24,13 @@ const toggleReasoning = (index) => {
   }
 };
 
-// 自动展开包含推理内容的最后一条消息
+// 自动展开包含推理内容的消息
 const autoExpandLastReasoning = () => {
+  // 切换会话时重置展开状态
+  expandedReasoning.value.clear();
   if (!props.messages) return;
   props.messages.forEach((m, i) => {
-    if (m.reasoning_content && m.reasoning_content.trim()) {
+    if (m.reasoning_content && typeof m.reasoning_content === 'string' && m.reasoning_content.trim()) {
       expandedReasoning.value.add(i);
     }
   });
