@@ -13,6 +13,7 @@ pub struct ChatSession {
     pub folder_id: Option<i64>,
     pub title: String,
     pub last_scroll_pos: i32,
+    pub sort_order: i32,
     pub updated_at: String,
 }
 
@@ -116,9 +117,9 @@ pub fn init_db(conn: &Connection) -> Result<()> {
  * 但更好的做法是在 db_cmd.rs 中开始引用它们。
  */
 
-pub fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
+pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
     let mut stmt = conn.prepare(
-        "SELECT id, folder_id, title, last_scroll_pos, updated_at FROM sessions ORDER BY updated_at DESC"
+        "SELECT id, folder_id, title, last_scroll_pos, sort_order, updated_at FROM sessions ORDER BY sort_order ASC, updated_at DESC"
     )?;
 
     let session_iter = stmt.query_map([], |row| {
@@ -127,7 +128,8 @@ pub fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
             folder_id: row.get(1)?,
             title: row.get(2)?,
             last_scroll_pos: row.get(3)?,
-            updated_at: row.get(4)?,
+            sort_order: row.get(4)?,
+            updated_at: row.get(5)?,
         })
     })?;
 
@@ -138,12 +140,12 @@ pub fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
     Ok(sessions)
 }
 
-pub fn create_session(conn: &Connection, title: &str) -> Result<i64> {
-    conn.execute("INSERT INTO sessions (title) VALUES (?1)", params![title])?;
+pub(crate) fn create_session(conn: &Connection, title: &str) -> Result<i64> {
+    conn.execute("INSERT INTO sessions (title, last_scroll_pos) VALUES (?1, 0)", params![title])?;
     Ok(conn.last_insert_rowid())
 }
 
-pub fn get_folders(conn: &Connection) -> Result<Vec<Folder>> {
+pub(crate) fn get_folders(conn: &Connection) -> Result<Vec<Folder>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, sort_order, is_collapsed FROM folders ORDER BY sort_order ASC, created_at DESC"
     )?;
@@ -164,28 +166,28 @@ pub fn get_folders(conn: &Connection) -> Result<Vec<Folder>> {
     Ok(folders)
 }
 
-pub fn create_folder(conn: &Connection, name: &str) -> Result<i64> {
+pub(crate) fn create_folder(conn: &Connection, name: &str) -> Result<i64> {
     conn.execute("INSERT INTO folders (name) VALUES (?1)", params![name])?;
     Ok(conn.last_insert_rowid())
 }
 
-pub fn delete_folder(conn: &Connection, id: i64) -> Result<()> {
+pub(crate) fn delete_folder(conn: &Connection, id: i64) -> Result<()> {
     // sessions 表有 ON DELETE SET NULL，所以直接删
     conn.execute("DELETE FROM folders WHERE id = ?1", params![id])?;
     Ok(())
 }
 
-pub fn rename_folder(conn: &Connection, id: i64, name: &str) -> Result<()> {
+pub(crate) fn rename_folder(conn: &Connection, id: i64, name: &str) -> Result<()> {
     conn.execute("UPDATE folders SET name = ?1 WHERE id = ?2", params![name, id])?;
     Ok(())
 }
 
-pub fn update_folder_collapsed(conn: &Connection, id: i64, collapsed: bool) -> Result<()> {
+pub(crate) fn update_folder_collapsed(conn: &Connection, id: i64, collapsed: bool) -> Result<()> {
     conn.execute("UPDATE folders SET is_collapsed = ?1 WHERE id = ?2", params![collapsed, id])?;
     Ok(())
 }
 
-pub fn move_session_to_folder(conn: &Connection, session_id: i64, folder_id: Option<i64>) -> Result<()> {
+pub(crate) fn move_session_to_folder(conn: &Connection, session_id: i64, folder_id: Option<i64>) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET folder_id = ?1 WHERE id = ?2",
         params![folder_id, session_id]
@@ -193,12 +195,13 @@ pub fn move_session_to_folder(conn: &Connection, session_id: i64, folder_id: Opt
     Ok(())
 }
 
-pub fn delete_session(conn: &Connection, id: i64) -> Result<()> {
+pub(crate) fn delete_session(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM messages WHERE session_id = ?1", params![id])?;
     conn.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
     Ok(())
 }
 
-pub fn update_session_title(conn: &Connection, id: i64, title: &str) -> Result<()> {
+pub(crate) fn update_session_title(conn: &Connection, id: i64, title: &str) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET title = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![title, id]
@@ -206,7 +209,7 @@ pub fn update_session_title(conn: &Connection, id: i64, title: &str) -> Result<(
     Ok(())
 }
 
-pub fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Result<()> {
+pub(crate) fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET last_scroll_pos = ?1 WHERE id = ?2",
         params![pos, id]
@@ -216,7 +219,7 @@ pub fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Result<()>
 
 // --- 消息管理逻辑 ---
 
-pub fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
+pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
     let mut stmt = conn.prepare(
         "SELECT id, session_id, role, content, reasoning_content, created_at FROM messages WHERE session_id = ?1 ORDER BY id ASC"
     )?;
@@ -239,7 +242,8 @@ pub fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessag
     Ok(messages)
 }
 
-pub fn save_message(conn: &Connection, session_id: i64, role: &str, content: &str, reasoning_content: Option<&str>) -> Result<()> {
+pub(crate) fn save_message(conn: &Connection, session_id: i64, role: &str, content: &str, reasoning_content: Option<&str>) -> Result<()> {
+    println!("💾 [DEBUG] Saving message: role={}, content_len={}, reasoning_len={}", role, content.len(), reasoning_content.map(|r| r.len()).unwrap_or(0));
     conn.execute(
         "INSERT INTO messages (session_id, role, content, reasoning_content) VALUES (?1, ?2, ?3, ?4)",
         params![session_id, role, content, reasoning_content],
@@ -248,5 +252,29 @@ pub fn save_message(conn: &Connection, session_id: i64, role: &str, content: &st
         "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
         params![session_id]
     )?;
+    Ok(())
+}
+
+pub(crate) fn update_sessions_order(conn: &mut Connection, orders: Vec<(i64, i32)>) -> Result<()> {
+    let tx = conn.transaction()?;
+    for (id, order) in orders {
+        tx.execute(
+            "UPDATE sessions SET sort_order = ? WHERE id = ?",
+            params![order, id],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+pub(crate) fn update_folders_order(conn: &mut Connection, orders: Vec<(i64, i32)>) -> Result<()> {
+    let tx = conn.transaction()?;
+    for (id, order) in orders {
+        tx.execute(
+            "UPDATE folders SET sort_order = ? WHERE id = ?",
+            params![order, id],
+        )?;
+    }
+    tx.commit()?;
     Ok(())
 }

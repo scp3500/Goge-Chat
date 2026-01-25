@@ -17,25 +17,6 @@ const chatStore = useChatStore();
 const isMaximized = ref(false); 
 const showSettings = ref(false); 
 
-/**
- * 🕵️‍♂️ 【新增】数据侦探：监听 Store 的每一次变化
- * 只要标题变脏，立刻报警并打印堆栈
- */
-chatStore.$subscribe((mutation, state) => {
-    // 扫描整个列表，看是否有标题包含 "import" 或 "c:"
-    const dirtySession = state.historyList.find(s => 
-        s.title && (s.title.includes('import') || s.title.includes('c:'))
-    );
-    
-    if (dirtySession) {
-        console.group("🚨 抓到了！标题被污染了！");
-        console.error("脏标题内容:", dirtySession.title);
-        console.error("触发这次修改的操作类型:", mutation.type);
-        console.error("具体的 Mutation 信息:", mutation); 
-        console.trace("堆栈追踪 (谁触发的修改？)");
-        console.groupEnd();
-    }
-});
 
 /**
  * 🩺 核心修复：全局拦截函数

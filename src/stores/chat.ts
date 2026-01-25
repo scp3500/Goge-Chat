@@ -257,7 +257,8 @@ export const useChatStore = defineStore('chat', () => {
                     aiFullContent += content;
                 } else if (data.startsWith("r:")) {
                     const content = data.substring(2);
-                    if (!lastMsg.reasoning_content) lastMsg.reasoning_content = "";
+                    console.log("🧠 [DEBUG] Frontend received reasoning chunk:", content);
+                    if (!lastMsg.reasoning_content || lastMsg.reasoning_content === null) lastMsg.reasoning_content = "";
                     lastMsg.reasoning_content += content;
                     aiFullReasoning += content;
                 }
@@ -299,6 +300,11 @@ export const useChatStore = defineStore('chat', () => {
             });
 
             if (aiFullContent.trim().length > 0 || aiFullReasoning.trim().length > 0) {
+                console.log("💾 [DEBUG] Saving assistant message:", {
+                    content_len: aiFullContent.length,
+                    reasoning_len: aiFullReasoning.length,
+                    has_reasoning: aiFullReasoning.trim().length > 0
+                });
                 await invoke("save_message", {
                     sessionId,
                     role: "assistant",
