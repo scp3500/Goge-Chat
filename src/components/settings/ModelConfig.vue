@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { EYE_OPEN_SVG, EYE_CLOSED_SVG } from '../../../constants/icons.ts';
+import { EYE_OPEN_SVG, EYE_CLOSED_SVG } from '../../constants/icons.ts';
 
 defineProps({
   providerName: String,

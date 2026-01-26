@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 // 注意这里：../ 代表跳出 stores 文件夹，进入 api/config
 import { configApi } from '../api/config';
-import { AppSettings, DEFAULT_SETTINGS } from '../api/config/types';
+import { AppSettings, DEFAULT_SETTINGS } from '../types/config';
 
 export const useConfigStore = defineStore('config', () => {
     const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS });

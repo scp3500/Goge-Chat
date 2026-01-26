@@ -1,14 +1,9 @@
 // src/api/chat.ts
 import { invoke } from '@tauri-apps/api/core';
+import type { ChatSession } from '../types/chat';
 
-// 建议简单定义一下 Session 类型，解决 unshift 报错
-export interface ChatSession {
-    id: string;
-    title: string;
-    last_scroll_pos?: number;
-    sort_order?: number;
-    folder_id?: string | null;
-}
+// 重新导出 ChatSession 类型以保持向后兼容性
+export type { ChatSession };
 
 export const chatApi = {
     /** 获取所有会话 */

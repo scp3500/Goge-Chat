@@ -4,7 +4,7 @@ import { debounce } from 'lodash-es';
 import { useChatStore } from "../../stores/chat"; 
 import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG, BRAIN_SVG } from '../../constants/icons.ts';
 import { renderMarkdown } from '../../services/markdown';
-import { useScrollRestore } from './composables/useScrollRestore';
+import { useScrollRestore } from '../../composables/useScrollRestore';
 
 const props = defineProps(['messages', 'sessionId', 'initialScrollPos']);
 const emit = defineEmits(['update-pos', 'refresh']);

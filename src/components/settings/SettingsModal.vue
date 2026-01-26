@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useConfigService } from '../../services/configService';
-import SidebarNav from './components/SidebarNav.vue';
-import ProviderList from './components/ProviderList.vue';
-import ModelConfig from './components/ModelConfig.vue';
-import AppearanceConfig from './components/AppearanceConfig.vue';
+import SidebarNav from './SidebarNav.vue';
+import ProviderList from './ProviderList.vue';
+import ModelConfig from './ModelConfig.vue';
+import AppearanceConfig from './AppearanceConfig.vue';
 
 // 1. 注入配置服务
 const configStore = useConfigService();
