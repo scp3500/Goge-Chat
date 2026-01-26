@@ -25,4 +25,7 @@ export const chatApi = {
 
     /** 更新排序 */
     updateSessionsOrder: (orders: [string, number][]) => invoke('update_sessions_order', { orders }),
+
+    /** 更新文件夹排序 */
+    updateFoldersOrder: (orders: [string, number][]) => invoke('update_folders_order', { orders }),
 };

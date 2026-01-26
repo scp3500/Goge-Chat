@@ -81,6 +81,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
     if !columns_sessions.contains(&"sort_order".to_string()) {
         let _ = conn.execute("ALTER TABLE sessions ADD COLUMN sort_order INTEGER DEFAULT 0", []);
+        // 初始化现有记录的排序顺序为 id 顺序
+        let _ = conn.execute("UPDATE sessions SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL", []);
     }
 
     // folder_id 可能已经在 CREATE TABLE 语句中创建了，也可能是以前的老数据库需要迁移
@@ -94,6 +96,11 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
     if !columns_folders.contains(&"is_collapsed".to_string()) {
         let _ = conn.execute("ALTER TABLE folders ADD COLUMN is_collapsed BOOLEAN DEFAULT 0", []);
+    }
+    if !columns_folders.contains(&"sort_order".to_string()) {
+        let _ = conn.execute("ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0", []);
+        // 初始化现有文件夹的排序顺序为 id 顺序
+        let _ = conn.execute("UPDATE folders SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL", []);
     }
 
     let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
@@ -220,39 +227,70 @@ pub(crate) fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Res
 // --- 消息管理逻辑 ---
 
 pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
+    println!("📥 [DB] Loading messages for session ID: {}", session_id);
     let mut stmt = conn.prepare(
         "SELECT id, session_id, role, content, reasoning_content, created_at FROM messages WHERE session_id = ?1 ORDER BY id ASC"
     )?;
 
     let msg_iter = stmt.query_map(params![session_id], |row| {
+        let reasoning_content: Option<String> = row.get(4)?;
         Ok(ChatMessage {
             id: Some(row.get(0)?),
             session_id: row.get(1)?,
             role: row.get(2)?,
             content: row.get(3)?,
-            reasoning_content: row.get(4)?,
+            reasoning_content,
             created_at: Some(row.get(5)?),
         })
     })?;
 
     let mut messages = Vec::new();
     for msg in msg_iter {
-        messages.push(msg?);
+        let msg = msg?;
+        if msg.role == "assistant" {
+            println!("📥 [DB] Loaded assistant message - reasoning content length: {:?}", msg.reasoning_content.as_ref().map(|s| s.len()));
+        }
+        messages.push(msg);
     }
+    println!("📥 [DB] Total messages loaded: {}", messages.len());
     Ok(messages)
 }
 
 pub(crate) fn save_message(conn: &Connection, session_id: i64, role: &str, content: &str, reasoning_content: Option<&str>) -> Result<()> {
-    println!("💾 [DEBUG] Saving message: role={}, content_len={}, reasoning_len={}", role, content.len(), reasoning_content.map(|r| r.len()).unwrap_or(0));
-    conn.execute(
+    println!("💾 [DB] === DB_SAVE_MESSAGE ===");
+    println!("💾 [DB] Session ID: {}", session_id);
+    println!("💾 [DB] Role: {}", role);
+    println!("💾 [DB] Content length: {}", content.len());
+    println!("💾 [DB] Reasoning content received: {:?}", reasoning_content.map(|s| format!("length: {}", s.len())));
+    
+    // 存储实际传递的深度思考内容
+    let reasoning_to_store = reasoning_content;
+    
+    println!("💾 [DB] Executing INSERT statement...");
+    let result = conn.execute(
         "INSERT INTO messages (session_id, role, content, reasoning_content) VALUES (?1, ?2, ?3, ?4)",
-        params![session_id, role, content, reasoning_content],
-    )?;
-    conn.execute(
-        "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        params![session_id]
-    )?;
-    Ok(())
+        params![session_id, role, content, reasoning_to_store],
+    );
+    
+    match result {
+        Ok(rows) => {
+            println!("💾 [DB] INSERT successful, {} rows affected", rows);
+            println!("💾 [DB] Updating session timestamp...");
+            let update_result = conn.execute(
+                "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+                params![session_id]
+            );
+            match update_result {
+                Ok(_) => println!("💾 [DB] Session update successful"),
+                Err(e) => println!("💾 [DB] Session update failed: {}", e)
+            }
+            Ok(())
+        }
+        Err(e) => {
+            println!("💾 [DB] INSERT FAILED: {}", e);
+            Err(e)
+        }
+    }
 }
 
 pub(crate) fn update_sessions_order(conn: &mut Connection, orders: Vec<(i64, i32)>) -> Result<()> {

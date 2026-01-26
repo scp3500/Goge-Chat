@@ -16,7 +16,7 @@ const props = defineProps({
   list: { type: Array, default: () => [] }
 });
 
-const emit = defineEmits(['create', 'select', 'delete', 'rename', 'reorder', 'newFolder']);
+const emit = defineEmits(['create', 'select', 'delete', 'rename', 'reorder', 'reorder-folders', 'newFolder']);
 
 // 侧边栏折叠状态：true = 72px 窄模式, false = 300px 展开模式
 const isCollapsed = ref(false); 
@@ -52,13 +52,14 @@ const toggleSidebar = () => {
       
       <HistoryList
         :is-collapsed="isCollapsed"
-        :list="props.list" 
+        :list="props.list"
         :active="props.active"
         :filter="searchQuery"
         @select="(id) => emit('select', id)"
         @delete="(id) => emit('delete', id)"
         @rename="(id, title) => emit('rename', id, title)"
         @reorder="(newList) => emit('reorder', newList)"
+        @reorder-folders="(newList) => emit('reorder-folders', newList)"
       />
 
       <footer class="sidebar-footer">

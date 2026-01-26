@@ -123,7 +123,7 @@ export const useChatStore = defineStore('chat', () => {
             const id = await invoke<string>("create_folder", { name });
             // 🚩 新建文件夹默认置顶 (unshift) 且默认折叠 (is_collapsed: true)
             folders.value.unshift({ id, name, sort_order: 0, is_collapsed: true });
-            
+
             // 同步折叠状态到数据库
             try {
                 await invoke("update_folder_collapsed", { id, collapsed: true });
@@ -189,35 +189,68 @@ export const useChatStore = defineStore('chat', () => {
             const history = await invoke<any[]>("get_messages", { sessionId });
             console.log("📥 Frontend received messages:", {
                 count: history?.length || 0,
-                messages: history?.map(m => ({ role: m.role, contentLen: m.content.length, hasReasoning: !!m.reasoning_content }))
+                messages: history?.map(m => ({
+                    role: m.role,
+                    contentLen: m.content.length,
+                    hasReasoning: !!m.reasoningContent,  // ✅ 改为 camelCase
+                    reasoningLen: m.reasoningContent?.length || 0  // ✅ 改为 camelCase
+                }))
             });
+
+            // 打印助手消息的深度思考内容详情
+            if (history) {
+                history.forEach((m, i) => {
+                    if (m.role === "assistant" && m.reasoningContent) {  // ✅ 改为 camelCase
+                        console.log(`📥 Assistant message ${i} reasoning content length:`, m.reasoningContent.length);
+                        console.log(`📥 Assistant message ${i} reasoning preview:`, m.reasoningContent.substring(0, 100) + "...");
+                    }
+                });
+            }
+
             // 只在确认是当前会话时才更新消息
             if (activeId.value === sessionId) {
                 const newMessages = history && history.length > 0
-                    ? history.map(m => {
-                        if (m.reasoning_content) {
-                            console.log("✅ Message with reasoning:", { role: m.role, has_reasoning: !!m.reasoning_content, reasoning_len: m.reasoning_content.length });
-                        }
-                        return {
-                            ...m,
-                            reasoning_content: m.reasoning_content || null
-                        };
-                    })
+                    ? history.map(m => ({
+                        ...m
+                        // 保留从数据库加载的深度思考内容
+                    }))
                     : [{ role: "system", content: "你是一个简洁专业的 AI 助手。" }];
-                
+
                 // 原子性更新：一次性替换整个数组，避免中间状态
                 currentMessages.value = newMessages;
-                
-                console.log("📊 Current messages after load:", {
-                    count: currentMessages.value.length,
-                    messages: currentMessages.value.map(m => ({ role: m.role, contentLen: m.content.length }))
-                });
             }
         } catch (err) {
             console.error("获取消息失败:", err);
         } finally {
             isLoading.value = false;
         }
+    };
+
+    /**
+     * 保存助手回复到数据库
+     * @param sessionId 会话ID
+     * @param content 助手回复内容
+     * @param reasoningContent 深度思考内容 ✅ 改为 camelCase
+     */
+    const saveAssistantResponse = async (sessionId: string, content: string, reasoningContent: string | null) => {  // ✅ 参数改为 camelCase
+        console.log("💾 [SAVE] === START SAVING ===");
+        console.log("💾 [SAVE] Content length:", content.length);
+        console.log("💾 [SAVE] Reasoning content:", reasoningContent);  // ✅ 改为 camelCase
+        console.log("💾 [SAVE] Reasoning content length:", reasoningContent?.length || 0);  // ✅ 改为 camelCase
+        console.log("💾 [SAVE] Reasoning content preview:", reasoningContent?.substring(0, 100) + "...");  // ✅ 改为 camelCase
+
+        const saveParams = {
+            sessionId,
+            role: "assistant",
+            content,
+            reasoningContent  // ✅ 改为 camelCase
+        };
+
+        console.log("💾 [SAVE] saveParams:", JSON.stringify(saveParams, null, 2));
+        console.log("💾 [SAVE] Invoking save_message...");
+        await invoke("save_message", saveParams);
+        console.log("💾 [SAVE] save_message completed");
+        console.log("💾 [SAVE] === END SAVING ===");
     };
 
     const sendMessage = async (text: string) => {
@@ -228,26 +261,38 @@ export const useChatStore = defineStore('chat', () => {
 
         try {
             await invoke("reset_ai_generation");
-            await invoke("save_message", { sessionId, role: "user", content: text });
 
+            // 保存用户消息
+            await invoke("save_message", {
+                sessionId,
+                role: "user",
+                content: text,
+                reasoningContent: null  // ✅ 改为 camelCase
+            });
+
+            // 添加到当前消息列表
             currentMessages.value.push({
                 role: "user",
-                content: text
+                content: text,
+                reasoningContent: null  // ✅ 改为 camelCase
             });
+
+            // 添加加载中的助手消息
             currentMessages.value.push({
                 role: "assistant",
                 content: "__LOADING__",
-                reasoning_content: null
+                reasoningContent: null  // ✅ 改为 camelCase
             });
 
             const onEvent = new Channel<string>();
             let aiFullContent = "";
-            let aiFullReasoning = "";
+            let reasoningChunkCount = 0;
+
             onEvent.onmessage = (data) => {
                 if (!isGenerating.value) return;
                 const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-                // 这里保持流式解析，因为需要实时给用户展示打字机效果
+                // 处理内容流
                 if (data.startsWith("c:")) {
                     const content = data.substring(2);
                     if (lastMsg.content === "__LOADING__") {
@@ -255,30 +300,47 @@ export const useChatStore = defineStore('chat', () => {
                     }
                     lastMsg.content += content;
                     aiFullContent += content;
-                } else if (data.startsWith("r:")) {
+                }
+                // 处理推理流
+                else if (data.startsWith("r:")) {
                     const content = data.substring(2);
-                    console.log("🧠 [DEBUG] Frontend received reasoning chunk:", content);
-                    if (!lastMsg.reasoning_content || lastMsg.reasoning_content === null) lastMsg.reasoning_content = "";
-                    lastMsg.reasoning_content += content;
-                    aiFullReasoning += content;
+                    reasoningChunkCount++;
+                    console.log(`🧠 [DEBUG] Frontend received reasoning chunk #${reasoningChunkCount}, length: ${content.length}, preview:`, content.substring(0, 100) + "...");
+
+                    // 初始化推理内容
+                    if (!lastMsg.reasoningContent) {  // ✅ 改为 camelCase
+                        lastMsg.reasoningContent = "";  // ✅ 改为 camelCase
+                        console.log("🧠 [DEBUG] Initializing reasoningContent for last message");
+                    }
+
+                    lastMsg.reasoningContent += content;  // ✅ 改为 camelCase
+
+                    console.log(`🧠 [DEBUG] lastMsg.reasoningContent length: ${lastMsg.reasoningContent.length}, total chunks: ${reasoningChunkCount}`);
+                } else if (data.startsWith("data: ")) {
+                    console.log(`🧠 [DEBUG] Raw data event: ${data.substring(0, 50)}...`);
+                } else {
+                    console.log(`🧠 [DEBUG] Unknown event prefix: ${data.substring(0, 10)}`);
                 }
             };
 
-            const msgsToSend = currentMessages.value.slice(0, -1).map((m) => {
-                const cleanMsg = {
-                    role: m.role,
-                    content: m.content
-                };
-                return cleanMsg;
-            });
-            
+            // 准备发送的消息列表（排除加载中的消息）
+            const msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
+                role: m.role,
+                content: m.content,
+                reasoningContent: m.reasoningContent  // ✅ 改为 camelCase
+            }));
+
             console.log("📤 Messages to send before reasoning:", {
                 count: msgsToSend.length,
                 useReasoning: useReasoning.value,
-                messages: msgsToSend.map(m => ({ role: m.role, contentLen: m.content.length }))
+                messages: msgsToSend.map(m => ({
+                    role: m.role,
+                    contentLen: m.content.length,
+                    hasReasoning: !!m.reasoningContent  // ✅ 改为 camelCase
+                }))
             });
-            
-            // 🔧 修复：在构建完整消息列表后，找到最后一条用户消息并添加推理标记
+
+            // 如果启用推理，在最后一条用户消息前添加标记
             if (useReasoning.value) {
                 for (let i = msgsToSend.length - 1; i >= 0; i--) {
                     if (msgsToSend[i].role === "user") {
@@ -288,36 +350,57 @@ export const useChatStore = defineStore('chat', () => {
                     }
                 }
             }
-            
+
             console.log("📤 Messages to send after reasoning:", {
                 count: msgsToSend.length,
-                messages: msgsToSend.map(m => ({ role: m.role, contentLen: m.content.length, hasReason: m.content.startsWith('[REASON]') }))
+                messages: msgsToSend.map(m => ({
+                    role: m.role,
+                    contentLen: m.content.length,
+                    hasReason: m.content.startsWith('[REASON]'),
+                    hasReasoning: !!m.reasoningContent  // ✅ 改为 camelCase
+                }))
             });
 
+            // 调用 AI
             await invoke("ask_ai", {
                 msg: msgsToSend,
                 onEvent,
             });
 
-            if (aiFullContent.trim().length > 0 || aiFullReasoning.trim().length > 0) {
-                console.log("💾 [DEBUG] Saving assistant message:", {
-                    content_len: aiFullContent.length,
-                    reasoning_len: aiFullReasoning.length,
-                    has_reasoning: aiFullReasoning.trim().length > 0
-                });
-                await invoke("save_message", {
-                    sessionId,
-                    role: "assistant",
-                    content: aiFullContent,
-                    reasoning_content: aiFullReasoning.trim().length > 0 ? aiFullReasoning : null,
-                });
+            console.log("🧠 [FINAL] AI generation completed");
+            console.log("🧠 [FINAL] aiFullContent length:", aiFullContent.length);
+            console.log("🧠 [FINAL] reasoningChunkCount:", reasoningChunkCount);
 
-                // 检查是否需要自动总结标题
-                const msgCount = currentMessages.value.filter(m => m.content !== "__LOADING__").length;
-                if (msgCount >= 5 && activeSession.value?.title === "新对话") {
-                    autoSummaryTitle(sessionId);
-                }
+            // 获取最后一条消息的深度思考内容
+            const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+            console.log("🧠 [DEBUG] Last message object:", {
+                role: lastMsg.role,
+                contentLength: lastMsg.content.length,
+                hasReasoningContent: !!lastMsg.reasoningContent,  // ✅ 改为 camelCase
+                reasoningContentLength: lastMsg.reasoningContent?.length || 0  // ✅ 改为 camelCase
+            });
+
+            const finalReasoningContent = lastMsg.reasoningContent || null;  // ✅ 改为 camelCase
+
+            // 详细打印深度思考内容用于调试
+            if (finalReasoningContent) {
+                console.log("🧠 [FINAL] Reasoning content length:", finalReasoningContent.length);
+                console.log("🧠 [FINAL] Reasoning content preview:", finalReasoningContent.substring(0, 200));
+                console.log("🧠 [DEBUG] Full reasoning content (first 500 chars):", finalReasoningContent.substring(0, 500));
+                console.log("🧠 [DEBUG] Reasoning content lines:", finalReasoningContent.split('\n').length);
+            } else {
+                console.log("🧠 [DEBUG] No reasoning content received, lastMsg.reasoningContent:", lastMsg.reasoningContent);  // ✅ 改为 camelCase
             }
+
+            // 保存助手回复 - 只在生成完成后保存完整的 AI 回复
+            await saveAssistantResponse(sessionId, aiFullContent, finalReasoningContent);
+
+            // 自动总结标题
+            const msgCount = currentMessages.value.filter(m => m.content !== "__LOADING__").length;
+            if (msgCount >= 5 && activeSession.value?.title === "新对话") {
+                autoSummaryTitle(sessionId);
+            }
+            console.log("💾 [SAVE] === END SAVING ===");
         } catch (error) {
             console.error("对话失败:", error);
         } finally {
@@ -350,7 +433,7 @@ export const useChatStore = defineStore('chat', () => {
     const autoSummaryTitle = async (sessionId: string) => {
         try {
             // 1. 构造 Prompt
-            const prompt = "请总结以上对话的标题(5-8字)。直接返回标题文字，不要代码，不要标点符号。";
+            const prompt = "请总结以上对话的标题(8-10字)。直接返回标题文字，不要代码，不要标点符号。";
 
             const filteredMsgs = currentMessages.value.filter(m => m.content !== "__LOADING__");
             // 取前几轮对话 + prompt
@@ -361,7 +444,7 @@ export const useChatStore = defineStore('chat', () => {
 
             console.log("=== [Blocking] 请求后端生成标题 ===");
 
-            // 2. ⚡️ 核心改动：使用 generate_title，不再使用 Channel 流式接收
+            // 2. ⚡️ 核心改动:使用 generate_title，不再使用 Channel 流式接收
             // 这是一个异步等待过程，前端会等待后端完全生成好字符串后一次性返回
             const rawTitle = await invoke<string>("generate_title", {
                 msg: summaryMsgs
@@ -400,7 +483,7 @@ export const useChatStore = defineStore('chat', () => {
         folders.value = newList;
         const orders: [string, number][] = newList.map((f, index) => [f.id, index]);
         try {
-            await invoke("update_folders_order", { orders });
+            await chatApi.updateFoldersOrder(orders);
         } catch (e) {
             console.error("更新文件夹排序失败:", e);
         }

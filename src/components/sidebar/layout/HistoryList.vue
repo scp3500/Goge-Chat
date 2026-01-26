@@ -130,7 +130,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
       drag-class="drag-item-active"
       class="folders-area"
       :animation="200"
-      @change="e => { if (e.moved) emit('reorder-folders', chatStore.folders) }"
+      @change="e => { if (e.moved || e.added || e.removed) emit('reorder-folders', chatStore.folders) }"
     >
       <template #item="{ element: folder }">
         <div class="folder-group">

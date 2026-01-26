@@ -24,16 +24,22 @@ const toggleReasoning = (index) => {
   }
 };
 
-// 自动展开包含推理内容的消息
+// 默认收起所有推理过程
 const autoExpandLastReasoning = () => {
   // 切换会话时重置展开状态
   expandedReasoning.value.clear();
+  
+  // ✅ 默认全部收起,用户需要手动点击展开
+  // 如果想要自动展开最后一条,可以取消下面的注释:
+  /*
   if (!props.messages) return;
-  props.messages.forEach((m, i) => {
-    if (m.reasoning_content && typeof m.reasoning_content === 'string' && m.reasoning_content.trim()) {
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    if (props.messages[i].reasoningContent) {
       expandedReasoning.value.add(i);
+      break;  // 只展开最后一条
     }
-  });
+  }
+  */
 };
 
 // 💡 统一复制函数
@@ -50,7 +56,7 @@ const doCopy = async (text, el) => {
   } catch (err) { console.error('复制失败', err); }
 };
 
-// 💡 格式化用户文本，每30个字符换行
+// 💡 格式化用户文本,每30个字符换行
 const formatUserText = (text) => {
   return text.replace(/(.{30})/g, '$1\n');
 };
@@ -81,10 +87,10 @@ const handleScroll = debounce((e) => {
   emit('update-pos', Math.floor(e.target.scrollTop));
 }, 300);
 
-// 核心监听：数据变化触发按钮注入
+// 核心监听:数据变化触发按钮注入
 watch(() => props.messages, injectCodeButtons, { deep: true });
 
-// 核心监听：切换会话触发坐标恢复
+// 核心监听:切换会话触发坐标恢复
 watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
   if (!newId || loading) return;
   isRestoring.value = true;
@@ -118,12 +124,14 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
           </div>
 
           <div v-else class="assistant-content-wrapper">
-            <template v-if="m.content === '__LOADING__' && !m.reasoning_content">
+            <!-- ✅ 改为 camelCase -->
+            <template v-if="m.content === '__LOADING__' && !m.reasoningContent">
               <div class="typing-indicator"><span></span><span></span><span></span></div>
             </template>
             <template v-else>
               <!-- 🧠 推理过程展示 -->
-              <div v-if="m.reasoning_content" class="reasoning-container">
+              <!-- ✅ 改为 camelCase -->
+              <div v-if="m.reasoningContent" class="reasoning-container">
                 <div class="reasoning-status" @click="toggleReasoning(i)">
                   <span class="status-icon" v-html="BRAIN_SVG"></span>
                   <span class="status-text">{{ m.content === '__LOADING__' ? '正在思考...' : '思考过程' }}</span>
@@ -135,14 +143,16 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
                 </div>
                 <Transition name="collapse">
                   <div v-if="expandedReasoning.has(i)" class="reasoning-content">
-                    <div class="reasoning-inner">{{ m.reasoning_content }}</div>
+                    <!-- ✅ 改为 camelCase -->
+                    <div class="reasoning-inner">{{ m.reasoningContent }}</div>
                   </div>
                 </Transition>
               </div>
 
               <!-- 正文内容 -->
               <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body"></div>
-              <div v-else-if="m.reasoning_content" class="typing-indicator small"><span></span><span></span><span></span></div>
+              <!-- ✅ 改为 camelCase -->
+              <div v-else-if="m.reasoningContent" class="typing-indicator small"><span></span><span></span><span></span></div>
               
               <div v-if="m.content !== '__LOADING__'" class="msg-action-bar-bottom">
                 <button class="action-btn" title="重新生成" @click="emit('refresh', m)" v-html="REFRESH_SVG"></button>
@@ -158,6 +168,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 </template>
 
 <style scoped>
+/* 样式保持不变 */
 .assistant-content-wrapper { 
   position: relative; 
   width: 100%;
@@ -165,7 +176,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   flex-direction: column;
 }
 
-/* 🚩 左下角工具栏：默认显示 */
 .msg-action-bar-bottom {
   display: flex;
   gap: 4px;
@@ -200,7 +210,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* 🚩 代码块：确保滚动条显示 */
 :deep(.markdown-body pre) { 
   position: relative; 
   display: block; 
@@ -241,7 +250,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 
 .copied, :deep(.copied) { color: #4ade80 !important; }
 
-/* --- 基础 UI 框架 --- */
 .message-display { flex: 1; padding: 40px 6% 60px 6%; display: flex; flex-direction: column; overflow-y: auto; position: relative; overflow-anchor: none !important; scroll-behavior: auto !important; }
 .scroll-content-wrapper { display: flex; flex-direction: column; gap: 48px; width: 100%; margin: 0 auto; backface-visibility: hidden; }
 
@@ -262,7 +270,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 
 .markdown-body { font-size: 16px; line-height: 1.7; color: #e3e3e3; }
 
-/* 🧠 推理过程样式 - 现代化重构 */
 .reasoning-container {
   margin-bottom: 16px;
   display: flex;
@@ -314,7 +321,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   overflow: hidden;
 }
 
-/* 现代化左侧线条 */
 .reasoning-content::before {
   content: "";
   position: absolute;
@@ -352,7 +358,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   height: 4px;
 }
 
-/* 🚩 表格样式 */
 :deep(.markdown-body table) { width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5rem 0; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; overflow: hidden; }
 :deep(.markdown-body th) { background-color: rgba(255, 255, 255, 0.05); padding: 12px 16px; text-align: left; font-weight: 600; color: #ffffff; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
 :deep(.markdown-body td) { padding: 10px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: #e3e3e3; }
@@ -360,8 +365,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 :deep(.markdown-body tr:nth-child(even)) { background-color: rgba(255, 255, 255, 0.02); }
 
 :deep(.markdown-body :not(pre) > code) { color: #C2C5C3 !important; background-color: rgba(255, 255, 255, 0.1) !important; border: 0px solid rgba(255, 255, 255, 0.2) !important; padding: 0.15em 0.4em !important; border-radius: 6px !important; font-family: inherit !important; font-weight: 500 !important; }
-
-/* 🚩 代码高亮颜色已在main.css中定义 */
 
 .modern-scroll::-webkit-scrollbar { width: 6px; }
 .modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
