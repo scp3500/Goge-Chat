@@ -35,6 +35,24 @@ const showApiKey = ref(false);
       </div>
       <p class="hint">点击眼睛图标切换显示/隐藏密钥。</p>
     </div>
+
+    <!-- SearXNG Instance URL -->
+    <div class="config-group">
+      <div class="group-header">
+        <label>SearXNG 实例地址 (可选)</label>
+      </div>
+      <div class="input-row">
+        <div class="input-box">
+          <input
+            type="text"
+            v-model="settings.searchInstanceUrl"
+            placeholder="例如: https://searx.be (留空使用默认列表)"
+            @change="configStore.updateConfig(settings)"
+          />
+        </div>
+      </div>
+      <p class="hint">默认使用公共开源实例，无需配置即可联网。你也可以设置自己的私有 SearXNG 实例。</p>
+    </div>
   </div>
 </template>
 

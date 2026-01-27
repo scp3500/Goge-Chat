@@ -70,13 +70,15 @@ export const messageCommands = {
     /** 保存消息 */
     saveMessage: (params: SaveMessageParams) => invoke<void>('save_message', params as unknown as Record<string, unknown>),
 
-    /** 保存助手回复（带深度思考） */
-    saveAssistantResponse: (sessionId: string, content: string, reasoningContent: string | null) => 
-        invoke<void>('save_message', { 
-            sessionId, 
-            role: 'assistant', 
-            content, 
-            reasoningContent 
+    /** 保存助手回复(带深度思考和搜索元数据) */
+    saveAssistantResponse: (sessionId: string, content: string, reasoningContent: string | null, fileMetadata: string | null = null, searchMetadata: string | null = null) =>
+        invoke<number>('save_message', {
+            sessionId,
+            role: 'assistant',
+            content,
+            reasoningContent,
+            fileMetadata,
+            searchMetadata
         }),
 };
 
@@ -85,7 +87,7 @@ export const messageCommands = {
  */
 export const aiCommands = {
     /** 向 AI 提问 */
-    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>) => 
+    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>) =>
         invoke<void>('ask_ai', { msg, onEvent }),
 
     /** 停止 AI 生成 */

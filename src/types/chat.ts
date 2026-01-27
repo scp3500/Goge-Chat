@@ -17,9 +17,11 @@ export interface Folder {
 
 // 消息类型
 export interface ChatMessage {
+    id?: number;
     role: 'user' | 'assistant' | 'system';
     content: string;
     reasoningContent?: string | null;
+    fileMetadata?: string | null;
 }
 
 // AI 提供者类型
@@ -35,4 +37,5 @@ export interface AIMessage {
     role: string;
     content: string;
     reasoningContent?: string | null;
+    fileMetadata?: string | null;
 }

@@ -6,6 +6,8 @@ export interface AppSettings {
     scrollbarWidth: number;
     apiKey: string;
     useReasoning: boolean;
+    searchInstanceUrl: string;
+    defaultSearchProvider: string;
 }
 
 // 提供一组默认值，防止空指针
@@ -15,7 +17,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     themeColor: '#1E1F20',
     scrollbarWidth: 12,
     apiKey: '',
-    useReasoning: false
+    useReasoning: false,
+    searchInstanceUrl: 'https://searx.be',
+    defaultSearchProvider: 'all'
 };
 
 // 配置类别

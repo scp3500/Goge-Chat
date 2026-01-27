@@ -130,8 +130,8 @@ const handleScrollUpdate = (pos) => {
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
   /* ---------------------------------- */
-
-  overflow: hidden;
+  
+  /* overflow: hidden; */
 }
 
 .list-fade-enter-active,

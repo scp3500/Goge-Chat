@@ -1,0 +1,21 @@
+﻿cargo :     Finished
+ `dev` profile [unop
+timized + debuginfo]
+ target(s) in 0.77s
+所在位置 行:1 字符: 1
++ cargo check *>&1 |
+ Out-File -FilePath 
+err_utf8.txt -Encodi
+ng utf8
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo  
+            : NotSpe
+cified:     (    Fin
+ished `d...g    et(s
+) in 0.77s:Strin    
+g) [], RemoteExcepti
+    on
+    + FullyQualified
+Erro    rId : Native
+CommandE    rror
+ 

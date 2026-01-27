@@ -1,5 +1,5 @@
-use rusqlite::{Connection, Result, params};
-use serde::{Serialize, Deserialize};
+use rusqlite::{params, Connection, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 // 状态管理容器
@@ -32,13 +32,16 @@ pub struct ChatMessage {
     pub role: String,
     pub content: String,
     pub reasoning_content: Option<String>,
+    pub file_metadata: Option<String>,
+    pub search_metadata: Option<String>,
     pub created_at: Option<String>,
 }
 
 // --- 数据库初始化与迁移 ---
 
 pub fn init_db(conn: &Connection) -> Result<()> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         CREATE TABLE IF NOT EXISTS folders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -61,28 +64,44 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             role TEXT NOT NULL,
             content TEXT NOT NULL,
             reasoning_content TEXT,
+            file_metadata TEXT,
+            search_metadata TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
         );
-    ")?;
+    ",
+    )?;
 
     let mut stmt = conn.prepare("PRAGMA table_info(sessions)")?;
-    let columns_sessions: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
+    let columns_sessions: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>>>()?;
 
     if !columns_sessions.contains(&"last_scroll_pos".to_string()) {
-        let _ = conn.execute("ALTER TABLE sessions ADD COLUMN last_scroll_pos INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN last_scroll_pos INTEGER DEFAULT 0",
+            [],
+        );
     }
 
     if !columns_sessions.contains(&"updated_at".to_string()) {
         let _ = conn.execute("ALTER TABLE sessions ADD COLUMN updated_at DATETIME", []);
-        let _ = conn.execute("UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL", []);
+        let _ = conn.execute(
+            "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+            [],
+        );
     }
 
     if !columns_sessions.contains(&"sort_order".to_string()) {
-        let _ = conn.execute("ALTER TABLE sessions ADD COLUMN sort_order INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE sessions ADD COLUMN sort_order INTEGER DEFAULT 0",
+            [],
+        );
         // 初始化现有记录的排序顺序为 id 顺序
-        let _ = conn.execute("UPDATE sessions SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL", []);
+        let _ = conn.execute(
+            "UPDATE sessions SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL",
+            [],
+        );
     }
 
     // folder_id 可能已经在 CREATE TABLE 语句中创建了，也可能是以前的老数据库需要迁移
@@ -92,23 +111,42 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     }
 
     let mut stmt = conn.prepare("PRAGMA table_info(folders)")?;
-    let columns_folders: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
+    let columns_folders: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>>>()?;
     if !columns_folders.contains(&"is_collapsed".to_string()) {
-        let _ = conn.execute("ALTER TABLE folders ADD COLUMN is_collapsed BOOLEAN DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE folders ADD COLUMN is_collapsed BOOLEAN DEFAULT 0",
+            [],
+        );
     }
     if !columns_folders.contains(&"sort_order".to_string()) {
-        let _ = conn.execute("ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0",
+            [],
+        );
         // 初始化现有文件夹的排序顺序为 id 顺序
-        let _ = conn.execute("UPDATE folders SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL", []);
+        let _ = conn.execute(
+            "UPDATE folders SET sort_order = id WHERE sort_order = 0 OR sort_order IS NULL",
+            [],
+        );
     }
 
     let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
-    let columns_messages: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
+    let columns_messages: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>>>()?;
 
     if !columns_messages.contains(&"reasoning_content".to_string()) {
         let _ = conn.execute("ALTER TABLE messages ADD COLUMN reasoning_content TEXT", []);
+    }
+
+    if !columns_messages.contains(&"file_metadata".to_string()) {
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN file_metadata TEXT", []);
+    }
+
+    if !columns_messages.contains(&"search_metadata".to_string()) {
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN search_metadata TEXT", []);
     }
 
     Ok(())
@@ -148,7 +186,10 @@ pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
 }
 
 pub(crate) fn create_session(conn: &Connection, title: &str) -> Result<i64> {
-    conn.execute("INSERT INTO sessions (title, last_scroll_pos) VALUES (?1, 0)", params![title])?;
+    conn.execute(
+        "INSERT INTO sessions (title, last_scroll_pos) VALUES (?1, 0)",
+        params![title],
+    )?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -185,19 +226,29 @@ pub(crate) fn delete_folder(conn: &Connection, id: i64) -> Result<()> {
 }
 
 pub(crate) fn rename_folder(conn: &Connection, id: i64, name: &str) -> Result<()> {
-    conn.execute("UPDATE folders SET name = ?1 WHERE id = ?2", params![name, id])?;
+    conn.execute(
+        "UPDATE folders SET name = ?1 WHERE id = ?2",
+        params![name, id],
+    )?;
     Ok(())
 }
 
 pub(crate) fn update_folder_collapsed(conn: &Connection, id: i64, collapsed: bool) -> Result<()> {
-    conn.execute("UPDATE folders SET is_collapsed = ?1 WHERE id = ?2", params![collapsed, id])?;
+    conn.execute(
+        "UPDATE folders SET is_collapsed = ?1 WHERE id = ?2",
+        params![collapsed, id],
+    )?;
     Ok(())
 }
 
-pub(crate) fn move_session_to_folder(conn: &Connection, session_id: i64, folder_id: Option<i64>) -> Result<()> {
+pub(crate) fn move_session_to_folder(
+    conn: &Connection,
+    session_id: i64,
+    folder_id: Option<i64>,
+) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET folder_id = ?1 WHERE id = ?2",
-        params![folder_id, session_id]
+        params![folder_id, session_id],
     )?;
     Ok(())
 }
@@ -208,10 +259,18 @@ pub(crate) fn delete_session(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn clear_messages(conn: &Connection, session_id: i64) -> Result<()> {
+    conn.execute(
+        "DELETE FROM messages WHERE session_id = ?1",
+        params![session_id],
+    )?;
+    Ok(())
+}
+
 pub(crate) fn update_session_title(conn: &Connection, id: i64, title: &str) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET title = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-        params![title, id]
+        params![title, id],
     )?;
     Ok(())
 }
@@ -219,7 +278,7 @@ pub(crate) fn update_session_title(conn: &Connection, id: i64, title: &str) -> R
 pub(crate) fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Result<()> {
     conn.execute(
         "UPDATE sessions SET last_scroll_pos = ?1 WHERE id = ?2",
-        params![pos, id]
+        params![pos, id],
     )?;
     Ok(())
 }
@@ -229,18 +288,22 @@ pub(crate) fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Res
 pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
     println!("📥 [DB] Loading messages for session ID: {}", session_id);
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, role, content, reasoning_content, created_at FROM messages WHERE session_id = ?1 ORDER BY id ASC"
+        "SELECT id, session_id, role, content, reasoning_content, file_metadata, search_metadata, created_at FROM messages WHERE session_id = ?1 ORDER BY id ASC"
     )?;
 
     let msg_iter = stmt.query_map(params![session_id], |row| {
         let reasoning_content: Option<String> = row.get(4)?;
+        let file_metadata: Option<String> = row.get(5)?;
+        let search_metadata: Option<String> = row.get(6)?;
         Ok(ChatMessage {
             id: Some(row.get(0)?),
             session_id: row.get(1)?,
             role: row.get(2)?,
             content: row.get(3)?,
             reasoning_content,
-            created_at: Some(row.get(5)?),
+            file_metadata,
+            search_metadata,
+            created_at: Some(row.get(7)?),
         })
     })?;
 
@@ -248,7 +311,10 @@ pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<Cha
     for msg in msg_iter {
         let msg = msg?;
         if msg.role == "assistant" {
-            println!("📥 [DB] Loaded assistant message - reasoning content length: {:?}", msg.reasoning_content.as_ref().map(|s| s.len()));
+            println!(
+                "📥 [DB] Loaded assistant message - reasoning content length: {:?}",
+                msg.reasoning_content.as_ref().map(|s| s.len())
+            );
         }
         messages.push(msg);
     }
@@ -256,41 +322,74 @@ pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<Cha
     Ok(messages)
 }
 
-pub(crate) fn save_message(conn: &Connection, session_id: i64, role: &str, content: &str, reasoning_content: Option<&str>) -> Result<()> {
+pub(crate) fn save_message(
+    conn: &Connection,
+    session_id: i64,
+    role: &str,
+    content: &str,
+    reasoning_content: Option<&str>,
+    file_metadata: Option<&str>,
+    search_metadata: Option<&str>,
+) -> Result<i64> {
     println!("💾 [DB] === DB_SAVE_MESSAGE ===");
     println!("💾 [DB] Session ID: {}", session_id);
     println!("💾 [DB] Role: {}", role);
     println!("💾 [DB] Content length: {}", content.len());
-    println!("💾 [DB] Reasoning content received: {:?}", reasoning_content.map(|s| format!("length: {}", s.len())));
-    
-    // 存储实际传递的深度思考内容
-    let reasoning_to_store = reasoning_content;
-    
+    println!(
+        "💾 [DB] Reasoning content received: {:?}",
+        reasoning_content.map(|s| format!("length: {}", s.len()))
+    );
+
     println!("💾 [DB] Executing INSERT statement...");
     let result = conn.execute(
-        "INSERT INTO messages (session_id, role, content, reasoning_content) VALUES (?1, ?2, ?3, ?4)",
-        params![session_id, role, content, reasoning_to_store],
+        "INSERT INTO messages (session_id, role, content, reasoning_content, file_metadata, search_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![session_id, role, content, reasoning_content, file_metadata, search_metadata],
     );
-    
+
     match result {
         Ok(rows) => {
             println!("💾 [DB] INSERT successful, {} rows affected", rows);
             println!("💾 [DB] Updating session timestamp...");
             let update_result = conn.execute(
                 "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-                params![session_id]
+                params![session_id],
             );
             match update_result {
                 Ok(_) => println!("💾 [DB] Session update successful"),
-                Err(e) => println!("💾 [DB] Session update failed: {}", e)
+                Err(e) => println!("💾 [DB] Session update failed: {}", e),
             }
-            Ok(())
+            Ok(conn.last_insert_rowid())
         }
         Err(e) => {
             println!("💾 [DB] INSERT FAILED: {}", e);
             Err(e)
         }
     }
+}
+
+pub(crate) fn delete_message(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM messages WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
+pub(crate) fn update_message_content(conn: &Connection, id: i64, content: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE messages SET content = ?1 WHERE id = ?2",
+        params![content, id],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn delete_messages_after(
+    conn: &Connection,
+    session_id: i64,
+    message_id: i64,
+) -> Result<()> {
+    conn.execute(
+        "DELETE FROM messages WHERE session_id = ?1 AND id > ?2",
+        params![session_id, message_id],
+    )?;
+    Ok(())
 }
 
 pub(crate) fn update_sessions_order(conn: &mut Connection, orders: Vec<(i64, i32)>) -> Result<()> {

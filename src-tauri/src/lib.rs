@@ -1,23 +1,23 @@
 // src-tauri/src/lib.rs
 
-mod models;
-mod db;
 mod commands;
+mod db;
+mod models; // I'll rename the file to avoid conflict or just use it as a module
 
+use crate::db::DbState;
 use rusqlite::Connection;
 use std::sync::Mutex;
-use crate::db::DbState;
 use tauri::Manager;
 
 // ✨ 【新增导入】：用于多线程安全的红绿灯标志位
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::State;
 
 // ✨ 【新增导入】：用于 HTTP 请求
+use crate::models::Message;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use crate::models::Message; // 假设 Message 在 models 模块中定义
+use serde::{Deserialize, Serialize}; // 假设 Message 在 models 模块中定义
 
 // ✨ 【新增状态】：定义全局中断标志位
 pub struct GoleState {
@@ -71,7 +71,7 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
 
     // 1. 【动态读取】加载配置
     let config = commands::config_cmd::load_config(app).await?;
-    
+
     // 2. 【安全校验】
     if config.api_key.trim().is_empty() {
         return Err("API Key 未配置，请前往设置页面填写".to_string());
@@ -90,7 +90,8 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
     };
 
     // 发送请求
-    let response = client.post(base_url)
+    let response = client
+        .post(base_url)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request_body)
@@ -104,19 +105,20 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
     }
 
     // 解析 JSON
-    let api_res: APIResponse = response.json().await
+    let api_res: APIResponse = response
+        .json()
+        .await
         .map_err(|e| format!("JSON 解析失败: {}", e))?;
 
     // 提取内容
-    let raw_content = api_res.choices.first()
+    let raw_content = api_res
+        .choices
+        .first()
         .map(|c| c.message.content.clone())
         .unwrap_or_else(|| "新对话".to_string());
 
     // 🧹 Rust 级基础清洗 (去掉换行和前后空格)
-    let clean_title = raw_content
-        .replace("\n", "")
-        .trim()
-        .to_string();
+    let clean_title = raw_content.replace("\n", "").trim().to_string();
 
     println!("✨ 后端生成标题完成: {}", clean_title);
     Ok(clean_title)
@@ -129,8 +131,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_handle = app.handle();
-            let app_dir = app_handle.path().app_data_dir().expect("无法获取 C 盘数据目录");
-            
+            let app_dir = app_handle
+                .path()
+                .app_data_dir()
+                .expect("无法获取 C 盘数据目录");
+
             if !app_dir.exists() {
                 std::fs::create_dir_all(&app_dir).expect("无法在 C 盘创建数据目录");
             }
@@ -151,19 +156,21 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             // 配置管理
-            commands::config_cmd::load_config, 
-            commands::config_cmd::save_config, 
-
+            commands::config_cmd::load_config,
+            commands::config_cmd::save_config,
             // AI 交互
             commands::ai::ask_ai,
-            stop_ai_generation, 
+            stop_ai_generation,
             reset_ai_generation,
             generate_title, // 👈 记得在这里注册！
-
             // 数据库 CRUD 指令
             commands::db_cmd::get_sessions,
             commands::db_cmd::create_session,
             commands::db_cmd::delete_session,
+            commands::db_cmd::clear_messages,
+            commands::db_cmd::delete_message,
+            commands::db_cmd::update_message,
+            commands::db_cmd::delete_messages_after,
             commands::db_cmd::get_messages,
             commands::db_cmd::save_message,
             commands::db_cmd::rename_session,
@@ -176,6 +183,9 @@ pub fn run() {
             commands::db_cmd::move_session_to_folder,
             commands::db_cmd::update_folder_collapsed,
             commands::db_cmd::update_folders_order,
+            // 文件指令
+            commands::file_cmd::open_file,
+            commands::file_cmd::read_file_text_content,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

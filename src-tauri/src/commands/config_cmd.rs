@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 // 必须保留 Manager，因为它提供了 app.path() 扩展方法
-use tauri::{AppHandle, Manager, path::BaseDirectory};
+use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
@@ -15,6 +15,10 @@ pub struct AppConfig {
     pub scrollbar_width: u32,
     #[serde(rename = "apiKey")]
     pub api_key: String,
+    #[serde(rename = "searchInstanceUrl")]
+    pub search_instance_url: String,
+    #[serde(rename = "defaultSearchProvider")]
+    pub default_search_provider: String,
 }
 
 // 辅助函数：内部使用，不需要 pub
@@ -28,7 +32,7 @@ fn get_config_path(app: &AppHandle) -> std::path::PathBuf {
 #[tauri::command]
 pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
     let path = get_config_path(&app);
-    
+
     if !path.exists() {
         return Ok(AppConfig {
             font_size: 16,
@@ -36,6 +40,8 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
             theme_color: "#202124".into(),
             scrollbar_width: 12,
             api_key: "".into(),
+            search_instance_url: "https://searx.be".into(),
+            default_search_provider: "all".into(),
         });
     }
 
@@ -46,7 +52,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 #[tauri::command]
 pub async fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
     let path = get_config_path(&app);
-    
+
     // 确保目录存在
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
