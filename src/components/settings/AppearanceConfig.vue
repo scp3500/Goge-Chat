@@ -1,9 +1,22 @@
 <script setup>
+import { useConfigStore } from '../../stores/config';
+
 defineProps({
-  settings: Object,
-  themes: Array,
-  configStore: Object
+  themes: Array
 });
+
+const configStore = useConfigStore();
+const { settings } = configStore;
+
+// 更新配置
+const handleUpdate = async () => {
+  try {
+    await configStore.updateConfig(settings);
+  } catch (error) {
+    console.error('保存外观设置失败:', error);
+  }
+};
+
 </script>
 
 <template>
@@ -15,17 +28,24 @@ defineProps({
       <div class="settings-card">
         <div class="control-item">
           <label>聊天字号 ({{ settings.fontSize }}px)</label>
-          <input type="range" v-model="settings.fontSize" min="12" max="24" @input="configStore.updateConfig(settings)" />
+          <input 
+            type="range" 
+            v-model.number="settings.fontSize" 
+            min="12" 
+            max="24" 
+            @input="handleUpdate" 
+          />
         </div>
         <div class="control-item">
           <label>主题颜色</label>
           <div class="theme-grid">
             <div 
-              v-for="t in themes" :key="t" 
+              v-for="t in themes" 
+              :key="t" 
               class="theme-item" 
               :style="{ background: t }"
               :class="{ active: settings.themeColor === t }"
-              @click="settings.themeColor = t; configStore.updateConfig(settings)"
+              @click="settings.themeColor = t; handleUpdate()"
             ></div>
           </div>
         </div>

@@ -81,3 +81,29 @@ export const TRASH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" hei
 
 // 新建文件夹图标
 export const FOLDER_PLUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>`;
+
+// 功能标识图标
+// 视觉图标
+export const VISION_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+// 工具图标
+export const TOOLS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+
+// 下拉箭头图标
+export const CHEVRON_DOWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+
+// AI 极简图标 (星星/火花)
+export const AI_SPARKLE_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z" />
+  <path d="M12 10V5M12 19v-4M7 12H2m15 0h5" />
+</svg>`;
+
+// AI 极简图标 (机器人)
+export const AI_BOT_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="14" height="10" x="5" y="10" rx="2"/><path d="M12 10V6m-4 0h8"/><path d="M2 15h3m14 0h3m-13-2h.01m5.99 0h.01"/>
+</svg>`;
+
+// AI 灵感图标 (基于用户上传的特殊角色形象 - 纯净白色极简版)
+export const AI_EVO_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.5C10 2.5 9 4.5 8.5 5.5C6 4.5 3 6.5 3 11C3 17 8 21.5 12 21.5C16 21.5 21 17 21 11C21 6.5 18 4.5 15.5 5.5C15 4.5 14 2.5 12 2.5ZM12 7.8C11.0059 7.8 10.2 8.60589 10.2 9.6C10.2 10.5941 11.0059 11.4 12 11.4C12.9941 11.4 13.8 10.5941 13.8 9.6C13.8 8.60589 12.9941 7.8 12 7.8ZM12 13.2C10.2327 13.2 8.8 14.6327 8.8 16.4C8.8 18.1673 10.2327 19.6 12 19.6C13.7673 19.6 15.2 18.1673 15.2 16.4C15.2 14.6327 13.7673 13.2 12 13.2Z" fill="currentColor"/>
+</svg>`;

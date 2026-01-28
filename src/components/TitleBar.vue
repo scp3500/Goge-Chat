@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { HOME_SVG, SETTINGS_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, CLOSE_SVG } from '../constants/icons.ts';
+import ModelSelector from './chat/ModelSelector.vue';
 
 const appWindow = getCurrentWindow();
 const isMaximized = ref(false);
@@ -27,7 +28,11 @@ onMounted(async () => {
 });
 
 const handleGlobalDrag = async (event) => {
-  if (event.target.closest('.window-controls') || event.target.closest('.back-btn')) return;
+  if (
+    event.target.closest('.window-controls') || 
+    event.target.closest('.back-btn') || 
+    event.target.closest('.model-selector')
+  ) return;
   await appWindow.startDragging();
 };
 
@@ -46,7 +51,10 @@ const openSettings = () => {
 <template>
   <header class="titlebar" :class="{ 'maximized': isMaximized }" @mousedown="handleGlobalDrag">
     <div class="window-title">
-      <span v-if="!isSettings" class="app-name">Goge Chat</span>
+      <template v-if="!isSettings">
+        <span class="app-name">Goge Chat</span>
+        <ModelSelector class="titlebar-model-selector" menuId="titlebar-model" />
+      </template>
       
       <button
         v-else
@@ -86,9 +94,13 @@ const openSettings = () => {
   align-items: center; 
   padding: 0 10px; 
   -webkit-app-region: drag; 
+  position: relative;
+  z-index: 100;
 }
 
-.window-title { font-size: 12px; color: #888; flex: 1; display: flex; align-items: center; }
+.window-title { font-size: 12px; color: #888; flex: 1; display: flex; align-items: center; gap: 20px; }
+.app-name { font-weight: 600; color: #aaa; margin-right: 4px; }
+.titlebar-model-selector { margin-left: 10px; }
 
 /* 返回按钮样式 */
 .back-btn {

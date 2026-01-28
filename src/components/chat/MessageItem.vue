@@ -23,6 +23,14 @@ const toggleReasoning = () => {
   isReasoningExpanded.value = !isReasoningExpanded.value;
 };
 
+// 💡 只有在不生成时，或者是老消息时，才显示功能按钮
+const showActionButtons = computed(() => {
+  if (!chatStore.isGenerating) return true;
+  // 如果正在生成，隐藏最后两条消息（当前的 User 和 Assistant）的按钮
+  const total = chatStore.currentMessages.length;
+  return props.index < total - 2;
+});
+
 // 解析搜索元数据
 const searchResults = computed(() => {
   if (!props.m.searchMetadata) return [];
@@ -50,6 +58,7 @@ const doCopy = async (text, el) => {
 
 // 💡 格式化用户文本,每30个字符换行
 const formatUserText = (text) => {
+  if (!text) return '';
   // 如果是 [REASON] 或 [SEARCH] 等标记，先清理掉展示
   let cleanText = text.replace(/\[REASON\]|\[SEARCH\]/g, '');
   // 去掉附件正文内容的显示
@@ -58,8 +67,13 @@ const formatUserText = (text) => {
   if (index !== -1) {
     cleanText = cleanText.substring(0, index);
   }
-  return cleanText.replace(/(.{30})/g, '$1\n');
+  return cleanText.trim();
 };
+
+const hasVisibleContent = computed(() => {
+  const formatted = formatUserText(props.m.content);
+  return formatted.length > 0;
+});
 
 const parsedFiles = computed(() => {
   if (!props.m.fileMetadata) return [];
@@ -83,7 +97,7 @@ const handleOpenFile = async (path) => {
 const messageRef = ref(null);
 const injectCodeButtons = () => {
   nextTick(() => {
-    if (!messageRef.value) return;
+    if (!messageRef.value || !showActionButtons.value) return;
     // 查找 wrapper，如果已经有wrapper则跳过，或者查找 pre not(.processed)
     const pres = messageRef.value.querySelectorAll('pre:not(.processed)');
     
@@ -142,6 +156,9 @@ const injectCodeButtons = () => {
 
 onMounted(injectCodeButtons);
 watch(() => props.m.content, injectCodeButtons);
+watch(showActionButtons, (val) => {
+  if (val) injectCodeButtons();
+});
 
 const editTextarea = ref(null);
 
@@ -158,48 +175,53 @@ watch(() => props.isEditing, (newVal) => {
   <div class="message-row" :class="String(m.role || 'user').toLowerCase()" ref="messageRef">
     
     <div v-if="m.role === 'user'" class="message-bubble-wrapper">
-      <div class="message-bubble" :class="{ 'is-editing': isEditing }">
-        <template v-if="isEditing">
-          <textarea
-            ref="editTextarea"
-            :value="m.content"
-            class="edit-textarea modern-scroll"
-            @input="$emit('update-edit-content', $event.target.value)"
-            @keydown.esc="$emit('cancel-edit')"
-            @keydown.ctrl.enter="$emit('save-edit')"
-          ></textarea>
-          <div class="edit-actions">
-            <button class="edit-cancel" @click="$emit('cancel-edit')">取消</button>
-            <button class="edit-save" @click="e => $emit('save-edit', e)">保存并重新生成</button>
-          </div>
-        </template>
-        <template v-else>
-          <div class="user-text">{{ formatUserText(m.content) }}</div>
-          <!-- 文件显示区 -->
-          <div v-if="parsedFiles.length > 0" class="message-file-attachments">
-            <div 
-              v-for="file in parsedFiles" 
-              :key="file.path" 
-              class="message-file-card"
-              @dblclick="handleOpenFile(file.path)"
-              title="双击打开文件"
-            >
-              <div class="m-file-icon" v-html="file.icon || ATTACHMENT_SVG"></div>
-              <div class="m-file-info">
-                <span class="m-file-name text-ellipsis">{{ file.name }}</span>
-              </div>
-              <button class="m-open-btn" @click.stop="handleOpenFile(file.path)" title="打开文件">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                  <polyline points="15 3 21 3 21 9"></polyline>
-                  <line x1="10" y1="14" x2="21" y2="3"></line>
-                </svg>
-              </button>
+      <div class="user-turn-content">
+        <!-- 文字气泡 -->
+        <div v-if="hasVisibleContent || isEditing" class="message-bubble" :class="{ 'is-editing': isEditing }">
+          <template v-if="isEditing">
+            <textarea
+              ref="editTextarea"
+              :value="m.content"
+              class="edit-textarea modern-scroll"
+              @input="$emit('update-edit-content', $event.target.value)"
+              @keydown.esc="$emit('cancel-edit')"
+              @keydown.ctrl.enter="$emit('save-edit')"
+            ></textarea>
+            <div class="edit-actions">
+              <button class="edit-cancel" @click="$emit('cancel-edit')">取消</button>
+              <button class="edit-save" @click="e => $emit('save-edit', e)">保存并重新生成</button>
             </div>
+          </template>
+          <template v-else>
+            <div class="user-text">{{ formatUserText(m.content) }}</div>
+          </template>
+        </div>
+
+        <!-- 文件显示区 (独立气泡) -->
+        <div v-if="parsedFiles.length > 0" class="message-file-attachments">
+          <div 
+            v-for="file in parsedFiles" 
+            :key="file.path" 
+            class="message-file-card"
+            @dblclick="handleOpenFile(file.path)"
+            title="双击打开文件"
+          >
+            <div class="m-file-icon" v-html="file.icon || ATTACHMENT_SVG"></div>
+            <div class="m-file-info">
+              <span class="m-file-name text-ellipsis">{{ file.name }}</span>
+            </div>
+            <button class="m-open-btn" @click.stop="handleOpenFile(file.path)" title="打开文件">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </button>
           </div>
-        </template>
+        </div>
       </div>
-      <div v-if="!isEditing" class="msg-action-bar-user">
+      
+      <div v-if="!isEditing && showActionButtons" class="msg-action-bar-user">
         <button class="action-btn" title="编辑" @click="$emit('start-edit')" v-html="EDIT_SVG"></button>
         <button class="action-btn" title="删除" @click="e => $emit('delete', e)" v-html="TRASH_SVG"></button>
       </div>
@@ -238,7 +260,7 @@ watch(() => props.isEditing, (newVal) => {
         <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body"></div>
         <div v-else-if="m.reasoningContent" class="typing-indicator small"><span></span><span></span><span></span></div>
         
-        <div v-if="m.content !== '__LOADING__'" class="msg-action-bar-bottom">
+        <div v-if="m.content !== '__LOADING__' && showActionButtons" class="msg-action-bar-bottom">
           <button class="action-btn" title="重新生成" @click="chatStore.regenerateAction(index)" v-html="REFRESH_SVG"></button>
           <button class="action-btn" title="复制全文" @click="e => doCopy(m.content, e.currentTarget)" v-html="COPY_SVG"></button>
           <button class="action-btn delete-btn" title="删除" @click="e => $emit('delete', e)" v-html="TRASH_SVG"></button>
@@ -257,11 +279,12 @@ watch(() => props.isEditing, (newVal) => {
 .action-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.06); }
 .action-btn.delete-btn:hover { color: #ff4d4f; background: rgba(255, 77, 79, 0.1); }
 
-.message-bubble-wrapper { display: flex; flex-direction: column; align-items: flex-end; max-width: 80%; }
+.message-bubble-wrapper { display: flex; flex-direction: column; align-items: flex-end; max-width: 85%; }
+.user-turn-content { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; width: 100%; }
 .msg-action-bar-user { display: flex; gap: 4px; margin-top: 4px; opacity: 0; visibility: hidden; transition: all 0.2s; }
 .message-bubble-wrapper:hover .msg-action-bar-user { opacity: 1; visibility: visible; }
 
-.message-bubble { padding: 12px 16px; border-radius: 18px; background: #3a3a3c; color: #fff; max-width: 100%; word-wrap: break-word; }
+.message-bubble { padding: 12px 16px; border-radius: 18px; background: #3a3a3c; color: #fff; max-width: 100%; word-wrap: break-word; white-space: pre-wrap; }
 .message-bubble.is-editing { width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; }
 .edit-textarea { width: 100%; min-height: 100px; background: transparent; border: none; color: #fff; font-size: 15px; line-height: 1.6; resize: vertical; outline: none; font-family: inherit; }
 .edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
@@ -279,7 +302,7 @@ watch(() => props.isEditing, (newVal) => {
 .markdown-body { font-size: 16px; line-height: 1.7; color: #e3e3e3; }
 .reasoning-container { margin-bottom: 16px; display: flex; flex-direction: column; }
 .reasoning-status { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; color: rgba(255, 255, 255, 0.45); font-size: 13px; border-radius: 6px; width: fit-content; }
-.status-icon { width: 14px; height: 14px; display: flex; align-items: center; color: #818cf8; }
+.status-icon { width: 14px; height: 14px; display: flex; align-items: center; color: #ffffff; opacity: 0.8; }
 .status-arrow { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .status-arrow.is-expanded { transform: rotate(180deg); }
 .reasoning-content { margin-top: 4px; padding-left: 12px; position: relative; overflow: hidden; }

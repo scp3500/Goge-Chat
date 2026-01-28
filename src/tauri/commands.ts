@@ -135,6 +135,9 @@ export const tauriCommands = {
     ...aiCommands,
     ...configCommands,
     ...dbCommands,
+    /** 文件相关 */
+    open_file: (path: string) => invoke<void>('open_file', { path }),
+    read_file_text_content: (path: string) => invoke<string>('read_file_text_content', { path }),
 };
 
 /**

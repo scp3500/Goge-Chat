@@ -19,6 +19,14 @@ pub struct AppConfig {
     pub search_instance_url: String,
     #[serde(rename = "defaultSearchProvider")]
     pub default_search_provider: String,
+    #[serde(rename = "providers")]
+    pub providers: serde_json::Value,
+    #[serde(rename = "defaultProviderId")]
+    pub default_provider_id: String,
+    #[serde(rename = "selectedModelId")]
+    pub selected_model_id: String,
+    #[serde(rename = "useReasoning")]
+    pub use_reasoning: bool,
 }
 
 // 辅助函数：内部使用，不需要 pub
@@ -42,6 +50,10 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
             api_key: "".into(),
             search_instance_url: "https://searx.be".into(),
             default_search_provider: "all".into(),
+            providers: serde_json::json!([]),
+            default_provider_id: "deepseek".into(),
+            selected_model_id: "deepseek-chat".into(),
+            use_reasoning: false,
         });
     }
 

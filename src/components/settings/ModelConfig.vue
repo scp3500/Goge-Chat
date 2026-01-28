@@ -1,30 +1,58 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useProviderConfig } from '../../composables/useProviderConfig';
+import { useConfigStore } from '../../stores/config';
 import { EYE_OPEN_SVG, EYE_CLOSED_SVG } from '../../constants/icons.ts';
 
-defineProps({
-  providerName: String,
-  providerId: String,
-  settings: Object,
-  configStore: Object
+const props = defineProps({
+  providerId: String
 });
 
+const configStore = useConfigStore();
+const { currentProvider, updateCurrentProvider } = useProviderConfig();
+
 const showApiKey = ref(false);
+
+// 当前提供商的配置（响应式）
+const providerConfig = computed(() => currentProvider.value);
+
+// 更新 API Key
+const handleApiKeyChange = async () => {
+  if (providerConfig.value && providerConfig.value.apiKey !== undefined) {
+    try {
+      await updateCurrentProvider({ apiKey: providerConfig.value.apiKey });
+    } catch (error) {
+      console.error('保存 API Key 失败:', error);
+    }
+  }
+};
+
+// 更新搜索实例 URL
+const handleSearchUrlChange = async () => {
+  try {
+    await configStore.updateConfig({ 
+      searchInstanceUrl: configStore.settings.searchInstanceUrl 
+    });
+  } catch (error) {
+    console.error('保存搜索实例地址失败:', error);
+  }
+};
+
 </script>
 
 <template>
-  <div class="config-content">
+  <div class="config-content" v-if="providerConfig">
     <div class="config-group">
       <div class="group-header">
-        <label>{{ providerName }} API Key</label>
+        <label>{{ providerConfig.name }} API Key</label>
       </div>
       <div class="input-row">
         <div class="input-box">
           <input
             :type="showApiKey ? 'text' : 'password'"
-            v-model="settings.apiKey"
+            v-model="providerConfig.apiKey"
             :placeholder="`在此输入您的 ${providerId === 'ollama' ? 'Ollama 地址' : 'sk-...'}`"
-            @change="configStore.updateConfig(settings)"
+            @change="handleApiKeyChange"
           />
           <button
             class="eye-btn"
@@ -36,6 +64,24 @@ const showApiKey = ref(false);
       <p class="hint">点击眼睛图标切换显示/隐藏密钥。</p>
     </div>
 
+    <!-- Base URL (如果需要自定义) -->
+    <div class="config-group" v-if="providerConfig.baseUrl">
+      <div class="group-header">
+        <label>API Base URL</label>
+      </div>
+      <div class="input-row">
+        <div class="input-box">
+          <input
+            type="text"
+            v-model="providerConfig.baseUrl"
+            placeholder="例如: https://api.example.com"
+            @change="handleApiKeyChange"
+          />
+        </div>
+      </div>
+      <p class="hint">大多数情况下保持默认即可。</p>
+    </div>
+
     <!-- SearXNG Instance URL -->
     <div class="config-group">
       <div class="group-header">
@@ -45,9 +91,9 @@ const showApiKey = ref(false);
         <div class="input-box">
           <input
             type="text"
-            v-model="settings.searchInstanceUrl"
+            v-model="configStore.settings.searchInstanceUrl"
             placeholder="例如: https://searx.be (留空使用默认列表)"
-            @change="configStore.updateConfig(settings)"
+            @change="handleSearchUrlChange"
           />
         </div>
       </div>

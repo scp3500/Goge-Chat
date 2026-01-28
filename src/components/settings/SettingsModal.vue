@@ -1,61 +1,65 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useConfigService } from '../../services/configService';
+import { computed } from 'vue';
+import { useSettings } from '../../composables/useSettings';
+import { useProviderConfig } from '../../composables/useProviderConfig';
 import SidebarNav from './SidebarNav.vue';
 import ProviderList from './ProviderList.vue';
 import ModelConfig from './ModelConfig.vue';
 import AppearanceConfig from './AppearanceConfig.vue';
 
-// 1. 注入配置服务
-const configStore = useConfigService();
-const { settings } = configStore;
+// 使用 composables
+const { configStore, settingsStore, currentCategoryTitle } = useSettings();
+const { allProviders, toggleProvider } = useProviderConfig();
 
 const emit = defineEmits(['close']);
 
-// 2. 主题列表
+// 主题列表
 const themes = ['#202124', '#1b1b1f', '#0f0f10', '#2c2c32'];
 
-// 3. 布局控制变量
-const activeCategory = ref('models');
-const activeProviderId = ref('deepseek');
-
-// 4. 供应商列表
-const providers = ref([
-  { id: 'deepseek', name: 'DeepSeek', icon: '🐋', status: 'on' },
-  { id: 'openai', name: 'OpenAI', icon: '🤖', status: 'off' },
-  { id: 'claude', name: 'Claude', icon: '🦜', status: 'off' },
-  { id: 'gemini', name: 'Gemini', icon: '💎', status: 'off' },
-  { id: 'ollama', name: 'Ollama', icon: '🦙', status: 'off' },
-  { id: 'qwen', name: 'Qwen', icon: '🐑', status: 'off' }
-]);
-
-// 5. 切换供应商状态
-const toggleProviderStatus = (providerId) => {
-  const provider = providers.value.find(p => p.id === providerId);
-  if (provider) {
-    provider.status = provider.status === 'on' ? 'off' : 'on';
-  }
-};
+// 提供商列表（转换为旧格式以兼容现有组件）
+const providersForList = computed(() => 
+  allProviders.value.map(p => ({
+    id: p.id,
+    name: p.name,
+    icon: p.icon,
+    status: p.enabled ? 'on' : 'off'
+  }))
+);
 
 // 当前选中的供应商名称
 const activeProviderName = computed(() => {
-  const p = providers.value.find(p => p.id === activeProviderId.value);
-  return p ? p.name : '配置详情';
+  const provider = allProviders.value.find(p => p.id === settingsStore.activeProviderId);
+  return provider ? provider.name : '配置详情';
 });
+
+// 切换供应商状态
+const handleToggleStatus = async (providerId) => {
+  try {
+    await toggleProvider(providerId);
+  } catch (error) {
+    console.error('切换提供商状态失败:', error);
+  }
+};
+
+// 关闭设置
+const handleClose = () => {
+  settingsStore.closeSettings();
+  emit('close');
+};
 
 </script>
 
 <template>
   <div class="settings-layout">
     <!-- 左侧导航 -->
-    <SidebarNav v-model:activeCategory="activeCategory" />
+    <SidebarNav v-model:activeCategory="settingsStore.activeCategory" />
 
     <!-- 中间供应商列表 -->
     <ProviderList 
-      v-if="activeCategory === 'models'"
-      :providers="providers"
-      v-model:activeProviderId="activeProviderId"
-      @toggleStatus="toggleProviderStatus"
+      v-if="settingsStore.activeCategory === 'models'"
+      :providers="providersForList"
+      v-model:activeProviderId="settingsStore.activeProviderId"
+      @toggleStatus="handleToggleStatus"
     />
 
     <!-- 右侧详情面板 -->
@@ -64,25 +68,20 @@ const activeProviderName = computed(() => {
         
         <header class="detail-header">
           <div class="header-info">
-            <h2>{{ activeCategory === 'models' ? activeProviderName : '界面外观与显示' }}</h2>
+            <h2>{{ settingsStore.activeCategory === 'models' ? activeProviderName : '界面外观与显示' }}</h2>
           </div>
         </header>
 
         <!-- 模型配置 -->
         <ModelConfig 
-          v-if="activeCategory === 'models'"
-          :providerName="activeProviderName"
-          :providerId="activeProviderId"
-          :settings="settings"
-          :configStore="configStore"
+          v-if="settingsStore.activeCategory === 'models'"
+          :providerId="settingsStore.activeProviderId"
         />
 
         <!-- 显示设置 -->
         <AppearanceConfig 
-          v-else-if="activeCategory === 'appearance'"
-          :settings="settings"
+          v-else-if="settingsStore.activeCategory === 'appearance'"
           :themes="themes"
-          :configStore="configStore"
         />
 
         <!-- 占位符 -->

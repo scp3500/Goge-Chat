@@ -3,6 +3,8 @@ import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
 import { STOP_SVG, SEND_SVG, PLUS_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG } from '../../constants/icons';
+import ModelSelector from './ModelSelector.vue';
+import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -11,12 +13,13 @@ const { isGenerating, useReasoning, useSearch, searchProvider } = storeToRefs(ch
 
 const searchProviders = [
   { id: 'all', name: '全网搜索', icon: GLOBE_SVG },
-  { id: 'google', name: 'Google', icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>' },
-  { id: 'bing', name: 'Bing', icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="#008373" d="M10.5 4L4 6.5v11.5l6.5 2.5l7.5-4.5V9.5z"/><path fill="#00A294" d="M20 9l-9.5-5V20l9.5-5z"/></svg>' },
-  { id: 'baidu', name: 'Baidu', icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="#2932e1" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm-9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>' },
+  { id: 'google', name: 'Google', icon: GLOBE_SVG },
+  { id: 'bing', name: 'Bing', icon: GLOBE_SVG },
+  { id: 'baidu', name: 'Baidu', icon: GLOBE_SVG },
 ];
 
-const showSearchMenu = ref(false);
+const uiStore = useUIStore();
+const showSearchMenu = computed(() => uiStore.isMenuOpen('search-menu'));
 const activeSearchProvider = computed(() => searchProviders.find(p => p.id === searchProvider.value) || searchProviders[0]);
 
 const inputMsg = ref("");
@@ -130,21 +133,23 @@ const handleSearchClick = (e) => {
     e.stopPropagation();
     if (!useSearch.value) {
         useSearch.value = true;
-        showSearchMenu.value = true;
+        uiStore.setActiveMenu('search-menu');
     } else {
-        showSearchMenu.value = !showSearchMenu.value;
+        // 如果已经开启了搜索，再次点击图标则关闭搜索
+        useSearch.value = false;
+        uiStore.setActiveMenu(null);
     }
 };
 
 const selectSearchProvider = (id) => {
     searchProvider.value = id;
-    showSearchMenu.value = false;
+    uiStore.setActiveMenu(null);
 };
 
 // 点击外部关闭菜单
 onMounted(() => {
     window.addEventListener('click', () => {
-        showSearchMenu.value = false;
+        uiStore.setActiveMenu(null);
     });
 });
 
@@ -195,6 +200,10 @@ onMounted(() => {
           >
             <span v-html="PLUS_SVG"></span>
           </button>
+          
+          <!-- 极简模型选择器 -->
+          <ModelSelector minimal direction="up" fullWidth menuId="input-model" />
+
           <button
             class="icon-btn attach-btn"
             @click="handleThinkClick"
@@ -212,27 +221,6 @@ onMounted(() => {
             >
               <span v-html="activeSearchProvider.icon"></span>
             </button>
-            
-            <!-- 搜索源选择菜单 -->
-            <Transition name="fade-slide">
-              <div v-if="showSearchMenu" class="search-menu-popup modern-scroll" @click.stop>
-                <div class="menu-header">网络搜索</div>
-                <div 
-                  v-for="provider in searchProviders" 
-                  :key="provider.id"
-                  class="menu-item"
-                  :class="{ active: searchProvider === provider.id }"
-                  @click="selectSearchProvider(provider.id)"
-                >
-                  <span class="provider-icon" v-html="provider.icon"></span>
-                  <span class="provider-name">{{ provider.name }}</span>
-                  <span class="free-badge">免费</span>
-                </div>
-                <div class="menu-footer" @click="useSearch = false; showSearchMenu = false">
-                   关闭搜索
-                </div>
-              </div>
-            </Transition>
           </div>
         </div>
 
@@ -241,7 +229,7 @@ onMounted(() => {
             class="icon-btn action-btn"
             @click="handleAction"
             :class="{ 'is-stop': isGenerating }"
-            :disabled="!isGenerating && !inputMsg.trim()"
+            :disabled="!isGenerating && !inputMsg.trim() && selectedFiles.length === 0"
           >
             <template v-if="isGenerating">
               <span v-html="STOP_SVG"></span>
@@ -252,6 +240,37 @@ onMounted(() => {
           </button>
         </div>
       </div>
+
+      <!-- 全局搜索源选择菜单 (移出到外层以支持全宽/居中) -->
+      <Transition name="fade-slide">
+        <div v-if="showSearchMenu" class="search-menu-popup modern-scroll" @click.stop>
+          <div class="menu-list">
+            <div 
+              v-for="provider in searchProviders" 
+              :key="provider.id"
+              class="menu-item"
+              :class="{ active: searchProvider === provider.id }"
+              @click="selectSearchProvider(provider.id)"
+            >
+              <div class="menu-item-left">
+                <span class="provider-icon" v-html="provider.icon"></span>
+                <span class="provider-name">{{ provider.name }}</span>
+              </div>
+              <span class="free-badge">免费</span>
+            </div>
+          </div>
+          
+          <div class="menu-footer">
+            <div class="footer-left">网络搜索</div>
+            <div class="menu-shortcuts">
+              <span>ESC 关闭</span>
+              <span>▲▼ 选择</span>
+              <span><span class="key">Ctrl</span> + ▲▼ 翻页</span>
+              <span>↵ 确认</span>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
     </div>
   </div>
@@ -282,6 +301,7 @@ onMounted(() => {
   border: none;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
   cursor: text;
+  position: relative; /* 确保子绝父相 */
 }
 
 .text-input-section {
@@ -334,12 +354,14 @@ onMounted(() => {
   background: transparent;
   color: var(--text-color-white);
   transition: all 0.2s ease;
+  padding: 0;           /* 强烈清除所有默认内边距 */
+  margin: 0;
+  line-height: 0;       /* 防止行感干扰 */
 }
 
-.icon-btn svg {
-  width: 18px;
+.icon-btn :deep(svg) {
+  width: 18px;          /* 统一所有图标大小 */
   height: 18px;
-  fill: currentColor;
 }
 
 .attach-btn {
@@ -358,6 +380,14 @@ onMounted(() => {
 .attach-btn.active-search {
   color: #818cf8;
   opacity: 1;
+}
+
+/* 当处于蓝紫色(激活)状态时，悬停/点击反馈为白色 */
+.attach-btn.active-think:hover,
+.attach-btn.active-search:hover,
+.attach-btn.active-think:active,
+.attach-btn.active-search:active {
+  color: #ffffff !important;
 }
 
 /* --- 文件托盘样式 --- */
@@ -480,87 +510,126 @@ onMounted(() => {
 .modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 
 /* 搜索菜单样式 */
+/* 搜索菜单样式 - 极致毛玻璃 */
 .search-menu-popup {
   position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: 12px;
-  background: rgba(30, 31, 32, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  width: 180px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  bottom: calc(100% - 1px);
+  left: 0;      /* 设为 0 */
+  right: 0;     /* 设为 0 */
+  margin: 0 auto; /* 配合 width: 92% 实现完美居中 */
+  width: 92%;
+  background: rgba(24, 24, 26, 0.98);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
   overflow: hidden;
+  padding: 6px;
 }
 
-.menu-header {
-  padding: 10px 14px;
-  font-size: 11px;
-  color: #80868b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 10px 14px;
-  gap: 10px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  border-radius: 10px;
 }
 
 .menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .menu-item.active {
-  background: rgba(129, 140, 248, 0.15);
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+}
+
+.menu-item.active .provider-name {
+  color: #4ade80;
+}
+
+.menu-item.active .free-badge {
+  color: rgba(74, 222, 128, 0.5);
+}
+
+.menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .provider-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.provider-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 
 .provider-name {
-  flex: 1;
-  font-size: 13px;
-  color: #e3e3e3;
+  font-size: 14px;
+  color: #efefef;
+  font-weight: 500;
 }
 
 .free-badge {
-  font-size: 10px;
-  color: #818cf8;
-  background: rgba(129, 140, 248, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .menu-footer {
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #ef4444;
-  text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  background: rgba(239, 68, 68, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 6px;
 }
 
-.menu-footer:hover {
-  background: rgba(239, 68, 68, 0.1);
+.footer-left {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
+.menu-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.menu-shortcuts .key {
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-right: 2px;
 }
 
 /* 动画 */
 .fade-slide-enter-active, .fade-slide-leave-active {
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .fade-slide-enter-from, .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(15px);
 }
 </style>

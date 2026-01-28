@@ -16,22 +16,50 @@ pub async fn ask_ai(
     // 1. 加载配置
     let config = config_cmd::load_config(app).await?;
 
-    if config.api_key.trim().is_empty() {
-        return Err("API Key 未配置，请前往设置页面填写".to_string());
+    // 2. 确定当前使用的模型和提供商
+    let selected_model = config.selected_model_id.clone();
+    let selected_provider_id = config.default_provider_id.clone();
+
+    // 从 providers 数组中找到当前选中的提供商配置
+    let providers = config
+        .providers
+        .as_array()
+        .ok_or("配置错误：无法读取提供商列表")?;
+    let provider_config = providers
+        .iter()
+        .find(|p| p["id"].as_str() == Some(&selected_provider_id))
+        .ok_or(format!("找不到提供商配置: {}", selected_provider_id))?;
+
+    let api_key = provider_config["apiKey"].as_str().unwrap_or("").to_string();
+    let base_url = provider_config["baseUrl"]
+        .as_str()
+        .unwrap_or("https://api.deepseek.com")
+        .to_string();
+
+    if api_key.trim().is_empty() {
+        return Err(format!(
+            "{} 的 API Key 未配置，请前往设置页面填写",
+            provider_config["name"].as_str().unwrap_or("该提供商")
+        ));
     }
 
     let client = reqwest::Client::new();
     let messages = msg;
 
-    // 检查是否需要推理
-    let is_reasoning = messages
+    // 检查是否需要强制使用推理 (如果用户手动输入了 [REASON] 标记)
+    let has_reason_tag = messages
         .iter()
         .any(|m| m.role == "user" && m.content.contains("[REASON]"));
 
-    let model = if is_reasoning {
-        "deepseek-reasoner"
+    let model = if has_reason_tag {
+        // 如果有标记且是 DeepSeek，切换到 reasoner
+        if selected_provider_id == "deepseek" {
+            "deepseek-reasoner".to_string()
+        } else {
+            selected_model
+        }
     } else {
-        "deepseek-chat"
+        selected_model
     };
 
     // 预处理消息
@@ -107,9 +135,15 @@ pub async fn ask_ai(
         stream: true,
     };
 
+    let url = if base_url.ends_with("/chat/completions") {
+        base_url.clone()
+    } else {
+        format!("{}/chat/completions", base_url.trim_end_matches('/'))
+    };
+
     let response = client
-        .post("https://api.deepseek.com/chat/completions")
-        .header("Authorization", format!("Bearer {}", config.api_key))
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
         .json(&payload)
         .send()
         .await
