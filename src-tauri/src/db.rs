@@ -310,12 +310,6 @@ pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<Cha
     let mut messages = Vec::new();
     for msg in msg_iter {
         let msg = msg?;
-        if msg.role == "assistant" {
-            println!(
-                "📥 [DB] Loaded assistant message - reasoning content length: {:?}",
-                msg.reasoning_content.as_ref().map(|s| s.len())
-            );
-        }
         messages.push(msg);
     }
     println!("📥 [DB] Total messages loaded: {}", messages.len());

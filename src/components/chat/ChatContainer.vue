@@ -9,7 +9,7 @@ import ChatInput from "./ChatInput.vue";
 
 const chatStore = useChatStore();
 // 使用 storeToRefs 保持响应式
-const { activeId, currentMessages, isGenerating, activeSession } = storeToRefs(chatStore);
+const { activeId, currentMessages, isGenerating, activeSession, isChatViewActive } = storeToRefs(chatStore);
 
 const messageListRef = ref(null);
 
@@ -18,9 +18,12 @@ const messageListRef = ref(null);
  */
 const triggerScroll = async () => {
   await nextTick();
-  if (messageListRef.value?.scrollToBottom) {
-    messageListRef.value.scrollToBottom();
-  }
+  // 再次等待一帧，确保 v-show 的 display 切换已完成且布局已重绘
+  setTimeout(() => {
+    if (messageListRef.value?.scrollToBottom) {
+      messageListRef.value.scrollToBottom();
+    }
+  }, 10);
 };
 
 const handleStop = async () => {
@@ -37,18 +40,42 @@ watch(
   activeId,
   async (newId) => {
     if (newId) {
-      await chatStore.loadMessages(newId);
-      triggerScroll();
+      // 关键修复：如果当前会话正在生成消息，不要重新从数据库加载！
+      // 这里的 store 状态是最新的，包含正在生成的临时消息。
+      // 如果重载，会因为数据库还没保存而丢失 assistant 消息，导致追加到 user 气泡。
+      if (chatStore.generatingSessionId === newId && chatStore.isGenerating) {
+        console.log("🚫 Skipping loadMessages because generating session is active:", newId);
+        triggerScroll();
+      } else {
+        await chatStore.loadMessages(newId);
+        triggerScroll();
+      }
     }
   },
   { immediate: true }
 );
 
-// 监听消息变化
+// 监听视图激活状态（从设置返回时触发）
+watch(
+  isChatViewActive,
+  (isActive) => {
+    if (isActive) {
+      console.log("👀 Chat view active, triggering scroll restoration");
+      triggerScroll();
+    }
+  }
+);
+
+// 监听消息数量增加（新消息添加时才滚动，避免流式完成时的跳动）
+let previousMessageCount = 0;
 watch(
   () => currentMessages.value?.length,
-  () => triggerScroll(),
-  { deep: true }
+  (newCount) => {
+    if (newCount > previousMessageCount) {
+      triggerScroll();
+    }
+    previousMessageCount = newCount || 0;
+  }
 );
 
 

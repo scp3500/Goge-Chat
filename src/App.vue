@@ -17,6 +17,18 @@ const chatStore = useChatStore();
 const isMaximized = ref(false); 
 const showSettings = ref(false); 
 
+// 处理打开设置
+const handleOpenSettings = () => {
+    showSettings.value = true;
+    chatStore.setChatViewActive(false);  // 通知聊天 store 视图已切换
+};
+
+// 处理返回聊天
+const handleBackToChat = () => {
+    showSettings.value = false;
+    chatStore.setChatViewActive(true);  // 通知聊天 store 视图已激活
+}; 
+
 
 /**
  * 🩺 核心修复：全局拦截函数
@@ -59,13 +71,14 @@ onUnmounted(() => {
   >
     <TitleBar 
       :is-settings="showSettings" 
-      @open-settings="showSettings = true" 
-      @back-home="showSettings = false" 
+      @open-settings="handleOpenSettings" 
+      @back-home="handleBackToChat" 
     />
     
     <div class="content-area">
-      <transition name="view-fade" mode="out-in">
-        <div v-if="!showSettings" class="main-view">
+      <!-- 使用 v-show 替代 v-if，保持 ChatContainer 不被卸载 -->
+      <transition name="view-fade">
+        <div v-show="!showSettings" class="main-view">
           <SideBar 
             :active="chatStore.activeId" 
             :list="chatStore.historyList" 
@@ -86,8 +99,10 @@ onUnmounted(() => {
             <p>选择或创建一个对话开始</p>
           </div>
         </div>
+      </transition>
 
-        <SettingsModal v-else @close="showSettings = false" />
+      <transition name="view-fade">
+        <SettingsModal v-show="showSettings" @close="handleBackToChat" />
       </transition>
     </div>
   </div>
@@ -137,10 +152,14 @@ html, body, #app {
   overflow: hidden; 
 }
 
+
 .main-view { 
   display: flex; 
   width: 100%; 
   height: 100%; 
+  position: absolute;  /* 关键：绝对定位，防止动画期间挤占空间 */
+  top: 0;
+  left: 0;
 }
 
 .empty-chat { 

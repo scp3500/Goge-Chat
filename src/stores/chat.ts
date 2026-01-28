@@ -23,6 +23,14 @@ export const useChatStore = defineStore('chat', () => {
     const useSearch = ref(false);
     const searchProvider = ref('all');
 
+    // --- 暂停/恢复相关状态 ---
+    const generatingSessionId = ref<string | null>(null);  // 记录正在生成消息的会话 ID
+    const pausedChunks = ref<{ content: string[], reasoning: string[] }>({ content: [], reasoning: [] });  // 暂停期间的消息块
+    const isChatViewActive = ref(true);  // 追踪聊天视图是否激活（用于区分设置界面）
+
+    // 临时保存正在生成的完整消息（用于在会话切换时恢复）
+    const tempGeneratedMessage = ref<{ content: string, reasoning: string } | null>(null);
+
     // 使用 config store 中的推理设置
     const configStore = useConfigStore();
 
@@ -43,8 +51,50 @@ export const useChatStore = defineStore('chat', () => {
 
     const switchSession = async (sessionId: string) => {
         if (activeId.value === sessionId) return;
+
         activeId.value = sessionId;
         await loadMessages(sessionId);
+    };
+
+    /**
+     * 应用缓存的消息块（用于从设置界面返回聊天界面时）
+     */
+    const applyPausedChunks = () => {
+        // 只在有缓存且仍在生成时才应用
+        if (!generatingSessionId.value || !isGenerating.value) {
+            return;
+        }
+
+        if (generatingSessionId.value === activeId.value && pausedChunks.value.content.length > 0) {
+            const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+            // 确保最后一条消息存在且确实是 assistant 消息
+            if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.id) {
+                // 应用缓存的内容消息块
+                for (const chunk of pausedChunks.value.content) {
+                    lastMsg.content += chunk;
+                }
+                // 应用缓存的推理消息块
+                for (const chunk of pausedChunks.value.reasoning) {
+                    if (!lastMsg.reasoningContent) {
+                        lastMsg.reasoningContent = "";
+                    }
+                    lastMsg.reasoningContent += chunk;
+                }
+                // 清空缓存
+                pausedChunks.value = { content: [], reasoning: [] };
+            }
+        }
+    };
+
+    /**
+     * 设置聊天视图激活状态
+     */
+    const setChatViewActive = (active: boolean) => {
+        isChatViewActive.value = active;
+        // 如果重新激活聊天视图，应用缓存的消息块
+        if (active) {
+            applyPausedChunks();
+        }
     };
 
     const loadData = async () => {
@@ -281,14 +331,24 @@ export const useChatStore = defineStore('chat', () => {
 
             // 只在确认是当前会话时才更新消息
             if (activeId.value === sessionId) {
-                const newMessages = history && history.length > 0
+                let newMessages = history && history.length > 0
                     ? history.map(m => ({
                         ...m
-                        // 保留从数据库加载的深度思考内容
                     }))
                     : [{ role: "system", content: "你是一个简洁专业的 AI 助手。" }];
 
-                // 原子性更新：一次性替换整个数组，避免中间状态
+                // 🛡️ 智能合并：如果当前正在生成消息，将正在生成的临时消息追加到历史记录后
+                if (isGenerating.value && generatingSessionId.value === sessionId && tempGeneratedMessage.value) {
+                    console.log("� [loadMessages] Merging active generation into history");
+                    newMessages.push({
+                        role: "assistant", // 确保是 assistant
+                        content: tempGeneratedMessage.value.content || "",
+                        reasoningContent: tempGeneratedMessage.value.reasoning || "",
+                        // id 为空表示未保存
+                    });
+                }
+
+                // 原子性更新
                 currentMessages.value = newMessages;
             }
         } catch (err) {
@@ -342,6 +402,10 @@ export const useChatStore = defineStore('chat', () => {
 
         const sessionId = activeId.value;
         isGenerating.value = true;
+
+        // 设置正在生成消息的会话 ID 并清空之前的缓存
+        generatingSessionId.value = sessionId;
+        pausedChunks.value = { content: [], reasoning: [] };
 
         try {
             await invoke("reset_ai_generation");
@@ -398,32 +462,39 @@ export const useChatStore = defineStore('chat', () => {
 
             onEvent.onmessage = (data) => {
                 if (!isGenerating.value) return;
+
+                // 只要是当前会话就更新（不管视图是否隐藏）
+                const isCurrentSession = activeId.value === generatingSessionId.value;
                 const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
                 // 处理内容流
                 if (data.startsWith("c:")) {
                     const content = data.substring(2);
-                    if (lastMsg.content === "__LOADING__") {
-                        lastMsg.content = "";
-                    }
-                    lastMsg.content += content;
                     aiFullContent += content;
+
+                    // 同步更新 tempGeneratedMessage
+                    if (tempGeneratedMessage.value) {
+                        tempGeneratedMessage.value.content += content;
+                    }
+
+                    if (isCurrentSession) {
+                        if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                        lastMsg.content += content;
+                    }
                 }
                 // 处理推理流
                 else if (data.startsWith("r:")) {
                     const content = data.substring(2);
-                    reasoningChunkCount++;
-                    console.log(`🧠 [DEBUG] Frontend received reasoning chunk #${reasoningChunkCount}, length: ${content.length}, preview:`, content.substring(0, 100) + "...");
 
-                    // 初始化推理内容
-                    if (!lastMsg.reasoningContent) {  // ✅ 改为 camelCase
-                        lastMsg.reasoningContent = "";  // ✅ 改为 camelCase
-                        console.log("🧠 [DEBUG] Initializing reasoningContent for last message");
+                    // 同步更新 tempGeneratedMessage
+                    if (tempGeneratedMessage.value) {
+                        tempGeneratedMessage.value.reasoning += content;
                     }
 
-                    lastMsg.reasoningContent += content;  // ✅ 改为 camelCase
-
-                    console.log(`🧠 [DEBUG] lastMsg.reasoningContent length: ${lastMsg.reasoningContent.length}, total chunks: ${reasoningChunkCount}`);
+                    if (isCurrentSession) {
+                        if (!lastMsg.reasoningContent) lastMsg.reasoningContent = "";
+                        lastMsg.reasoningContent += content;
+                    }
                 } else if (data.startsWith("data: ")) {
                     console.log(`🧠 [DEBUG] Raw data event: ${data.substring(0, 50)}...`);
                 } else {
@@ -515,11 +586,17 @@ export const useChatStore = defineStore('chat', () => {
             console.error("对话失败:", error);
         } finally {
             isGenerating.value = false;
+            // 清空生成会话状态和缓存
+            generatingSessionId.value = null;
+            pausedChunks.value = { content: [], reasoning: [] };
         }
     };
 
     const stopGeneration = async () => {
         isGenerating.value = false;
+        // 清空生成会话状态和缓存
+        generatingSessionId.value = null;
+        pausedChunks.value = { content: [], reasoning: [] };
         try { await invoke("stop_ai_generation"); } catch (err) { console.error(err); }
     };
 
@@ -605,6 +682,8 @@ export const useChatStore = defineStore('chat', () => {
         activeId,
         currentMessages,
         isGenerating,
+        generatingSessionId,
+        isChatViewActive,
         isLoading,
         useReasoning,
         useSearch,
@@ -630,5 +709,7 @@ export const useChatStore = defineStore('chat', () => {
         reorderSessions,
         reorderFolders,
         toggleFolder,
+        applyPausedChunks,
+        setChatViewActive,
     };
 });
