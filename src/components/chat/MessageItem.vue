@@ -295,9 +295,52 @@ watch(() => props.isEditing, (newVal) => {
 .message-row { display: flex; width: 100%; }
 .message-row.user { justify-content: flex-end; }
 
-.typing-indicator { display: flex; align-items: center; gap: 6px; padding: 10px 0; }
-.typing-indicator span { width: 6px; height: 6px; background-color: rgba(255, 255, 255, 0.25); border-radius: 50%; animation: sophisticated-bounce 1.4s infinite ease-in-out; }
-@keyframes sophisticated-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.3; } 30% { transform: translateY(-6px); opacity: 1; background-color: #fff; } }
+/* Modern Typing Indicator - Minimal & Clean */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 0; /* No bubble padding */
+  background: transparent; /* No background */
+  border: none; /* No border */
+  border-radius: 0;
+  width: fit-content;
+  margin-top: 2px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Reset small modifer as it's now the default, but keep for specificity if needed */
+.typing-indicator.small {
+  padding: 8px 0;
+  margin: 0;
+}
+
+.typing-indicator span {
+  width: 6px; /* Smaller dots */
+  height: 6px;
+  background: rgba(255, 255, 255, 0.5); /* Subtle color */
+  border-radius: 50%;
+  animation: liquid-flow 1.4s ease-in-out infinite both;
+  box-shadow: none; /* Remove dot shadow */
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes liquid-flow {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-4px); /* Reduce excessive bounce */
+    opacity: 1;
+    background: #ffffff;
+  }
+}
+
 
 .markdown-body { font-size: 16px; line-height: 1.7; color: #e3e3e3; }
 .reasoning-container { margin-bottom: 16px; display: flex; flex-direction: column; }

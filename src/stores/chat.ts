@@ -29,6 +29,44 @@ export const useChatStore = defineStore('chat', () => {
     // 临时保存正在生成的完整消息（用于在会话切换时恢复）
     const tempGeneratedMessage = ref<{ content: string, reasoning: string } | null>(null);
 
+    // 🏄‍♂️ Smooth Streaming Queue State
+    const streamQueue = ref<string[]>([]);
+    const isProcessingQueue = ref(false);
+
+    const processStreamQueue = () => {
+        if (isProcessingQueue.value) return;
+        isProcessingQueue.value = true;
+
+        const animate = () => {
+            // Stop if generation stopped and queue empty
+            if (!isGenerating.value && streamQueue.value.length === 0) {
+                isProcessingQueue.value = false;
+                return;
+            }
+
+            if (streamQueue.value.length > 0) {
+                const isCurrentSession = activeId.value === generatingSessionId.value;
+                const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+
+                // ⚡️ Adaptive Speed Control
+                const charsPerFrame = Math.max(1, Math.floor(streamQueue.value.length / 4));
+                const chunk = streamQueue.value.splice(0, charsPerFrame).join('');
+
+                if (isCurrentSession) {
+                    if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                    lastMsg.content += chunk;
+                }
+
+                if (tempGeneratedMessage.value) {
+                    tempGeneratedMessage.value.content += chunk;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+    };
+
     // 使用 config store 中的推理设置
     const configStore = useConfigStore();
 
@@ -448,7 +486,7 @@ export const useChatStore = defineStore('chat', () => {
             // 添加加载中的助手消息
             currentMessages.value.push({
                 role: "assistant",
-                content: '',
+                content: '__LOADING__',
                 reasoningContent: '',
                 fileMetadata: null,
                 searchMetadata: null
@@ -457,6 +495,8 @@ export const useChatStore = defineStore('chat', () => {
             const onEvent = new Channel<string>();
             let aiFullContent = '';
             let reasoningChunkCount = 0;
+
+
 
             // 监听搜索状态事件
             const unlistenSearch = await listen('search-status', (event: any) => {
@@ -486,15 +526,14 @@ export const useChatStore = defineStore('chat', () => {
                     const content = data.substring(2);
                     aiFullContent += content;
 
-                    // 同步更新 tempGeneratedMessage
-                    if (tempGeneratedMessage.value) {
-                        tempGeneratedMessage.value.content += content;
+                    // 🌊 Push to smooth queue instead of direct rendering
+                    // We split by codepoints to handle emojis correctly
+                    for (const char of content) {
+                        streamQueue.value.push(char);
                     }
 
-                    if (isCurrentSession) {
-                        if (lastMsg.content === "__LOADING__") lastMsg.content = "";
-                        lastMsg.content += content;
-                    }
+                    // Kickstart the processor if idle
+                    processStreamQueue();
                 }
                 // 处理推理流
                 else if (data.startsWith("r:")) {
@@ -601,8 +640,12 @@ export const useChatStore = defineStore('chat', () => {
         } finally {
             isGenerating.value = false;
             // 清空生成会话状态和缓存
+            // 清空生成会话状态和缓存
             generatingSessionId.value = null;
             pausedChunks.value = { content: [], reasoning: [] };
+            generatingSessionId.value = null;
+            pausedChunks.value = { content: [], reasoning: [] };
+            streamQueue.value = []; // Clear queue on stop
         }
     };
 
@@ -611,6 +654,7 @@ export const useChatStore = defineStore('chat', () => {
         // 清空生成会话状态和缓存
         generatingSessionId.value = null;
         pausedChunks.value = { content: [], reasoning: [] };
+        streamQueue.value = []; // Clear queue on stop
         try { await invoke("stop_ai_generation"); } catch (err) { console.error(err); }
     };
 

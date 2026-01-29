@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { debounce } from '../../utils/format';
 import { useChatStore } from "../../stores/chat"; 
 import { useScrollRestore } from '../../composables/useScrollRestore';
@@ -12,6 +12,7 @@ const emit = defineEmits(['update-pos']);
 const chatStore = useChatStore();
 const scrollRef = ref(null);
 const isRestoring = ref(false); 
+const isUserScrolledUp = ref(false); // 💡 追踪用户是否手动向上滚动
 const { performRestore } = useScrollRestore();
 
 // 💡 编辑状态
@@ -73,20 +74,70 @@ const handleDelete = async (event, index, m) => {
 };
 
 // 💡 暴露给父组件的滚动方法
-defineExpose({ scrollToBottom: () => {
-  if (!isRestoring.value && scrollRef.value) scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
-}});
+defineExpose({ 
+  scrollToBottom: (behavior = 'auto') => {
+    if (!isRestoring.value && scrollRef.value) {
+      scrollRef.value.scrollTo({
+        top: scrollRef.value.scrollHeight + 100, // 添加额外偏移确保滚到最底部
+        behavior: behavior
+      });
+    }
+  }
+});
 
 const handleScroll = debounce((e) => {
+  if (!scrollRef.value) return;
+  const { scrollTop, scrollHeight, clientHeight } = scrollRef.value;
+  
+  // 判定是否在底部 (阈值 60px)
+  const isAtBottom = scrollHeight - scrollTop - clientHeight <= 60;
+  isUserScrolledUp.value = !isAtBottom;
+
   if (isRestoring.value || !props.sessionId || chatStore.isLoading) return;
-  chatStore.updateSessionScroll(props.sessionId, Math.floor(e.target.scrollTop));
-  emit('update-pos', Math.floor(e.target.scrollTop));
-}, 300);
+  chatStore.updateSessionScroll(props.sessionId, Math.floor(scrollTop));
+  emit('update-pos', Math.floor(scrollTop));
+}, 150);
+
+// 监听消息变化，实现智能自动滚动
+watch(() => props.messages, async (newVal, oldVal) => {
+  // 如果是由于切换会话导致的消息变化，不要滚动 (由 restore 处理)
+  // 通过检查长度变化来简单判定是否是流式更新
+  // 如果没有手动向上滚动，则自动滚动到底部
+  if (!isUserScrolledUp.value && !isRestoring.value) {
+     await nextTick();
+     if (scrollRef.value) {
+       scrollRef.value.scrollTo({
+         top: scrollRef.value.scrollHeight + 100, // 添加额外偏移确保滚到最底部
+         behavior: 'smooth' // 丝滑滚动
+       });
+     }
+  }
+}, { deep: true });
+
+// 💡 监听生成状态变化,确保在操作按钮渲染后滚动到底部
+watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
+  // 当生成结束时 (从 true 变为 false),触发一次最终滚动
+  if (wasGen && !isGen && !isUserScrolledUp.value) {
+    // 等待操作按钮渲染完成
+    await nextTick();
+    // 再多等一帧确保布局完全稳定
+    setTimeout(() => {
+      if (scrollRef.value) {
+        scrollRef.value.scrollTo({
+          top: scrollRef.value.scrollHeight + 100,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  }
+});
 
 // 核心监听:切换会话触发坐标恢复
 watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
   if (!newId || loading) return;
   isRestoring.value = true;
+  // 重置滚动状态
+  isUserScrolledUp.value = false;
   
   if (props.messages?.length > 0) {
     await performRestore(scrollRef.value, props.initialScrollPos || 0);
