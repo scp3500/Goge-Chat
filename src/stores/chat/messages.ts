@@ -337,23 +337,41 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 }
             };
 
+            // 获取当前预设
+            const activePreset = configStore.settings.presets.find(p => p.id === configStore.settings.defaultPresetId);
+
             // 准备发送的消息列表（排除加载中的消息）
-            const msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
+            let msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
                 role: m.role,
                 content: m.content,
                 reasoningContent: m.reasoningContent,
                 fileMetadata: m.fileMetadata,
-                searchMetadata: m.searchMetadata // Include searchMetadata
+                searchMetadata: m.searchMetadata
             }));
 
-            console.log("📤 Messages to send before reasoning:", {
+            // 注入系统提示词 (如果预设中有且不是正在生成历史)
+            if (activePreset?.systemPrompt && activePreset.systemPrompt.trim()) {
+                // 如果第一条不是系统提示词，或者第一条系统提示词和预设的不一样，则添加/替换
+                if (msgsToSend.length > 0 && msgsToSend[0].role !== 'system') {
+                    msgsToSend.unshift({
+                        role: 'system',
+                        content: activePreset.systemPrompt,
+                        reasoningContent: null,
+                        fileMetadata: null,
+                        searchMetadata: null
+                    });
+                } else if (msgsToSend.length > 0 && msgsToSend[0].role === 'system') {
+                    // 如果已经有系统提示词且内容不同，则替换（或者你可以选择追加）
+                    // 这里的策略是：如果预设有系统提示词，则始终确保第一条是该预设的系统提示词
+                    msgsToSend[0].content = activePreset.systemPrompt;
+                }
+            }
+
+            console.log("📤 Final messages to send:", {
                 count: msgsToSend.length,
-                useReasoning: useReasoning.value,
-                messages: msgsToSend.map(m => ({
-                    role: m.role,
-                    contentLen: m.content.length,
-                    hasReasoning: !!m.reasoningContent
-                }))
+                preset: activePreset?.name,
+                temperature: activePreset?.temperature,
+                maxTokens: activePreset?.maxTokens
             });
 
             // 如果启用推理，在最后一条用户消息前添加标记
@@ -375,8 +393,11 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 await invoke("ask_ai", {
                     msg: msgsToSend,
                     onEvent,
+                    temperature: activePreset?.temperature,
+                    max_tokens: activePreset?.maxTokens
                 });
             } finally {
+
                 unlistenSearch();
             }
 

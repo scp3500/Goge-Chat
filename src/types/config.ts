@@ -15,6 +15,21 @@ export interface ModelProviderConfig {
     isCustom?: boolean;
 }
 
+// 模型预设配置
+export interface ModelPreset {
+    id: string;
+    name: string;
+    temperature: number;
+    maxTokens: number;
+    systemPrompt: string;
+    isDefault?: boolean;
+    // 高级配置可以放在这里
+    topP?: number;
+    presencePenalty?: number;
+    frequencyPenalty?: number;
+}
+
+
 // 应用设置类型
 export interface AppSettings {
     // 外观设置
@@ -31,8 +46,13 @@ export interface AppSettings {
     useSearch: boolean;
     searchProvider: string;
 
+    // 预设设置
+    presets: ModelPreset[];
+    defaultPresetId: string;
+
     // 搜索设置
     searchInstanceUrl: string;
+
     defaultSearchProvider: string;
 
     // 兼容旧版本的 apiKey（将逐步废弃）
@@ -133,11 +153,23 @@ export const DEFAULT_SETTINGS: AppSettings = {
     searchProvider: 'all',
     searchInstanceUrl: 'https://searx.be',
     defaultSearchProvider: 'all',
+    presets: [
+        {
+            id: 'default_preset',
+            name: '默认配置',
+            temperature: 0.7,
+            maxTokens: 4096,
+            systemPrompt: '',
+            isDefault: true
+        }
+    ],
+    defaultPresetId: 'default_preset',
     apiKey: '' // 兼容旧版本
 };
 
+
 // 设置分类
-export type SettingsCategory = 'models' | 'appearance' | 'advanced' | 'about';
+export type SettingsCategory = 'models' | 'presets' | 'appearance' | 'advanced' | 'about';
 
 // 配置类别（向后兼容别名）
 export type ConfigCategory = SettingsCategory;

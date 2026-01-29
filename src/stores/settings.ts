@@ -13,8 +13,12 @@ export const useSettingsStore = defineStore('settings', () => {
     /** 当前激活的设置分类 */
     const activeCategory = ref<SettingsCategory>('models');
 
-    /** 当前选中的提供商 ID（在模型配置界面） */
+    /** 当前选中的提供商 ID（在模型服务界面） */
     const activeProviderId = ref<string>('deepseek');
+
+    /** 当前选中的预设 ID（在模型配置界面） */
+    const activePresetId = ref<string>('default_preset');
+
 
     /** 设置面板是否打开 */
     const isModalOpen = ref(false);
@@ -63,8 +67,12 @@ export const useSettingsStore = defineStore('settings', () => {
     };
 
     /**
-     * 标记有未保存的更改
+     * 设置当前选中的预设
      */
+    const setActivePreset = (presetId: string) => {
+        activePresetId.value = presetId;
+    };
+
     const markAsChanged = () => {
         hasUnsavedChanges.value = true;
     };
@@ -80,6 +88,7 @@ export const useSettingsStore = defineStore('settings', () => {
         // 状态
         activeCategory,
         activeProviderId,
+        activePresetId,
         isModalOpen,
         hasUnsavedChanges,
         searchQuery,
@@ -89,7 +98,9 @@ export const useSettingsStore = defineStore('settings', () => {
         closeSettings,
         setCategory,
         setActiveProvider,
+        setActivePreset,
         markAsChanged,
         clearChangedFlag
     };
+
 });

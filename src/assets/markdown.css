@@ -38,6 +38,21 @@
     margin-bottom: 0.8em;
 }
 
+/* 链接样式 */
+.markdown-body a {
+    color: #60a5fa;
+    /* Light blue */
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+    color: #93c5fd;
+    /* Lighter blue on hover */
+}
+
 /* ========================================================
    🚩 核心：代码块渲染逻辑 (VS Code 风格)
    ======================================================== */

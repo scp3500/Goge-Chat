@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { configCommands } from '../tauri/commands';
-import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig } from '../types/config';
+import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset } from '../types/config';
 
 export const useConfigStore = defineStore('config', () => {
     // ========== 状态 ==========
@@ -170,6 +170,73 @@ export const useConfigStore = defineStore('config', () => {
         }
     };
 
+    // ========== 预设管理 ==========
+
+    /** 获取指定预设 */
+    const getPreset = (id: string) =>
+        settings.value.presets?.find(p => p.id === id);
+
+    /** 更新预设内容 */
+    const updatePreset = async (presetId: string, config: Partial<ModelPreset>) => {
+        const presetIndex = settings.value.presets.findIndex(p => p.id === presetId);
+        if (presetIndex === -1) return;
+
+        const updatedPresets = JSON.parse(JSON.stringify(settings.value.presets));
+        updatedPresets[presetIndex] = {
+            ...updatedPresets[presetIndex],
+            ...config
+        };
+
+        await updateConfig({ presets: updatedPresets });
+    };
+
+    /** 添加新预设 */
+    const addPreset = async (name: string) => {
+        const id = `preset_${Date.now()}`;
+        const newPreset: ModelPreset = {
+            id,
+            name,
+            temperature: 0.7,
+            maxTokens: 4096,
+            systemPrompt: ''
+        };
+
+        const newPresets = [...(settings.value.presets || []), newPreset];
+        await updateConfig({ presets: newPresets });
+        return id;
+    };
+
+    /** 删除预设 */
+    const removePreset = async (presetId: string) => {
+        const newPresets = settings.value.presets.filter(p => p.id !== presetId);
+
+        let newDefaultId = settings.value.defaultPresetId;
+        if (settings.value.defaultPresetId === presetId) {
+            newDefaultId = newPresets.length > 0 ? newPresets[0].id : '';
+        }
+
+        await updateConfig({
+            presets: newPresets,
+            defaultPresetId: newDefaultId
+        });
+    };
+
+    /** 处理预置排序 */
+    const handlePresetsReorder = async (newSimplePresets: { id: string }[]) => {
+        try {
+            const originalPresets = [...settings.value.presets];
+            const newOrder: ModelPreset[] = newSimplePresets
+                .map(simple => originalPresets.find(p => p.id === simple.id))
+                .filter((p): p is ModelPreset => Boolean(p));
+
+            await updateConfig({ presets: JSON.parse(JSON.stringify(newOrder)) });
+        } catch (error) {
+            console.error("[ConfigStore PRESETS_REORDER] FAILED:", error);
+            throw error;
+        }
+    };
+
+
     /**
      * 处理提供商重新排序事件
      * @param newSimpleProviders 包含 id 的简化提供商列表，表示新的顺序
@@ -317,6 +384,13 @@ export const useConfigStore = defineStore('config', () => {
         addCustomProvider,
         removeProvider,
         handleReorder,
-        resetToDefaults
+        resetToDefaults,
+
+        // 预设管理
+        getPreset,
+        updatePreset,
+        addPreset,
+        removePreset,
+        handlePresetsReorder
     };
 });

@@ -7,6 +7,12 @@ import ModelSelector from './ModelSelector.vue';
 import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import NamePresetModal from '../modals/NamePresetModal.vue';
+import { useSettingsStore } from '../../stores/settings';
+import { useConfigStore } from '../../stores/config';
+import { SETTINGS_SVG } from '../../constants/icons.ts';
+
+
 
 const chatStore = useChatStore();
 const { isGenerating, useReasoning, useSearch, searchProvider } = storeToRefs(chatStore);
@@ -19,8 +25,15 @@ const searchProviders = [
 ];
 
 const uiStore = useUIStore();
+const settingsStore = useSettingsStore();
+const configStore = useConfigStore();
+
 const showSearchMenu = computed(() => uiStore.isMenuOpen('search-menu'));
+const showPresetMenu = computed(() => uiStore.isMenuOpen('preset-menu'));
 const activeSearchProvider = computed(() => searchProviders.find(p => p.id === searchProvider.value) || searchProviders[0]);
+
+const showNameModal = ref(false);
+
 
 const inputMsg = ref("");
 const textareaRef = ref(null);
@@ -157,9 +170,31 @@ const handleThinkClick = () => {
   useReasoning.value = !useReasoning.value;
 };
 
+const handleConfigClick = (e) => {
+  e.stopPropagation();
+  uiStore.toggleMenu('preset-menu');
+};
+
+const selectPreset = (presetId) => {
+  if (presetId === 'new') {
+    showNameModal.value = true;
+  } else {
+    configStore.updateConfig({ defaultPresetId: presetId });
+  }
+  uiStore.setActiveMenu(null);
+};
+
+const handleCreatePreset = async (name) => {
+  showNameModal.value = false;
+  const newId = await configStore.addPreset(name);
+  settingsStore.setActivePreset(newId);
+  settingsStore.openSettings('presets');
+};
+
 onMounted(() => {
   autoResize();
 });
+
 </script>
 
 <template>
@@ -193,8 +228,42 @@ onMounted(() => {
 
       <div class="tools-section" @click.stop>
         <div class="tools-left" style="display: flex; align-items: center; gap: 4px;">
+          <div class="preset-btn-wrapper" style="position: relative;">
+            <button
+              class="icon-btn attach-btn"
+              @click="handleConfigClick"
+              title="模型配置"
+              :class="{ 'active-config': showPresetMenu }"
+            >
+              <span v-html="SETTINGS_SVG"></span>
+            </button>
+            
+            <Transition name="fade-slide">
+              <div v-if="showPresetMenu" class="preset-dropdown modern-scroll">
+                <div class="menu-list">
+                  <div 
+                    v-for="preset in configStore.settings.presets" 
+                    :key="preset.id"
+                    class="menu-item"
+                    :class="{ active: configStore.settings.defaultPresetId === preset.id }"
+                    @click="selectPreset(preset.id)"
+                  >
+                    <span class="preset-name">{{ preset.name }}</span>
+                    <span v-if="configStore.settings.defaultPresetId === preset.id" class="check-icon">✓</span>
+                  </div>
+                  <div class="menu-sep"></div>
+                  <div class="menu-item new-preset" @click="selectPreset('new')">
+                    <span class="plus-icon">＋</span>
+                    <span>新建自定义配置</span>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
+
           <button
             class="icon-btn attach-btn"
+
             @click="handleAttachClick"
             title="添加文件/图片"
           >
@@ -273,8 +342,16 @@ onMounted(() => {
       </Transition>
 
     </div>
+
+    <!-- 命名模态框 -->
+    <NamePresetModal 
+      :show="showNameModal" 
+      @close="showNameModal = false" 
+      @confirm="handleCreatePreset"
+    />
   </div>
 </template>
+
 
 <style scoped>
 .input-area {
@@ -381,6 +458,12 @@ onMounted(() => {
   color: #818cf8;
   opacity: 1;
 }
+
+.attach-btn.active-config {
+  color: #818cf8;
+  opacity: 1;
+}
+
 
 /* 当处于蓝紫色(激活)状态时，悬停/点击反馈为白色 */
 .attach-btn.active-think:hover,
@@ -631,5 +714,45 @@ onMounted(() => {
 .fade-slide-enter-from, .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(15px);
+}
+
+/* 预置下拉菜单样式 */
+.preset-dropdown {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  width: 200px;
+  background: rgba(24, 24, 26, 0.98);
+  backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  padding: 6px;
+}
+
+.preset-dropdown .menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.preset-dropdown .new-preset {
+  color: #4ade80;
+  font-weight: 500;
+}
+
+.preset-dropdown .menu-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 0;
+}
+
+.check-icon {
+  color: #4ade80;
+  font-weight: bold;
 }
 </style>

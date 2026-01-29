@@ -5,6 +5,7 @@ import { useChatStore } from "../../stores/chat";
 import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG, BRAIN_SVG, EDIT_SVG, TRASH_SVG, ATTACHMENT_SVG } from '../../constants/icons.ts';
 import { renderMarkdown } from '../../services/markdown';
 import { invoke } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener'; // Import openUrl
 import { useConfigStore } from '../../stores/config'; // Import config store
 import { getProviderIcon } from '../../assets/icons'; // Import icon helper
 
@@ -206,6 +207,19 @@ watch(() => props.isEditing, (newVal) => {
     });
   }
 });
+// 💡 处理链接点击
+// 💡 处理链接点击
+const handleLinkClick = async (event) => {
+  const link = event.target.closest('a');
+  if (link && link.href) {
+    event.preventDefault();
+    try {
+      await openUrl(link.href);
+    } catch (err) {
+      console.error('Failed to open link:', err);
+    }
+  }
+};
 </script>
 
 <template>
@@ -305,7 +319,7 @@ watch(() => props.isEditing, (newVal) => {
           :query="m.searchQuery"
         />
 
-        <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body"></div>
+        <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body" @click="handleLinkClick"></div>
         <div v-else-if="m.reasoningContent" class="typing-indicator small"><span></span><span></span><span></span></div>
         
         <div v-if="m.content !== '__LOADING__' && showActionButtons" class="msg-action-bar-bottom">

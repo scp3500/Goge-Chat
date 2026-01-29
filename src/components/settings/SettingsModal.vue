@@ -5,7 +5,10 @@ import { useProviderConfig } from '../../composables/useProviderConfig';
 import SidebarNav from './SidebarNav.vue';
 import ProviderList from './ProviderList.vue';
 import ModelConfig from './ModelConfig.vue';
+import PresetList from './PresetList.vue';
+import PresetConfig from './PresetConfig.vue';
 import AppearanceConfig from './AppearanceConfig.vue';
+
 
 // 使用 composables
 const { configStore, settingsStore, currentCategoryTitle } = useSettings();
@@ -33,6 +36,13 @@ const activeProviderName = computed(() => {
   return provider ? provider.name : '配置详情';
 });
 
+// 当前选中的预设名称
+const activePresetName = computed(() => {
+  const preset = configStore.settings.presets.find(p => p.id === settingsStore.activePresetId);
+  return preset ? preset.name : '预设配置';
+});
+
+
 // 选择供应商
 const handleProviderSelect = (providerId) => {
   settingsStore.setActiveProvider(providerId);
@@ -57,7 +67,6 @@ const handleAddProvider = async () => {
     console.error('添加提供商失败:', error);
   }
 };
-
 const handleRenameProvider = async (providerId, newName) => {
   try {
     const { updateProvider } = useProviderConfig();
@@ -68,6 +77,7 @@ const handleRenameProvider = async (providerId, newName) => {
 };
 
 const handleDeleteProvider = async (providerId) => {
+
   try {
     const provider = allProviders.value.find(p => p.id === providerId);
     if (!provider) return;
@@ -80,6 +90,51 @@ const handleDeleteProvider = async (providerId) => {
     console.error('删除供应商失败:', error);
   }
 };
+
+
+// --- 预设操作 ---
+const handlePresetSelect = (presetId) => {
+  settingsStore.setActivePreset(presetId);
+};
+
+const handleAddPreset = async () => {
+  try {
+    const newId = await configStore.addPreset('新配置');
+    settingsStore.setActivePreset(newId);
+  } catch (error) {
+    console.error('添加预设失败:', error);
+  }
+};
+
+const handleRenamePreset = async (presetId, newName) => {
+  try {
+    await configStore.updatePreset(presetId, { name: newName });
+  } catch (error) {
+    console.error('重命名预设失败:', error);
+  }
+};
+
+const handleDeletePreset = async (presetId) => {
+  try {
+    const preset = configStore.settings.presets.find(p => p.id === presetId);
+    if (!preset) return;
+    
+    if (confirm(`确定要删除配置 "${preset.name}" 吗？`)) {
+      await configStore.removePreset(presetId);
+    }
+  } catch (error) {
+    console.error('删除预设失败:', error);
+  }
+};
+
+const handlePresetsReorder = async (newList) => {
+  try {
+    await configStore.handlePresetsReorder(newList);
+  } catch (error) {
+    console.error('更新预设排序失败:', error);
+  }
+};
+
 
 const handleReorder = async (newSimpleProviders) => {
   console.log('[SettingsModal] Received reorder event:', newSimpleProviders.map(p => p.id).join(','));
@@ -124,14 +179,32 @@ const handleClose = () => {
       @delete="handleDeleteProvider"
     />
 
+    <!-- 中间预设列表 -->
+    <PresetList
+      v-if="settingsStore.activeCategory === 'presets'"
+      :presets="configStore.settings.presets"
+      :active-preset-id="settingsStore.activePresetId"
+      @update:active-preset-id="handlePresetSelect"
+      @reorder="handlePresetsReorder"
+      @add="handleAddPreset"
+      @rename="handleRenamePreset"
+      @delete="handleDeletePreset"
+    />
+
+
     <!-- 右侧详情面板 -->
     <main class="detail-panel modern-scroll">
       <div class="detail-container">
 
         <header class="detail-header">
           <div class="header-info">
-            <h2>{{ settingsStore.activeCategory === 'models' ? activeProviderName : '界面外观与显示' }}</h2>
+            <h2>{{ 
+                settingsStore.activeCategory === 'models' ? activeProviderName : 
+                settingsStore.activeCategory === 'presets' ? activePresetName : 
+                '界面外观与显示' 
+            }}</h2>
           </div>
+
         </header>
 
         <!-- 模型配置 -->
@@ -139,6 +212,13 @@ const handleClose = () => {
           v-if="settingsStore.activeCategory === 'models'"
           :providerId="settingsStore.activeProviderId"
         />
+
+        <!-- 预设配置 -->
+        <PresetConfig
+          v-else-if="settingsStore.activeCategory === 'presets'"
+          :presetId="settingsStore.activePresetId"
+        />
+
 
         <!-- 显示设置 -->
         <AppearanceConfig 

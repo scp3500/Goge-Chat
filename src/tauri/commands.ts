@@ -87,8 +87,9 @@ export const messageCommands = {
  */
 export const aiCommands = {
     /** 向 AI 提问 */
-    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>) =>
-        invoke<void>('ask_ai', { msg, onEvent }),
+    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>, temperature?: number, max_tokens?: number) =>
+        invoke<void>('ask_ai', { msg, onEvent, temperature, max_tokens }),
+
 
     /** 停止 AI 生成 */
     stopAIGeneration: () => invoke<void>('stop_ai_generation'),

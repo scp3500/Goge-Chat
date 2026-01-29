@@ -63,7 +63,11 @@ export interface AskAIParams {
         reasoningContent?: string | null;
     }>;
     onEvent: any; // Channel 类型
+    temperature?: number;
+    maxTokens?: number;
 }
+
+
 
 export interface GenerateTitleParams {
     msg: Array<{

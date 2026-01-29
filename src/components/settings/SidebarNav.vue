@@ -12,7 +12,12 @@ defineEmits(['update:activeCategory']);
         <span class="icon">☁️</span>
         <span class="label">模型服务</span>
       </div>
+      <div class="nav-item" :class="{ active: activeCategory === 'presets' }" @click="$emit('update:activeCategory', 'presets')">
+        <span class="icon">⚙️</span>
+        <span class="label">模型配置</span>
+      </div>
       <div class="nav-item" :class="{ active: activeCategory === 'appearance' }" @click="$emit('update:activeCategory', 'appearance')">
+
         <span class="icon">🎨</span>
         <span class="label">显示设置</span>
       </div>

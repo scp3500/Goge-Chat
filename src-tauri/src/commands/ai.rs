@@ -13,6 +13,8 @@ pub async fn ask_ai(
     msg: Vec<Message>,
     on_event: Channel<String>,
     window: Window,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
 ) -> Result<(), String> {
     // 1. 加载配置
     let config = config_cmd::load_config(app).await?;
@@ -130,8 +132,9 @@ pub async fn ask_ai(
         }
     }
 
-    let temperature = provider_config["temperature"].as_f64().map(|f| f as f32);
-    let max_tokens = provider_config["maxTokens"].as_u64().map(|u| u as u32);
+    let temperature =
+        temperature.or_else(|| provider_config["temperature"].as_f64().map(|f| f as f32));
+    let max_tokens = max_tokens.or_else(|| provider_config["maxTokens"].as_u64().map(|u| u as u32));
 
     // --- ⬇️ Google Gemini Native 支持 ⬇️ ---
     if selected_provider_id == "gemini" {
