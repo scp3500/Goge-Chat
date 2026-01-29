@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub role: String,
     pub content: String,
 

@@ -18,6 +18,7 @@ export interface Folder {
 // 消息类型
 export interface ChatMessage {
     id?: number;
+    model?: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
     reasoningContent?: string | null;

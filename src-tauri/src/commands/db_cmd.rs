@@ -118,6 +118,7 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
         .map(|cm| {
             Message {
                 id: cm.id, // cm.id is Option<i64>
+                model: cm.model,
                 role: cm.role,
                 content: cm.content,
                 reasoning_content: cm.reasoning_content,
@@ -138,6 +139,7 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
 #[tauri::command]
 pub fn save_message(
     session_id: String,
+    model: Option<String>,
     role: String,
     content: String,
     reasoning_content: Option<String>,
@@ -171,6 +173,7 @@ pub fn save_message(
     let msg_id = db_save_message(
         &conn,
         numeric_id,
+        model.as_deref(),
         &role,
         &content,
         reasoning_content.as_deref(),

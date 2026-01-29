@@ -5,6 +5,8 @@ import { useChatStore } from "../../stores/chat";
 import { REFRESH_SVG, COPY_SVG, MORE_SVG, CHECK_SVG, BRAIN_SVG, EDIT_SVG, TRASH_SVG, ATTACHMENT_SVG } from '../../constants/icons.ts';
 import { renderMarkdown } from '../../services/markdown';
 import { invoke } from '@tauri-apps/api/core';
+import { useConfigStore } from '../../stores/config'; // Import config store
+import { getProviderIcon } from '../../assets/icons'; // Import icon helper
 
 const props = defineProps({
   m: Object,
@@ -16,6 +18,41 @@ const props = defineProps({
 const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'regenerate']);
 
 const chatStore = useChatStore();
+const configStore = useConfigStore(); // Init config store
+
+// 💡 格式化时间
+const formattedDate = computed(() => {
+  if (!props.m.created_at) return '';
+  const date = new Date(props.m.created_at + 'Z'); // Assume UTC usually, or append Z if needed for Rust's default format
+  // Simply formatting as MM/DD HH:mm
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${month}/${day} ${hours}:${minutes}`;
+});
+
+// 💡 获取模型图标
+const modelIcon = computed(() => {
+    // 1. 如果有明确的模型名称
+    const modelId = props.m.model;
+    if (modelId) {
+        // Find provider that has this model
+        const provider = configStore.settings.providers.find(p => p.models.includes(modelId));
+        if (provider) {
+            return getProviderIcon(provider.icon);
+        }
+    }
+    // Fallback: Try to guess from text or just return default
+    return getProviderIcon('gemini'); // As per request: "chat with gemini not provider", defaulting to Gemini icon
+});
+
+// 💡 获取显示的模型名称
+const displayModelName = computed(() => {
+    if (props.m.model) return props.m.model;
+    // Fallback for old messages
+    return "Gemini";
+});
 
 // 💡 展开/折叠推理过程
 const isReasoningExpanded = ref(false);
@@ -228,6 +265,17 @@ watch(() => props.isEditing, (newVal) => {
     </div>
 
     <div v-else class="assistant-content-wrapper">
+      <!-- 🆕 Assistant Header -->
+      <div class="assistant-header" v-if="m.content !== '__LOADING__'">
+        <div class="header-left">
+          <div class="avatar-icon" v-html="modelIcon"></div>
+          <span class="model-name-text">{{ displayModelName }}</span>
+          <div class="divider">|</div>
+          <span class="model-name-text" style="opacity: 0.7;">New API</span>
+        </div>
+        <span class="time-text">{{ formattedDate }}</span>
+      </div>
+
       <template v-if="m.content === '__LOADING__' && !m.reasoningContent">
         <div class="typing-indicator"><span></span><span></span><span></span></div>
       </template>
@@ -273,7 +321,53 @@ watch(() => props.isEditing, (newVal) => {
 
 <style scoped>
 /* 拷贝原来的样式 */
-.assistant-content-wrapper { position: relative; width: 100%; display: flex; flex-direction: column; }
+.assistant-content-wrapper { position: relative; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+
+/* 🆕 Header Styles */
+.assistant-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.avatar-icon :deep(svg) { width: 100%; height: 100%; }
+
+.model-name-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e3e3e3;
+  letter-spacing: 0.3px;
+}
+
+.divider {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+  margin: 0 4px;
+}
+
+.time-text {
+  font-size: 12px;
+  color: #7b7d81; /* Dimmer text for time */
+  margin-left: 2px;
+  font-family: 'Roboto Mono', monospace;
+}
 .msg-action-bar-bottom { display: flex; gap: 4px; margin-top: 10px; padding-left: 2px; }
 .action-btn { background: transparent; border: none; color: #707070; cursor: pointer; padding: 6px; border-radius: 6px; display: flex; align-items: center; transition: all 0.2s; }
 .action-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.06); }
