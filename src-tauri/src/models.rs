@@ -31,6 +31,11 @@ pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
     pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "max_tokens")]
+    pub max_tokens: Option<u32>,
 }
 
 /// 会话元数据：完全兼容蛇形和驼峰

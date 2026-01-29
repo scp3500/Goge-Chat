@@ -11,6 +11,8 @@ export interface ModelProviderConfig {
     temperature?: number;
     maxTokens?: number;
     customParams?: Record<string, any>;
+    disableUrlSuffix?: boolean;
+    isCustom?: boolean;
 }
 
 // 应用设置类型
@@ -26,6 +28,8 @@ export interface AppSettings {
     defaultProviderId: string;
     selectedModelId: string;
     useReasoning: boolean;
+    useSearch: boolean;
+    searchProvider: string;
 
     // 搜索设置
     searchInstanceUrl: string;
@@ -40,7 +44,7 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
     {
         id: 'deepseek',
         name: 'DeepSeek',
-        icon: '🐋',
+        icon: 'deepseek',
         enabled: true,
         apiKey: '',
         baseUrl: 'https://api.deepseek.com',
@@ -52,7 +56,7 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
     {
         id: 'openai',
         name: 'OpenAI',
-        icon: '🤖',
+        icon: 'openai',
         enabled: false,
         apiKey: '',
         baseUrl: 'https://api.openai.com/v1',
@@ -64,7 +68,7 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
     {
         id: 'claude',
         name: 'Claude',
-        icon: '🦜',
+        icon: 'anthropic',
         enabled: false,
         apiKey: '',
         baseUrl: 'https://api.anthropic.com',
@@ -75,20 +79,24 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
     },
     {
         id: 'gemini',
-        name: 'Gemini',
-        icon: '💎',
+        name: 'Gemini 3',
+        icon: 'google',
         enabled: false,
         apiKey: '',
         baseUrl: 'https://generativelanguage.googleapis.com',
-        models: ['gemini-pro', 'gemini-pro-vision'],
-        defaultModel: 'gemini-pro',
+        models: [
+            'gemini-3-pro-preview',
+            'gemini-3-flash-preview',
+            'gemini-3-pro-image-preview'
+        ],
+        defaultModel: 'gemini-3-pro-preview',
         temperature: 0.7,
         maxTokens: 4096
     },
     {
         id: 'ollama',
         name: 'Ollama',
-        icon: '🦙',
+        icon: 'ollama',
         enabled: false,
         apiKey: '',
         baseUrl: 'http://localhost:11434',
@@ -100,7 +108,7 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
     {
         id: 'qwen',
         name: 'Qwen',
-        icon: '🐑',
+        icon: 'qwen',
         enabled: false,
         apiKey: '',
         baseUrl: 'https://dashscope.aliyuncs.com/api',
@@ -121,6 +129,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     defaultProviderId: 'deepseek',
     selectedModelId: 'deepseek-chat',
     useReasoning: false,
+    useSearch: false,
+    searchProvider: 'all',
     searchInstanceUrl: 'https://searx.be',
     defaultSearchProvider: 'all',
     apiKey: '' // 兼容旧版本

@@ -312,7 +312,6 @@ pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<Cha
         let msg = msg?;
         messages.push(msg);
     }
-    println!("📥 [DB] Total messages loaded: {}", messages.len());
     Ok(messages)
 }
 

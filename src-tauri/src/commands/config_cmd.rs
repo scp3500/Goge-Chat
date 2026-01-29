@@ -5,28 +5,80 @@ use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
-    #[serde(rename = "fontSize")]
+    #[serde(default = "default_font_size", rename = "fontSize")]
     pub font_size: u32,
-    #[serde(rename = "lineRatio")]
+    #[serde(default = "default_line_ratio", rename = "lineRatio")]
     pub line_ratio: f32,
-    #[serde(rename = "themeColor")]
+    #[serde(default = "default_theme_color", rename = "themeColor")]
     pub theme_color: String,
-    #[serde(rename = "scrollbarWidth")]
+    #[serde(default = "default_scrollbar_width", rename = "scrollbarWidth")]
     pub scrollbar_width: u32,
-    #[serde(rename = "apiKey")]
+    #[serde(default, rename = "apiKey")]
     pub api_key: String,
-    #[serde(rename = "searchInstanceUrl")]
+    #[serde(default = "default_search_url", rename = "searchInstanceUrl")]
     pub search_instance_url: String,
-    #[serde(rename = "defaultSearchProvider")]
+    #[serde(default = "default_search_provider", rename = "defaultSearchProvider")]
     pub default_search_provider: String,
-    #[serde(rename = "providers")]
+    #[serde(default = "default_providers", rename = "providers")]
     pub providers: serde_json::Value,
-    #[serde(rename = "defaultProviderId")]
+    #[serde(default = "default_provider_id", rename = "defaultProviderId")]
     pub default_provider_id: String,
-    #[serde(rename = "selectedModelId")]
+    #[serde(default = "default_model_id", rename = "selectedModelId")]
     pub selected_model_id: String,
-    #[serde(rename = "useReasoning")]
+    #[serde(default, rename = "useReasoning")]
     pub use_reasoning: bool,
+    #[serde(default, rename = "useSearch")]
+    pub use_search: bool,
+    #[serde(default = "default_search_provider", rename = "searchProvider")]
+    pub search_provider: String,
+}
+
+fn default_font_size() -> u32 {
+    16
+}
+fn default_line_ratio() -> f32 {
+    1.7
+}
+fn default_theme_color() -> String {
+    "#202124".into()
+}
+fn default_scrollbar_width() -> u32 {
+    12
+}
+fn default_search_url() -> String {
+    "https://searx.be".into()
+}
+fn default_search_provider() -> String {
+    "all".into()
+}
+fn default_providers() -> serde_json::Value {
+    serde_json::json!([])
+}
+fn default_provider_id() -> String {
+    "deepseek".into()
+}
+fn default_model_id() -> String {
+    "deepseek-chat".into()
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            font_size: default_font_size(),
+            line_ratio: default_line_ratio(),
+            theme_color: default_theme_color(),
+            scrollbar_width: default_scrollbar_width(),
+            api_key: "".into(),
+            search_instance_url: default_search_url(),
+            default_search_provider: default_search_provider(),
+            providers: default_providers(),
+            default_provider_id: default_provider_id(),
+            selected_model_id: default_model_id(),
+            use_reasoning: false,
+            use_search: false,
+            search_provider: default_search_provider(),
+        }
+    }
 }
 
 // 辅助函数：内部使用，不需要 pub
@@ -42,19 +94,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
     let path = get_config_path(&app);
 
     if !path.exists() {
-        return Ok(AppConfig {
-            font_size: 16,
-            line_ratio: 1.7,
-            theme_color: "#202124".into(),
-            scrollbar_width: 12,
-            api_key: "".into(),
-            search_instance_url: "https://searx.be".into(),
-            default_search_provider: "all".into(),
-            providers: serde_json::json!([]),
-            default_provider_id: "deepseek".into(),
-            selected_model_id: "deepseek-chat".into(),
-            use_reasoning: false,
-        });
+        return Ok(AppConfig::default());
     }
 
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;

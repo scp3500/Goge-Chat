@@ -134,21 +134,44 @@ export function useProviderConfig() {
         };
     };
 
+    /**
+     * 更新提供商顺序
+     */
+    const updateProvidersOrder = async (newProviders: ModelProviderConfig[]) => {
+        try {
+            await configStore.updateProvidersOrder(newProviders);
+            settingsStore.markAsChanged();
+        } catch (error) {
+            console.error('更新提供商顺序失败:', error);
+            throw error;
+        }
+    };
+
+    // New methods from configStore
+    const addCustomProvider = configStore.addCustomProvider;
+    const removeProvider = configStore.removeProvider;
+
     return {
-        // 计算属性
+        // State
+        allProviders, // Now reactive from store getter
         currentProvider,
         currentProviderName,
-        allProviders,
         enabledProviders,
         isCurrentProviderEnabled,
 
-        // 方法
+        // Actions
         toggleProvider,
         updateCurrentProvider,
         updateProvider,
-        selectProvider,
-        setAsDefault,
+        updateProvidersOrder,
+        selectProvider, // Original selectProvider (sets active provider)
+        setAsDefault, // Original setAsDefault (sets default provider)
+        addCustomProvider,
+        removeProvider,
+
+        // Helpers
         isDefaultProvider,
-        validateProviderConfig
+        validateProviderConfig,
+        getProviderById: configStore.getProvider
     };
 }

@@ -72,26 +72,65 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
     // 1. 【动态读取】加载配置
     let config = commands::config_cmd::load_config(app).await?;
 
-    // 2. 【安全校验】
-    if config.api_key.trim().is_empty() {
-        return Err("API Key 未配置，请前往设置页面填写".to_string());
+    // 2. 【安全校验】获取当前选中的提供商和模型
+    let selected_provider_id = config.default_provider_id.clone();
+    let selected_model_id = config.selected_model_id.clone();
+
+    // 从 providers 数组中找到当前选中的提供商配置
+    let providers = config
+        .providers
+        .as_array()
+        .ok_or("配置错误: 无法读取提供商列表")?;
+    let provider_config = providers
+        .iter()
+        .find(|p| p["id"].as_str() == Some(&selected_provider_id))
+        .ok_or(format!("找不到提供商配置: {}", selected_provider_id))?;
+
+    let api_key = provider_config["apiKey"].as_str().unwrap_or("").to_string();
+    let base_url_raw = provider_config["baseUrl"]
+        .as_str()
+        .unwrap_or("https://api.deepseek.com")
+        .to_string();
+
+    if api_key.trim().is_empty() {
+        return Err(format!(
+            "{} 的 API Key 未配置，请前往设置页面填写",
+            provider_config["name"].as_str().unwrap_or("该提供商")
+        ));
     }
 
-    let api_key = config.api_key;
-    let base_url = "https://api.deepseek.com/chat/completions";
-    let model = "deepseek-chat";
+    // --- ⬇️ Google Gemini Native 支持 ⬇️ ---
+    if selected_provider_id == "gemini" {
+        return handle_gemini_title_native(api_key, base_url_raw, selected_model_id, msg).await;
+    }
+    // --- ⬆️ Google Gemini Native 支持 ⬆️ ---
+
+    // 格式化 URL
+    let base_url = if base_url_raw.ends_with("/chat/completions") {
+        base_url_raw.clone()
+    } else if selected_provider_id == "gemini" && !base_url_raw.contains("v1beta/openai") {
+        // ✨ 【核心修复】：Gemini 的 OpenAI 兼容地址需要包含 v1beta/openai
+        format!(
+            "{}/v1beta/openai/chat/completions",
+            base_url_raw.trim_end_matches('/')
+        )
+    } else {
+        format!("{}/chat/completions", base_url_raw.trim_end_matches('/'))
+    };
+
+    println!("🔗 最终标题生成请求地址: {}", base_url);
 
     let client = Client::new();
 
     let request_body = TitleChatRequest {
-        model: model.to_string(),
+        model: selected_model_id,
         messages: msg,
         stream: false, // 🔥 关键：关闭流式
     };
 
     // 发送请求
     let response = client
-        .post(base_url)
+        .post(&base_url)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request_body)
@@ -100,8 +139,12 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
         .map_err(|e| format!("网络请求失败: {}", e))?;
 
     if !response.status().is_success() {
-        let error_text = response.text().await.unwrap_or_default();
-        return Err(format!("API 报错: {}", error_text));
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "无法读取错误详情".to_string());
+        return Err(format!("API 状态码 {}: {}", status, error_text));
     }
 
     // 解析 JSON
@@ -121,6 +164,57 @@ async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<Stri
     let clean_title = raw_content.replace("\n", "").trim().to_string();
 
     println!("✨ 后端生成标题完成: {}", clean_title);
+    Ok(clean_title)
+}
+
+async fn handle_gemini_title_native(
+    api_key: String,
+    base_url: String,
+    model: String,
+    messages: Vec<Message>,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+
+    // 1. 转换消息格式 (非流式：generateContent)
+    let contents: Vec<serde_json::Value> = messages
+        .into_iter()
+        .map(|m| {
+            let role = if m.role == "user" { "user" } else { "model" };
+            serde_json::json!({
+                "role": role,
+                "parts": [{ "text": m.content }]
+            })
+        })
+        .collect();
+
+    let url = format!(
+        "{}/v1beta/models/{}:generateContent?key={}",
+        base_url.trim_end_matches('/'),
+        model,
+        api_key
+    );
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "contents": contents }))
+        .send()
+        .await
+        .map_err(|e| format!("Gemini 网络请求失败: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let err_text = response.text().await.unwrap_or_default();
+        return Err(format!("Gemini API 错误 (状态码 {}): {}", status, err_text));
+    }
+
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    let raw_title = json["candidates"][0]["content"]["parts"][0]["text"]
+        .as_str()
+        .unwrap_or("新对话")
+        .to_string();
+
+    let clean_title = raw_title.replace("\n", "").trim().to_string();
     Ok(clean_title)
 }
 

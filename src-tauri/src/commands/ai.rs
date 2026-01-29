@@ -1,7 +1,8 @@
 use crate::commands::config_cmd;
 use crate::models::{ChatRequest, Message};
 use futures_util::StreamExt;
-use serde_json::json;
+use serde::Serialize;
+use serde_json::{json, Value};
 use std::sync::atomic::Ordering;
 use tauri::{ipc::Channel, AppHandle, Emitter, State, Window};
 
@@ -129,17 +130,36 @@ pub async fn ask_ai(
         }
     }
 
+    let temperature = provider_config["temperature"].as_f64().map(|f| f as f32);
+    let max_tokens = provider_config["maxTokens"].as_u64().map(|u| u as u32);
+
+    // --- ⬇️ Google Gemini Native 支持 ⬇️ ---
+    if selected_provider_id == "gemini" {
+        return handle_gemini_native(api_key, base_url, model, clean_msgs, state, on_event).await;
+    }
+    // --- ⬆️ Google Gemini Native 支持 ⬆️ ---
+
     let payload = ChatRequest {
         model: model.to_string(),
         messages: clean_msgs,
         stream: true,
+        temperature,
+        max_tokens,
     };
 
-    let url = if base_url.ends_with("/chat/completions") {
+    let disable_url_suffix = provider_config["disableUrlSuffix"]
+        .as_bool()
+        .unwrap_or(false);
+
+    let url = if disable_url_suffix {
+        base_url.clone()
+    } else if base_url.ends_with("/chat/completions") {
         base_url.clone()
     } else {
         format!("{}/chat/completions", base_url.trim_end_matches('/'))
     };
+
+    println!("🔗 最终对话请求地址: {}", url);
 
     let response = client
         .post(&url)
@@ -191,5 +211,129 @@ pub async fn ask_ai(
     }
 
     println!("✅ AI 生成任务已彻底释放");
+    Ok(())
+}
+
+// --- ⬇️ Gemini Native 相关结构和实现 ⬇️ ---
+
+#[derive(Serialize)]
+struct GeminiPart {
+    text: Option<String>,
+}
+
+#[derive(Serialize)]
+struct GeminiContent {
+    role: String,
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Serialize)]
+struct GeminiRequest {
+    contents: Vec<GeminiContent>,
+}
+
+async fn handle_gemini_native(
+    api_key: String,
+    base_url: String,
+    model: String,
+    messages: Vec<Message>,
+    state: State<'_, crate::GoleState>,
+    on_event: Channel<String>,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+
+    // 1. 转换消息格式
+    let contents: Vec<GeminiContent> = messages
+        .into_iter()
+        .map(|m| {
+            let role = if m.role == "user" { "user" } else { "model" };
+            GeminiContent {
+                role: role.to_string(),
+                parts: vec![GeminiPart {
+                    text: Some(m.content),
+                }],
+            }
+        })
+        .collect();
+
+    let payload = GeminiRequest { contents };
+
+    // 2. 构造 URL (native 走 streamGenerateContent)
+    let url = format!(
+        "{}/v1beta/models/{}:streamGenerateContent?key={}",
+        base_url.trim_end_matches('/'),
+        model,
+        api_key
+    );
+
+    println!("🚀 [Native Gemini] 请求地址: {}", url);
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Gemini 网络请求失败: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let err_text = response.text().await.unwrap_or_default();
+        return Err(format!("Gemini API 错误 (状态码 {}): {}", status, err_text));
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+
+    while let Some(chunk) = stream.next().await {
+        if state.stop_flag.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        // Gemini 的 stream 数据是一个包含多个 JSON 对象的数组，格式大致为 [ {...}, {...} ]
+        // 这里尝试解析完整的 JSON 对象块
+        while let Some(start_idx) = buffer.find('{') {
+            let mut depth = 0;
+            let mut end_idx = None;
+            let bytes = buffer.as_bytes();
+
+            for i in start_idx..bytes.len() {
+                if bytes[i] == b'{' {
+                    depth += 1;
+                } else if bytes[i] == b'}' {
+                    if depth > 0 {
+                        depth -= 1;
+                        if depth == 0 {
+                            end_idx = Some(i);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if let Some(end) = end_idx {
+                let json_str = &buffer[start_idx..=end];
+                if let Ok(json) = serde_json::from_str::<Value>(json_str) {
+                    // 解析 candidates[0].content.parts[0].text
+                    if let Some(parts) = json["candidates"][0]["content"]["parts"].as_array() {
+                        for part in parts {
+                            if let Some(text) = part["text"].as_str() {
+                                on_event
+                                    .send(format!("c:{}", text))
+                                    .map_err(|e| e.to_string())?;
+                            }
+                        }
+                    }
+                }
+                buffer.drain(..=end);
+            } else {
+                break; // 等待更多数据
+            }
+        }
+    }
+
     Ok(())
 }

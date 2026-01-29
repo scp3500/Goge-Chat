@@ -54,6 +54,9 @@ export const useConfigStore = defineStore('config', () => {
             const saved = await configCommands.loadConfig();
 
             if (saved) {
+                console.log('[ConfigStore INIT] Loaded from backend, raw providers order:',
+                    Array.isArray(saved.providers) ? (saved.providers as any[]).map((p: any) => p.id).join(',') : 'N/A');
+
                 // 合并配置，确保新增字段有默认值
                 settings.value = {
                     ...DEFAULT_SETTINGS,
@@ -62,6 +65,8 @@ export const useConfigStore = defineStore('config', () => {
                     providers: mergeProviders(saved.providers || [], DEFAULT_SETTINGS.providers)
                 };
 
+                console.log('[ConfigStore INIT] After merge, final order:',
+                    settings.value.providers.map(p => p.id).join(','));
                 applyToCss(settings.value);
             }
         } catch (e) {
@@ -80,9 +85,25 @@ export const useConfigStore = defineStore('config', () => {
         savedProviders: ModelProviderConfig[],
         defaultProviders: ModelProviderConfig[]
     ): ModelProviderConfig[] => {
-        const merged = [...savedProviders];
+        // 1. 以已保存的提供商为基础，保持其顺序
+        const merged = savedProviders.map(saved => {
+            const defaultProv = defaultProviders.find(p => p.id === saved.id);
+            if (!defaultProv) return saved;
 
-        // 添加缺失的默认提供商
+            // 合并模型列表，确保新增的默认模型能出现
+            const allModels = [...new Set([...(saved.models || []), ...(defaultProv.models || [])])];
+
+            return {
+                ...defaultProv, // 使用最新的默认值（如 id, name, icon, baseUrl, models 等）
+                ...saved,       // 覆盖用户的个性化配置（enabled, apiKey, temperature, maxTokens 等）
+                name: defaultProv.name, // 强制使用最新的内置名称（如 "Gemini 3"）
+                icon: defaultProv.icon, // 强制使用最新的内置图标
+                baseUrl: defaultProv.baseUrl, // 强制使用最新的内置 API 地址
+                models: allModels // 使用合并后的模型列表
+            };
+        });
+
+        // 2. 添加全新的（默认配置中有但已保存配置中没有）提供商
         for (const defaultProvider of defaultProviders) {
             if (!merged.find(p => p.id === defaultProvider.id)) {
                 merged.push({ ...defaultProvider });
@@ -126,10 +147,11 @@ export const useConfigStore = defineStore('config', () => {
         const providerIndex = settings.value.providers.findIndex(p => p.id === providerId);
 
         if (providerIndex === -1) {
-            throw new Error(`Provider ${providerId} not found`);
+            console.warn(`[ConfigStore] Provider ${providerId} not found, cannot update.`);
+            return;
         }
 
-        const updatedProviders = [...settings.value.providers];
+        const updatedProviders = JSON.parse(JSON.stringify(settings.value.providers));
         updatedProviders[providerIndex] = {
             ...updatedProviders[providerIndex],
             ...config
@@ -149,6 +171,50 @@ export const useConfigStore = defineStore('config', () => {
     };
 
     /**
+     * 处理提供商重新排序事件
+     * @param newSimpleProviders 包含 id 的简化提供商列表，表示新的顺序
+     */
+    const handleReorder = async (newSimpleProviders: { id: string }[]) => {
+        console.log('[ConfigStore REORDER] ========== START ==========');
+        console.log('[ConfigStore REORDER] Received new order from UI:', newSimpleProviders.map(p => p.id).join(','));
+
+        try {
+            const originalProviders = [...settings.value.providers];
+            console.log('[ConfigStore REORDER] Current order in store:', originalProviders.map(p => p.id).join(','));
+
+            // 根据简化列表的顺序，从完整配置中找到对应的提供商
+            const newOrder: ModelProviderConfig[] = newSimpleProviders
+                .map(simple => originalProviders.find(p => p.id === simple.id))
+                .filter((p): p is ModelProviderConfig => Boolean(p)); // 过滤掉未找到的并进行类型断言
+
+            if (newOrder.length !== originalProviders.length) {
+                console.warn("[ConfigStore REORDER] Length mismatch! Expected:", originalProviders.length, "Got:", newOrder.length);
+            }
+
+            console.log('[ConfigStore REORDER] Calling updateProvidersOrder with:', newOrder.map(p => p.id).join(','));
+            await updateProvidersOrder(newOrder);
+            console.log('[ConfigStore REORDER] ========== COMPLETE ==========');
+        } catch (error) {
+            console.error("[ConfigStore REORDER] FAILED:", error);
+            lastError.value = error instanceof Error ? error.message : String(error);
+            throw error;
+        }
+    };
+
+    /**
+     * 更新提供商顺序
+     */
+    const updateProvidersOrder = async (newProviders: ModelProviderConfig[]) => {
+        console.log('[ConfigStore UPDATE_ORDER] Received:', newProviders.map(p => p.id).join(','));
+        // 深拷贝确保响应式引用被切断，防止 Pinia/Vue 同步冲突
+        const cleanProviders = JSON.parse(JSON.stringify(newProviders));
+        console.log('[ConfigStore UPDATE_ORDER] After deep clone:', (cleanProviders as any[]).map((p: any) => p.id).join(','));
+        console.log('[ConfigStore UPDATE_ORDER] Calling updateConfig...');
+        await updateConfig({ providers: cleanProviders });
+        console.log('[ConfigStore UPDATE_ORDER] updateConfig completed');
+    };
+
+    /**
      * 设置默认提供商
      */
     const setDefaultProvider = async (providerId: string) => {
@@ -158,6 +224,48 @@ export const useConfigStore = defineStore('config', () => {
         }
 
         await updateConfig({ defaultProviderId: providerId });
+    };
+
+    /**
+     * 添加自定义提供商
+     */
+    const addCustomProvider = async () => {
+        const id = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const newProvider: ModelProviderConfig = {
+            id,
+            name: 'Custom Provider',
+            icon: '🔌',
+            enabled: true,
+            apiKey: '',
+            baseUrl: 'https://api.openai.com/v1',
+            models: ['gpt-3.5-turbo', 'gpt-4'],
+            isCustom: true
+        };
+
+        const newProviders = [...settings.value.providers, newProvider];
+        await updateConfig({
+            providers: newProviders,
+            defaultProviderId: id // 自动切换到新创建的提供商
+        });
+        return id;
+    };
+
+    /**
+     * 删除提供商
+     */
+    const removeProvider = async (providerId: string) => {
+        const newProviders = settings.value.providers.filter(p => p.id !== providerId);
+
+        // 如果删除的是当前选中的提供商，切换到第一个可用的
+        let newDefaultId = settings.value.defaultProviderId;
+        if (settings.value.defaultProviderId === providerId) {
+            newDefaultId = newProviders.length > 0 ? newProviders[0].id : '';
+        }
+
+        await updateConfig({
+            providers: newProviders,
+            defaultProviderId: newDefaultId
+        });
     };
 
     /**
@@ -203,8 +311,12 @@ export const useConfigStore = defineStore('config', () => {
         init,
         updateConfig,
         updateProvider,
+        updateProvidersOrder,
         toggleProvider,
         setDefaultProvider,
+        addCustomProvider,
+        removeProvider,
+        handleReorder,
         resetToDefaults
     };
 });

@@ -12,6 +12,7 @@ import {
   CHECK_SVG,
   AI_EVO_SVG
 } from '../../constants/icons';
+import { getProviderIcon } from '../../assets/icons';
 
 const props = defineProps({
   minimal: {
@@ -153,7 +154,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
           <span v-html="AI_EVO_SVG" class="ai-logo-white"></span>
         </template>
         <template v-else>
-          {{ currentModel?.provider?.icon || '🤖' }}
+          <span v-html="getProviderIcon(currentModel?.provider?.icon || 'default')" class="provider-icon-inner"></span>
         </template>
       </span>
       <span v-if="!minimal" class="model-name">{{ currentModel?.id || '选择模型' }}</span>
@@ -221,7 +222,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
               @click="selectModel(provider.id, model)"
             >
               <div class="model-info">
-                <span class="model-icon">{{ provider.icon }}</span>
+                <span v-html="getProviderIcon(provider.icon)" class="model-icon"></span>
                 <span class="model-text">{{ model }}</span>
               </div>
               <div class="model-badges">
@@ -548,7 +549,50 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .model-icon {
-  font-size: 16px;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(220, 220, 225, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  color: #1a1a1b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
+}
+
+.model-item:hover .model-icon {
+  transform: translateY(-1px);
+  background: rgba(230, 230, 235, 0.95);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.model-item.selected .model-icon {
+  background: #f0f0f5;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.model-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.provider-icon-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.provider-icon-inner :deep(svg) {
+  width: 14px;
+  height: 14px;
 }
 
 .model-text {

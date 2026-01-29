@@ -9,7 +9,7 @@ import AppearanceConfig from './AppearanceConfig.vue';
 
 // 使用 composables
 const { configStore, settingsStore, currentCategoryTitle } = useSettings();
-const { allProviders, toggleProvider } = useProviderConfig();
+const { allProviders, toggleProvider, updateProvidersOrder } = useProviderConfig();
 
 const emit = defineEmits(['close']);
 
@@ -22,7 +22,8 @@ const providersForList = computed(() =>
     id: p.id,
     name: p.name,
     icon: p.icon,
-    status: p.enabled ? 'on' : 'off'
+    status: p.enabled ? 'on' : 'off',
+    isCustom: p.isCustom || false
   }))
 );
 
@@ -32,12 +33,68 @@ const activeProviderName = computed(() => {
   return provider ? provider.name : '配置详情';
 });
 
+// 选择供应商
+const handleProviderSelect = (providerId) => {
+  settingsStore.setActiveProvider(providerId);
+};
+
 // 切换供应商状态
-const handleToggleStatus = async (providerId) => {
+const handleStatusToggle = async (providerId) => {
   try {
     await toggleProvider(providerId);
   } catch (error) {
     console.error('切换提供商状态失败:', error);
+  }
+};
+
+
+const handleAddProvider = async () => {
+  try {
+    const newId = await allProviders.value.find(p => p.id === 'custom_new')?.id ?? await useProviderConfig().addCustomProvider();
+    // 这里的 addCustomProvider 已经在 store 里处理了自动选中，所以这里不需要额外操作
+    // 但为了保险起见，或者如果是从 composable 调用的，我们可以再次确认选中
+  } catch (error) {
+    console.error('添加提供商失败:', error);
+  }
+};
+
+const handleRenameProvider = async (providerId, newName) => {
+  try {
+    const { updateProvider } = useProviderConfig();
+    await updateProvider(providerId, { name: newName });
+  } catch (error) {
+    console.error('重命名供应商失败:', error);
+  }
+};
+
+const handleDeleteProvider = async (providerId) => {
+  try {
+    const provider = allProviders.value.find(p => p.id === providerId);
+    if (!provider) return;
+    
+    if (confirm(`确定要删除供应商 "${provider.name}" 吗？此操作不可恢复。`)) {
+      const { removeProvider } = useProviderConfig();
+      await removeProvider(providerId);
+    }
+  } catch (error) {
+    console.error('删除供应商失败:', error);
+  }
+};
+
+const handleReorder = async (newSimpleProviders) => {
+  console.log('[SettingsModal] Received reorder event:', newSimpleProviders.map(p => p.id).join(','));
+  console.log('[SettingsModal] configStore is:', configStore);
+  console.log('[SettingsModal] configStore.handleReorder exists?', typeof configStore.handleReorder);
+  
+  try {
+    if (typeof configStore.handleReorder === 'function') {
+      await configStore.handleReorder(newSimpleProviders);
+      console.log('[SettingsModal] Reorder completed successfully');
+    } else {
+      console.error('[SettingsModal] configStore.handleReorder is NOT a function!');
+    }
+  } catch (error) {
+    console.error('[SettingsModal] 更新排序失败:', error);
   }
 };
 
@@ -55,17 +112,22 @@ const handleClose = () => {
     <SidebarNav v-model:activeCategory="settingsStore.activeCategory" />
 
     <!-- 中间供应商列表 -->
-    <ProviderList 
+    <ProviderList
       v-if="settingsStore.activeCategory === 'models'"
       :providers="providersForList"
-      v-model:activeProviderId="settingsStore.activeProviderId"
-      @toggleStatus="handleToggleStatus"
+      :active-provider-id="settingsStore.activeProviderId"
+      @update:active-provider-id="handleProviderSelect"
+      @toggle-status="handleStatusToggle"
+      @reorder="handleReorder"
+      @add="handleAddProvider"
+      @rename="handleRenameProvider"
+      @delete="handleDeleteProvider"
     />
 
     <!-- 右侧详情面板 -->
     <main class="detail-panel modern-scroll">
       <div class="detail-container">
-        
+
         <header class="detail-header">
           <div class="header-info">
             <h2>{{ settingsStore.activeCategory === 'models' ? activeProviderName : '界面外观与显示' }}</h2>

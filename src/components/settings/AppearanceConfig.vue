@@ -37,6 +37,28 @@ const handleUpdate = async () => {
           />
         </div>
         <div class="control-item">
+          <label>行高比例 ({{ settings.lineRatio }})</label>
+          <input 
+            type="range" 
+            v-model.number="settings.lineRatio" 
+            min="1.2" 
+            max="2.5" 
+            step="0.1"
+            @input="handleUpdate" 
+          />
+        </div>
+        <div class="control-item">
+          <label>滚动条宽度 ({{ settings.scrollbarWidth }}px)</label>
+          <input 
+            type="range" 
+            v-model.number="settings.scrollbarWidth" 
+            min="4" 
+            max="16" 
+            step="1"
+            @input="handleUpdate" 
+          />
+        </div>
+        <div class="control-item">
           <label>主题颜色</label>
           <div class="theme-grid">
             <div 

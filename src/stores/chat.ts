@@ -20,8 +20,6 @@ export const useChatStore = defineStore('chat', () => {
     const currentMessages = ref<any[]>([]);
     const isGenerating = ref(false);
     const isLoading = ref(false);
-    const useSearch = ref(false);
-    const searchProvider = ref('all');
 
     // --- 暂停/恢复相关状态 ---
     const generatingSessionId = ref<string | null>(null);  // 记录正在生成消息的会话 ID
@@ -44,6 +42,22 @@ export const useChatStore = defineStore('chat', () => {
         set: (value: boolean) => {
             console.log("🧠 useReasoning changed:", value);
             configStore.updateConfig({ useReasoning: value });
+        }
+    });
+
+    const useSearch = computed({
+        get: () => configStore.settings.useSearch,
+        set: (value: boolean) => {
+            console.log("🔍 useSearch changed:", value);
+            configStore.updateConfig({ useSearch: value });
+        }
+    });
+
+    const searchProvider = computed({
+        get: () => configStore.settings.searchProvider,
+        set: (value: string) => {
+            console.log("🔍 searchProvider changed:", value);
+            configStore.updateConfig({ searchProvider: value });
         }
     });
 
