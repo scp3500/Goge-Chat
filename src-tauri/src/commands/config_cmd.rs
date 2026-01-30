@@ -18,6 +18,12 @@ pub struct AppConfig {
     pub line_ratio: f32,
     #[serde(default = "default_theme_color", rename = "themeColor")]
     pub theme_color: String,
+    #[serde(default = "default_theme", rename = "theme")]
+    pub theme: String,
+    #[serde(default = "default_dark_theme_id", rename = "darkThemeId")]
+    pub dark_theme_id: String,
+    #[serde(default = "default_light_theme_id", rename = "lightThemeId")]
+    pub light_theme_id: String,
     #[serde(default = "default_scrollbar_width", rename = "scrollbarWidth")]
     pub scrollbar_width: u32,
     #[serde(default, rename = "apiKey")]
@@ -34,6 +40,8 @@ pub struct AppConfig {
     pub default_provider_id: String,
     #[serde(default = "default_model_id", rename = "selectedModelId")]
     pub selected_model_id: String,
+    #[serde(default = "default_model_id", rename = "globalModelId")]
+    pub global_model_id: String,
 
     #[serde(default, rename = "useReasoning")]
     pub use_reasoning: bool,
@@ -47,6 +55,8 @@ pub struct AppConfig {
     pub presets: serde_json::Value,
     #[serde(default = "default_preset_id", rename = "defaultPresetId")]
     pub default_preset_id: String,
+    #[serde(default = "default_preset_id", rename = "globalPresetId")]
+    pub global_preset_id: String,
 }
 
 // Partial structs for file separation
@@ -59,6 +69,12 @@ struct SettingsPart {
     line_ratio: f32,
     #[serde(default = "default_theme_color", rename = "themeColor")]
     theme_color: String,
+    #[serde(default = "default_theme", rename = "theme")]
+    theme: String,
+    #[serde(default = "default_dark_theme_id", rename = "darkThemeId")]
+    dark_theme_id: String,
+    #[serde(default = "default_light_theme_id", rename = "lightThemeId")]
+    light_theme_id: String,
     #[serde(default = "default_scrollbar_width", rename = "scrollbarWidth")]
     scrollbar_width: u32,
     #[serde(default, rename = "apiKey", skip_serializing_if = "String::is_empty")]
@@ -71,6 +87,8 @@ struct SettingsPart {
     default_provider_id: String, // Pointer to default provider
     #[serde(default = "default_model_id", rename = "selectedModelId")]
     selected_model_id: String, // Pointer to selected model
+    #[serde(default = "default_model_id", rename = "globalModelId")]
+    global_model_id: String,
     #[serde(default, rename = "useReasoning")]
     use_reasoning: bool,
     #[serde(default, rename = "useSearch")]
@@ -79,6 +97,8 @@ struct SettingsPart {
     search_provider: String,
     #[serde(default = "default_preset_id", rename = "defaultPresetId")]
     default_preset_id: String, // Pointer to default preset
+    #[serde(default = "default_preset_id", rename = "globalPresetId")]
+    global_preset_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -101,6 +121,7 @@ struct SecretsPart {
 }
 
 // defaults
+// defaults
 fn default_font_size() -> u32 {
     16
 }
@@ -109,6 +130,15 @@ fn default_line_ratio() -> f32 {
 }
 fn default_theme_color() -> String {
     "#202124".into()
+}
+fn default_theme() -> String {
+    "dark".into()
+}
+fn default_dark_theme_id() -> String {
+    "nord".into()
+}
+fn default_light_theme_id() -> String {
+    "light".into()
 }
 fn default_scrollbar_width() -> u32 {
     12
@@ -227,6 +257,9 @@ impl Default for AppConfig {
             font_size: default_font_size(),
             line_ratio: default_line_ratio(),
             theme_color: default_theme_color(),
+            theme: default_theme(),
+            dark_theme_id: default_dark_theme_id(),
+            light_theme_id: default_light_theme_id(),
             scrollbar_width: default_scrollbar_width(),
             api_key: "".into(),
             search_instance_url: default_search_url(),
@@ -234,11 +267,13 @@ impl Default for AppConfig {
             providers: default_providers(),
             default_provider_id: default_provider_id(),
             selected_model_id: default_model_id(),
+            global_model_id: default_model_id(),
             use_reasoning: false,
             use_search: false,
             search_provider: default_search_provider(),
             presets: default_presets(),
             default_preset_id: default_preset_id(),
+            global_preset_id: default_preset_id(),
         }
     }
 }
@@ -326,16 +361,21 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
         config.font_size = settings.font_size;
         config.line_ratio = settings.line_ratio;
         config.theme_color = settings.theme_color;
+        config.theme = settings.theme;
+        config.dark_theme_id = settings.dark_theme_id;
+        config.light_theme_id = settings.light_theme_id;
         config.scrollbar_width = settings.scrollbar_width;
         config.api_key = settings.api_key;
         config.search_instance_url = settings.search_instance_url;
         config.default_search_provider = settings.default_search_provider;
         config.default_provider_id = settings.default_provider_id;
         config.selected_model_id = settings.selected_model_id;
+        config.global_model_id = settings.global_model_id;
         config.use_reasoning = settings.use_reasoning;
         config.use_search = settings.use_search;
         config.search_provider = settings.search_provider;
         config.default_preset_id = settings.default_preset_id;
+        config.global_preset_id = settings.global_preset_id;
 
         config.providers = providers_part.providers;
         config.presets = presets_part.presets;
@@ -438,16 +478,21 @@ pub async fn save_config(_app: AppHandle, mut config: AppConfig) -> Result<(), S
         font_size: config.font_size,
         line_ratio: config.line_ratio,
         theme_color: config.theme_color,
+        theme: config.theme.clone(),
+        dark_theme_id: config.dark_theme_id.clone(),
+        light_theme_id: config.light_theme_id.clone(),
         scrollbar_width: config.scrollbar_width,
         api_key: config.api_key,
         search_instance_url: config.search_instance_url,
         default_search_provider: config.default_search_provider,
         default_provider_id: config.default_provider_id,
         selected_model_id: config.selected_model_id,
+        global_model_id: config.global_model_id,
         use_reasoning: config.use_reasoning,
         use_search: config.use_search,
         search_provider: config.search_provider,
         default_preset_id: config.default_preset_id,
+        global_preset_id: config.global_preset_id,
     };
     let settings_json = serde_json::to_string_pretty(&settings_part).map_err(|e| e.to_string())?;
     fs::write(config_dir.join("settings.json"), settings_json).map_err(|e| e.to_string())?;

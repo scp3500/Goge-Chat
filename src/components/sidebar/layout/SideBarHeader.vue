@@ -114,7 +114,7 @@ const handleInput = (e) => {
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass-hover);
   opacity: 1;
 }
 
@@ -141,8 +141,8 @@ const handleInput = (e) => {
   display: flex;
   align-items: center;
   /* 极简无边框设计，仅在悬停时感知背景 */
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-selectors);
+  border: 1px solid var(--border-selectors);
   border-radius: 20px;
   padding: 0 12px;
   height: 36px;

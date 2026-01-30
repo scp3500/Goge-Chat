@@ -56,18 +56,19 @@ const formatUserText = (text) => {
 .message-bubble { 
   padding: 12px 16px; 
   border-radius: 18px; 
-  background: #3a3a3c; 
-  color: #fff; 
+  background: var(--bg-user-bubble); 
+  color: var(--color-user-bubble-text); 
   max-width: 100%; 
   word-wrap: break-word; 
   white-space: pre-wrap; 
+  border: 1px solid var(--border-glass);
 }
 
 .message-bubble.is-editing { 
   width: 100%; 
   padding: 12px; 
-  background: rgba(255, 255, 255, 0.05); 
-  border: 1px solid rgba(255, 255, 255, 0.12); 
+  background: var(--bg-glass); 
+  border: 1px solid var(--border-glass-bright); 
   border-radius: 14px; 
 }
 
@@ -76,7 +77,7 @@ const formatUserText = (text) => {
   min-height: 100px; 
   background: transparent; 
   border: none; 
-  color: #fff; 
+  color: var(--text-color-white); 
   font-size: 15px; 
   line-height: 1.6; 
   resize: vertical; 
@@ -100,12 +101,12 @@ const formatUserText = (text) => {
 }
 
 .edit-cancel { 
-  background: rgba(255, 255, 255, 0.05); 
-  color: rgba(255, 255, 255, 0.6); 
+  background: var(--bg-glass-active); 
+  color: var(--text-tertiary); 
 }
 
 .edit-save { 
-  background: #4f46e5; 
+  background: var(--color-primary); 
   color: #fff; 
 }
 </style>

@@ -14,8 +14,12 @@ const drag = ref(false);
 const props = defineProps(['list', 'active', 'filter', 'isCollapsed']);
 const emit = defineEmits(['select', 'delete', 'rename', 'reorder', 'reorder-folders']);
 
-const vFocus = {
-  mounted: (el) => el.focus()
+const editingInputRef = ref([]);
+
+const setEditingRef = (el) => {
+  if (el) {
+    el.focus();
+  }
 };
 
 // 计算文件夹列表
@@ -153,7 +157,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
               @blur="e => handleRenameFolder(folder.id, e.target.value)"
               @keyup.enter="e => handleRenameFolder(folder.id, e.target.value)"
               @click.stop
-              v-focus
+              :ref="setEditingRef"
             />
             <span v-else class="folder-name">{{ folder.name.replace(/^[cr]:/g, '') }}</span>
           </div>
@@ -281,7 +285,8 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
   align-items: center;
   gap: 8px;
   padding: 6px 16px 6px 10px;
-  color: #9aa0a6;
+  color: var(--text-color);
+  opacity: 0.7;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -290,8 +295,9 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
 }
 
 .folder-header:hover {
-  color: #e8eaed;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-color-white);
+  background: var(--bg-glass-hover);
+  opacity: 1;
 }
 
 .folder-icon {
@@ -309,7 +315,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
   flex-direction: column;
   gap: 2px;
   padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid var(--border-glass);
   margin-left: 17px;
   margin-top: 4px;
   margin-bottom: 8px;
@@ -322,8 +328,8 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
 
 .drag-item-active {
   opacity: 0.95 !important;
-  background: rgba(45, 45, 45, 0.95) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  background: var(--bg-dropdown) !important;
+  box-shadow: var(--shadow-main);
   transform: scale(1.02);
   z-index: 1000;
   cursor: grabbing !important;
@@ -332,23 +338,24 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
 .glass-menu { 
   position: fixed; 
   z-index: 10000; 
-  background: rgba(30, 31, 32, 0.95); 
+  background: var(--bg-menu); 
   backdrop-filter: blur(12px); 
-  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border: 1px solid var(--border-menu); 
   border-radius: 10px; 
   padding: 6px; 
-  min-width: 150px; 
+  min-width: 150px;
+  box-shadow: var(--shadow-main);
 }
 
-.menu-item { padding: 8px 12px; font-size: 13px; color: #d1d1d1; border-radius: 6px; cursor: pointer; }
-.menu-item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.menu-item { padding: 8px 12px; font-size: 13px; color: var(--text-color); border-radius: 6px; cursor: pointer; }
+.menu-item:hover { background: var(--bg-menu-hover); color: var(--text-color-white); }
 .menu-item.delete { color: #ff6b6b; }
-.menu-sep { height: 1px; background: rgba(255, 255, 255, 0.05); margin: 4px 0; }
+.menu-sep { height: 1px; background: var(--border-menu); margin: 4px 0; }
 
 .edit-input {
-  background: #2b2c2e;
-  border: 1px solid #5f6368;
-  color: #ffffff;
+  background: var(--bg-input-focus);
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-color-white);
   font-size: 13px;
   border-radius: 4px;
   outline: none;

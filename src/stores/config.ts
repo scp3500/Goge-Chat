@@ -35,10 +35,25 @@ export const useConfigStore = defineStore('config', () => {
      */
     const applyToCss = (val: AppSettings) => {
         const root = document.documentElement;
+
+        // 🛡️ 强力修复：彻底移除可能存在的内联硬编码背景色，确保 CSS 变量生效
+        root.style.removeProperty('--bg-main');
+
         root.style.setProperty('--font-size-base', `${val.fontSize}px`);
         root.style.setProperty('--font-ratio', val.lineRatio.toString());
-        root.style.setProperty('--bg-main', val.themeColor);
         root.style.setProperty('--scrollbar-width', `${val.scrollbarWidth}px`);
+
+        // 应用主题属性
+        // 根据当前模式（light/dark）获取用户预设的具体主题 ID
+        const activeThemeId = val.theme === 'light' ? (val.lightThemeId || 'light') : (val.darkThemeId || 'dark');
+        root.setAttribute('data-theme', activeThemeId);
+
+        // 同时切换类名以便排查
+        if (val.theme === 'light') {
+            root.classList.add('light-mode');
+        } else {
+            root.classList.remove('light-mode');
+        }
     };
 
     // ========== 初始化 ==========

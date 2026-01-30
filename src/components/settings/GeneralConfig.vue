@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useConfigStore } from '../../stores/config';
 import { BRAIN_SVG, BOX_SVG, SPARKLES_SVG } from '../../constants/icons';
 
@@ -33,6 +33,19 @@ const updateDefaultPreset = (e) => {
 
 const updateDefaultPrompt = (val) => {
   configStore.updateConfig({ defaultSystemPrompt: val });
+};
+
+const isPromptTemplateMatch = computed(() => {
+  return configStore.settings.promptLibrary.some(p => p.content === configStore.settings.defaultSystemPrompt);
+});
+
+const onSelectPromptTemplate = (e) => {
+  const val = e.target.value;
+  if (!val) return;
+  const item = configStore.settings.promptLibrary.find(p => p.id === val);
+  if (item) {
+    configStore.updateConfig({ defaultSystemPrompt: item.content });
+  }
 };
 </script>
 
@@ -76,11 +89,24 @@ const updateDefaultPrompt = (val) => {
         <div class="card-header">
           <div class="icon-wrap" v-html="BRAIN_SVG"></div>
           <div class="title-wrap">
-            <label>全局兜底提示词</label>
-            <span class="hint">当所选预设未配置提示词时，将自动使用此内容作为系统指令</span>
+            <label>默认系统提示词</label>
+            <span class="hint">当新对话未自定义提示词时，将自动使用此内容作为系统指令</span>
           </div>
         </div>
         <div class="input-wrap">
+          <select @change="onSelectPromptTemplate">
+            <option value="" :selected="!isPromptTemplateMatch">-- 手动编辑 / 自定义内容 --</option>
+            <option 
+              v-for="p in configStore.settings.promptLibrary" 
+              :key="p.id" 
+              :value="p.id"
+              :selected="configStore.settings.defaultSystemPrompt === p.content"
+            >
+              {{ p.icon }} {{ p.name }}
+            </option>
+          </select>
+        </div>
+        <div class="input-wrap mt-2">
           <textarea 
             v-model="configStore.settings.defaultSystemPrompt" 
             @change="updateDefaultPrompt($event.target.value)"
@@ -109,13 +135,14 @@ const updateDefaultPrompt = (val) => {
 .header-section h2 {
   font-size: 20px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-color-white);
   margin: 0 0 4px 0;
 }
 
 .subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-color);
+  opacity: 0.4;
 }
 
 .config-list {
@@ -125,8 +152,8 @@ const updateDefaultPrompt = (val) => {
 }
 
 .config-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -136,8 +163,8 @@ const updateDefaultPrompt = (val) => {
 }
 
 .config-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass-hover);
+  border-color: var(--border-glass-bright);
 }
 
 
@@ -150,18 +177,87 @@ const updateDefaultPrompt = (val) => {
 .icon-wrap {
   width: 32px;
   height: 32px;
-  background: rgba(129, 140, 248, 0.1);
+  background: var(--color-primary-bg);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #818cf8;
+  color: var(--color-primary);
   flex-shrink: 0;
 }
 
 .icon-wrap :deep(svg) {
   width: 18px;
   height: 18px;
+}
+
+.library-select-container {
+  position: relative;
+  margin-left: auto;
+}
+
+.mini-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: var(--color-primary-light);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mini-tool-btn:hover {
+  background: var(--color-primary-border);
+}
+
+.mini-tool-btn .icon :deep(svg) {
+  width: 12px;
+  height: 12px;
+}
+
+.library-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 180px;
+  max-height: 200px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-glass-bright);
+  border-radius: 12px;
+  box-shadow: var(--shadow-main);
+  z-index: 100;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-glass-hover);
+}
+
+.item-icon { font-size: 16px; }
+.item-name { font-size: 13px; color: var(--text-color-white); }
+
+.pop-up-enter-active, .pop-up-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pop-up-enter-from, .pop-up-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
 }
 
 .title-wrap {
@@ -173,21 +269,22 @@ const updateDefaultPrompt = (val) => {
 .title-wrap label {
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-color-white);
 }
 
 .hint {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-color);
+  opacity: 0.35;
   line-height: 1.4;
 }
 
 .input-wrap select, .input-wrap textarea {
   width: 100%;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
+  border: 1px solid var(--border-glass);
   border-radius: 10px;
-  color: #fff;
+  color: var(--text-color-white);
   padding: 10px 12px;
   font-family: inherit;
   font-size: 14px;
@@ -196,12 +293,16 @@ const updateDefaultPrompt = (val) => {
 }
 
 .input-wrap select:focus, .input-wrap textarea:focus {
-  border-color: #818cf8;
-  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--color-primary);
+  background: var(--bg-input-focus);
 }
 
 .input-wrap textarea {
   resize: none;
   line-height: 1.6;
+}
+
+.mt-2 {
+  margin-top: 12px;
 }
 </style>

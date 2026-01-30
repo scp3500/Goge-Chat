@@ -51,12 +51,12 @@ defineEmits(['update:activeCategory']);
 </template>
 
 <style scoped>
-.nav-sidebar { width: 180px; background: #131314; padding: 12px 8px; border-right: 1px solid rgba(255, 255, 255, 0.03); }
-.nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; cursor: pointer; margin-bottom: 2px; color: #999; font-size: 14px; transition: all 0.2s; }
-.nav-item.active { background: #2b2d31; color: #fff; }
-.nav-item:hover:not(.active) { background: rgba(255, 255, 255, 0.03); color: #ccc; }
+.nav-sidebar { width: 180px; background: var(--bg-sidebar); padding: 12px 8px; border-right: none; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; cursor: pointer; margin-bottom: 2px; color: var(--text-color); opacity: 0.7; font-size: 14px; transition: all 0.2s; }
+.nav-item.active { background: var(--bg-glass-active); color: var(--text-color-white); opacity: 1; }
+.nav-item:hover:not(.active) { background: var(--bg-glass-hover); color: var(--text-color-white); opacity: 0.9; }
 .icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; opacity: 0.7; }
 .nav-item.active .icon { opacity: 1; }
 .icon :deep(svg) { width: 100%; height: 100%; }
-.nav-divider { height: 1px; background: rgba(255, 255, 255, 0.05); margin: 12px 8px; }
+.nav-divider { height: 1px; background: var(--border-glass); margin: 12px 8px; }
 </style>

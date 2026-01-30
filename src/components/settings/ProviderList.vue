@@ -17,8 +17,8 @@ const targetProvider = ref(null);
 const editingId = ref(null);
 const editingName = ref('');
 
-const vFocus = {
-  mounted: (el) => el.focus()
+const setInputRef = (el) => {
+  if (el) el.focus();
 };
 
 const openContextMenu = (provider, e) => {
@@ -117,7 +117,7 @@ const list = computed({
                 @keyup.enter="handleRename"
                 @keyup.esc="cancelRename"
                 @click.stop
-                v-focus
+                :ref="setInputRef"
               />
               <span v-else class="p-name">{{ provider.name }}</span>
             </div>
@@ -148,15 +148,15 @@ const list = computed({
 </template>
 
 <style scoped>
-.provider-sidebar { width: 260px; background: #18191b; border-right: 1px solid rgba(255, 255, 255, 0.03); display: flex; flex-direction: column; }
+.provider-sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; }
 .sidebar-header { padding: 16px; display: flex; align-items: center; gap: 8px; }
-.search-box { background: #131314; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex: 1; }
-.search-box input { background: transparent; border: none; color: #fff; outline: none; flex: 1; font-size: 13px; }
-.add-btn { width: 32px; height: 32px; border-radius: 8px; background: #2b2d31; border: 1px solid rgba(255,255,255,0.05); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 16px; }
-.add-btn:hover { background: #3f4148; }
+.search-box { background: var(--bg-input); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex: 1; border: 1px solid var(--border-glass); }
+.search-box input { background: transparent; border: none; color: var(--text-color-white); outline: none; flex: 1; font-size: 13px; }
+.add-btn { width: 32px; height: 32px; border-radius: 8px; background: var(--bg-glass); border: 1px solid var(--border-glass); color: var(--text-color-white); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 16px; }
+.add-btn:hover { background: var(--bg-glass-hover); }
 .list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: background 0.2s; }
-.list-item:hover { background: rgba(255, 255, 255, 0.05); }
-.list-item.active { background: #2b2d31; }
+.list-item:hover { background: var(--bg-glass-hover); }
+.list-item.active { background: var(--bg-glass-active); }
 .item-left { display: flex; align-items: center; gap: 12px; }
 .p-icon {
   flex-shrink: 0;
@@ -165,26 +165,26 @@ const list = computed({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(220, 220, 225, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-model-icon);
+  border: 1px solid var(--border-glass);
   border-radius: 10px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  color: #1a1a1b;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  color: var(--color-model-icon);
+  box-shadow: var(--shadow-main);
 }
 
 .list-item:hover .p-icon {
   transform: translateY(-1px);
-  background: rgba(235, 235, 240, 0.95);
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--bg-model-icon-hover);
+  box-shadow: 0 5px 12px var(--bg-mask);
+  border-color: var(--border-glass-bright);
 }
 
 .list-item.active .p-icon {
-  background: #f0f0f5;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: var(--bg-model-icon-active);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-border), 0 4px 12px var(--bg-mask);
 }
 
 .p-icon :deep(svg) {
@@ -197,10 +197,11 @@ const list = computed({
 .list-item:hover .drag-handle { color: #888; }
 .item-right { display: flex; align-items: center; gap: 8px; }
 .p-name { font-size: 14px; font-weight: 500; }
-.status-tag.on { background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-.status-tag.off { background: rgba(255, 255, 255, 0.05); color: #888; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-.toggle-btn { width: 36px; height: 20px; background: #555; border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.3s; }
-.toggle-btn.on { background: #3b82f6; }
+.status-tag { background: var(--bg-glass); color: var(--text-secondary); font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+.status-tag.on { background: var(--color-primary-bg); color: var(--color-primary); }
+.status-tag.off { background: var(--bg-glass); color: var(--text-tertiary); }
+.toggle-btn { width: 36px; height: 20px; background: var(--bg-glass-active); border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.3s; }
+.toggle-btn.on { background: var(--color-primary); }
 .toggle-slider { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
 .toggle-btn.on .toggle-slider { left: 18px; }
 
@@ -211,29 +212,29 @@ const list = computed({
 
 .sortable-ghost {
   opacity: 0.5;
-  background: #2b2d31 !important;
+  background: var(--bg-glass-active) !important;
 }
 
 .glass-menu { 
   position: fixed; 
   z-index: 10000; 
-  background: rgba(30, 31, 32, 0.95); 
+  background: var(--bg-main); 
   backdrop-filter: blur(12px); 
-  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border: 1px solid var(--border-glass-bright); 
   border-radius: 10px; 
   padding: 6px; 
   min-width: 150px; 
 }
 
-.menu-item { padding: 8px 12px; font-size: 13px; color: #d1d1d1; border-radius: 6px; cursor: pointer; user-select: none; }
-.menu-item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.menu-item { padding: 8px 12px; font-size: 13px; color: var(--text-color); border-radius: 6px; cursor: pointer; user-select: none; }
+.menu-item:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
 .menu-item.delete { color: #ff6b6b; }
-.menu-sep { height: 1px; background: rgba(255, 255, 255, 0.05); margin: 4px 0; }
+.menu-sep { height: 1px; background: var(--border-glass); margin: 4px 0; }
 
 .edit-input {
-  background: #2b2c2e;
-  border: 1px solid #5f6368;
-  color: #ffffff;
+  background: var(--bg-input);
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-color-white);
   font-size: 13px;
   border-radius: 4px;
   outline: none;

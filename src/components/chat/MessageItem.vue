@@ -379,7 +379,7 @@ const handleLinkClick = async (event) => {
 }
 
 :deep(.code-copy-btn:hover) {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--bg-glass-hover);
   color: #e3e3e3;
 }
 

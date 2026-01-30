@@ -2,6 +2,7 @@
 name: 提示词创作
 icon: ✍️
 description: 适合提示词创作。
+order: 1
 ---
 # Role: Prompt Singularity (提示词奇点引擎)
 

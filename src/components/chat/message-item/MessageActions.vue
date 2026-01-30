@@ -51,7 +51,8 @@ defineEmits(['edit', 'delete', 'copy', 'regenerate']);
 .action-btn { 
   background: transparent; 
   border: none; 
-  color: #707070; 
+  color: var(--text-color); 
+  opacity: 0.7;
   cursor: pointer; 
   padding: 6px; 
   border-radius: 6px; 
@@ -61,12 +62,13 @@ defineEmits(['edit', 'delete', 'copy', 'regenerate']);
 }
 
 .action-btn:hover { 
-  color: #ffffff; 
-  background: rgba(255, 255, 255, 0.06); 
+  color: var(--text-color-white); 
+  background: var(--bg-glass-hover); 
+  opacity: 1;
 }
 
 .action-btn.delete-btn:hover { 
-  color: #ff4d4f; 
-  background: rgba(255, 77, 79, 0.1); 
+  color: var(--color-danger); 
+  background: var(--color-danger-alpha-10); 
 }
 </style>

@@ -16,8 +16,8 @@ const targetPreset = ref(null);
 const editingId = ref(null);
 const editingName = ref('');
 
-const vFocus = {
-  mounted: (el) => el.focus()
+const setInputRef = (el) => {
+  if (el) el.focus();
 };
 
 const openContextMenu = (preset, e) => {
@@ -117,7 +117,7 @@ const list = computed({
                 @keyup.enter="handleRename"
                 @keyup.esc="cancelRename"
                 @click.stop
-                v-focus
+                :ref="setInputRef"
               />
               <span v-else class="p-name">{{ preset.name }}</span>
             </div>
@@ -138,15 +138,15 @@ const list = computed({
 </template>
 
 <style scoped>
-.preset-sidebar { width: 260px; background: #18191b; border-right: 1px solid rgba(255, 255, 255, 0.03); display: flex; flex-direction: column; }
+.preset-sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; }
 .sidebar-header { padding: 16px; display: flex; align-items: center; gap: 8px; }
-.search-box { background: #131314; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex: 1; }
-.search-box input { background: transparent; border: none; color: #fff; outline: none; flex: 1; font-size: 13px; }
-.add-btn { width: 32px; height: 32px; border-radius: 8px; background: #2b2d31; border: 1px solid rgba(255,255,255,0.05); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 16px; }
-.add-btn:hover { background: #3f4148; }
+.search-box { background: var(--bg-input); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; flex: 1; }
+.search-box input { background: transparent; border: none; color: var(--text-color-white); outline: none; flex: 1; font-size: 13px; }
+.add-btn { width: 32px; height: 32px; border-radius: 8px; background: var(--bg-glass); border: 1px solid var(--border-glass); color: var(--text-color-white); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 16px; }
+.add-btn:hover { background: var(--bg-glass-hover); }
 .list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: background 0.2s; }
-.list-item:hover { background: rgba(255, 255, 255, 0.05); }
-.list-item.active { background: #2b2d31; }
+.list-item:hover { background: var(--bg-glass-hover); }
+.list-item.active { background: var(--bg-glass-active); }
 .item-left { display: flex; align-items: center; gap: 12px; }
 .p-icon {
   flex-shrink: 0;
@@ -155,16 +155,16 @@ const list = computed({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(40, 40, 45, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 10px;
   font-size: 16px;
 }
 
-.drag-handle { cursor: grab; color: #555; font-size: 14px; user-select: none; padding-right: 4px; }
+.drag-handle { cursor: grab; color: var(--text-tertiary); font-size: 14px; user-select: none; padding-right: 4px; }
 .drag-handle:active { cursor: grabbing; }
-.list-item:hover .drag-handle { color: #888; }
-.p-name { font-size: 14px; font-weight: 500; color: #efefef; }
+.list-item:hover .drag-handle { color: var(--text-secondary); }
+.p-name { font-size: 14px; font-weight: 500; color: var(--text-color); }
 
 .draggable-list {
   display: flex;
@@ -173,29 +173,30 @@ const list = computed({
 
 .sortable-ghost {
   opacity: 0.5;
-  background: #2b2d31 !important;
+  background: var(--bg-glass-active) !important;
 }
 
 .glass-menu { 
   position: fixed; 
   z-index: 10000; 
-  background: rgba(30, 31, 32, 0.95); 
+  background: var(--bg-menu); 
   backdrop-filter: blur(12px); 
-  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border: 1px solid var(--border-menu); 
   border-radius: 10px; 
   padding: 6px; 
   min-width: 150px; 
+  box-shadow: var(--shadow-main);
 }
 
-.menu-item { padding: 8px 12px; font-size: 13px; color: #d1d1d1; border-radius: 6px; cursor: pointer; user-select: none; }
-.menu-item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.menu-item { padding: 8px 12px; font-size: 13px; color: var(--text-color); border-radius: 6px; cursor: pointer; user-select: none; }
+.menu-item:hover { background: var(--bg-menu-hover); color: var(--text-color-white); }
 .menu-item.delete { color: #ff6b6b; }
-.menu-sep { height: 1px; background: rgba(255, 255, 255, 0.05); margin: 4px 0; }
+.menu-sep { height: 1px; background: var(--border-menu); margin: 4px 0; }
 
 .edit-input {
-  background: #2b2c2e;
-  border: 1px solid #5f6368;
-  color: #ffffff;
+  background: var(--bg-input-focus);
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-color-white);
   font-size: 13px;
   border-radius: 4px;
   outline: none;

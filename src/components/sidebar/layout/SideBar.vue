@@ -82,13 +82,13 @@ const toggleSidebar = () => {
 
   /* 动力学曲线：确保缩放极其顺滑 */
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
-  background: var(--bg-main); 
+  background: var(--bg-sidebar); 
   height: 100vh; 
   display: flex; 
   flex-direction: column; 
   
   /* --- 🩺 手术位置：彻底删除这一行 --- */
-  /* border-right: 1px solid #2a2b2d; */ 
+  border-right: none;
   /* ---------------------------------- */
 
   /* 🛡️ 核心：切掉所有溢出内容 */
@@ -133,7 +133,8 @@ const toggleSidebar = () => {
   padding: 16px 20px 16px 28px; 
   border-top: none; 
   font-size: 10px; 
-  color: #555; 
+  color: var(--text-color);
+  opacity: 0.5;
   text-align: left; 
   white-space: nowrap; 
   flex-shrink: 0;

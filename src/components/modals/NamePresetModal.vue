@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 
 const props = defineProps({
   show: Boolean
@@ -21,9 +21,19 @@ const handleCancel = () => {
   emit('close');
 };
 
-const vFocus = {
-  mounted: (el) => el.focus()
-};
+const inputRef = ref(null);
+
+onMounted(() => {
+  if (props.show) {
+    setTimeout(() => inputRef.value?.focus(), 50);
+  }
+});
+
+watch(() => props.show, (val) => {
+  if (val) {
+    setTimeout(() => inputRef.value?.focus(), 50);
+  }
+});
 </script>
 
 <template>
@@ -39,7 +49,7 @@ const vFocus = {
             placeholder="例如: 翻译专家, 文案助手..." 
             @keyup.enter="handleConfirm"
             @keyup.esc="handleCancel"
-            v-focus
+            ref="inputRef"
           />
         </div>
         
@@ -56,7 +66,7 @@ const vFocus = {
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--bg-mask);
   backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex;
@@ -65,12 +75,12 @@ const vFocus = {
 }
 
 .modal-content {
-  background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-main);
+  border: 1px solid var(--border-glass);
   border-radius: 16px;
   width: 360px;
   padding: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-main);
 }
 
 .modal-title {
@@ -87,8 +97,8 @@ const vFocus = {
 }
 
 .input-wrapper {
-  background: #111214;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-input-dim);
+  border: 1px solid var(--border-glass);
   border-radius: 8px;
   padding: 10px 14px;
   margin-bottom: 24px;
@@ -120,10 +130,10 @@ const vFocus = {
   border-radius: 6px;
 }
 
-.cancel-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ccc; }
+.cancel-btn:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
 
 .confirm-btn {
-  background: #248046;
+  background: var(--color-success);
   border: none;
   color: #fff;
   font-size: 14px;
@@ -133,7 +143,7 @@ const vFocus = {
   border-radius: 6px;
 }
 
-.confirm-btn:hover:not(:disabled) { background: #2ea05d; }
+.confirm-btn:hover:not(:disabled) { opacity: 0.9; }
 .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: all 0.2s ease; }

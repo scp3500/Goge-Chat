@@ -2,15 +2,14 @@
 import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
-import { STOP_SVG, SEND_SVG, PLUS_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG } from '../../constants/icons';
+import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG } from '../../constants/icons';
 import ModelSelector from './ModelSelector.vue';
 import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import NamePresetModal from '../modals/NamePresetModal.vue';
 import { useSettingsStore } from '../../stores/settings';
 import { useConfigStore } from '../../stores/config';
-import { SETTINGS_SVG } from '../../constants/icons.ts';
+import SystemPromptWidget from './SystemPromptWidget.vue';
 
 
 
@@ -170,11 +169,6 @@ const handleThinkClick = () => {
   useReasoning.value = !useReasoning.value;
 };
 
-const handleConfigClick = (e) => {
-  e.stopPropagation();
-  uiStore.toggleMenu('preset-menu');
-};
-
 const selectPreset = (presetId) => {
   if (presetId === 'new') {
     showNameModal.value = true;
@@ -228,50 +222,18 @@ onMounted(() => {
 
       <div class="tools-section" @click.stop>
         <div class="tools-left" style="display: flex; align-items: center; gap: 4px;">
-          <div class="preset-btn-wrapper" style="position: relative;">
-            <button
-              class="icon-btn attach-btn"
-              @click="handleConfigClick"
-              title="模型配置"
-              :class="{ 'active-config': showPresetMenu }"
-            >
-              <span v-html="SETTINGS_SVG"></span>
-            </button>
-            
-            <Transition name="fade-slide">
-              <div v-if="showPresetMenu" class="preset-dropdown modern-scroll">
-                <div class="menu-list">
-                  <div 
-                    v-for="preset in configStore.settings.presets" 
-                    :key="preset.id"
-                    class="menu-item"
-                    :class="{ active: configStore.settings.defaultPresetId === preset.id }"
-                    @click="selectPreset(preset.id)"
-                  >
-                    <span class="preset-name">{{ preset.name }}</span>
-                    <span v-if="configStore.settings.defaultPresetId === preset.id" class="check-icon">✓</span>
-                  </div>
-                  <div class="menu-sep"></div>
-                  <div class="menu-item new-preset" @click="selectPreset('new')">
-                    <span class="plus-icon">＋</span>
-                    <span>新建自定义配置</span>
-                  </div>
-                </div>
-              </div>
-            </Transition>
-          </div>
-
           <button
             class="icon-btn attach-btn"
-
             @click="handleAttachClick"
             title="添加文件/图片"
           >
-            <span v-html="PLUS_SVG"></span>
+            <span v-html="PAPERCLIP_SVG"></span>
           </button>
           
           <!-- 极简模型选择器 -->
           <ModelSelector minimal direction="up" fullWidth menuId="input-model" />
+
+          <SystemPromptWidget />
 
           <button
             class="icon-btn attach-btn"
@@ -281,6 +243,7 @@ onMounted(() => {
           >
             <span v-html="BRAIN_SVG"></span>
           </button>
+
           <div class="search-btn-wrapper" style="position: relative;">
             <button
               class="icon-btn attach-btn"
@@ -343,12 +306,7 @@ onMounted(() => {
 
     </div>
 
-    <!-- 命名模态框 -->
-    <NamePresetModal 
-      :show="showNameModal" 
-      @close="showNameModal = false" 
-      @confirm="handleCreatePreset"
-    />
+    
   </div>
 </template>
 
@@ -370,13 +328,13 @@ onMounted(() => {
   
   background: var(--bg-input-focus);
   border-radius: 30px;
-  padding: 16px 20px 10px 20px;
+  padding: 16px 20px 10px 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  border: none;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--input-shadow);
   cursor: text;
   position: relative; /* 确保子绝父相 */
 }
@@ -445,22 +403,22 @@ onMounted(() => {
   opacity: 0.6;
 }
 .attach-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--bg-glass-hover);
   opacity: 1;
 }
 
 .attach-btn.active-think {
-  color: #818cf8;
+  color: var(--color-primary);
   opacity: 1;
 }
 
 .attach-btn.active-search {
-  color: #818cf8;
+  color: var(--color-primary);
   opacity: 1;
 }
 
 .attach-btn.active-config {
-  color: #818cf8;
+  color: var(--color-primary);
   opacity: 1;
 }
 
@@ -486,27 +444,27 @@ onMounted(() => {
 .file-card {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass);
   border-radius: 12px;
   padding: 6px 10px;
   gap: 8px;
   min-width: 120px;
   max-width: 200px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-glass);
   transition: all 0.2s ease;
 }
 
 .file-card:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--bg-glass-hover);
+  border-color: var(--border-glass-bright);
 }
 
 .file-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #818cf8;
+  color: var(--color-primary);
 }
 
 .file-icon :deep(svg) {
@@ -529,7 +487,7 @@ onMounted(() => {
 }
 
 .remove-file-btn {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-mask);
   border: none;
   border-radius: 50%;
   width: 16px;
@@ -545,7 +503,8 @@ onMounted(() => {
 
 .remove-file-btn:hover {
   opacity: 1;
-  background: rgba(239, 68, 68, 0.8);
+  opacity: 1;
+  background: var(--color-danger);
 }
 
 .remove-file-btn :deep(svg) {
@@ -564,7 +523,7 @@ onMounted(() => {
 }
 
 .action-btn:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.1); /* 悬停显示白圆 */
+  background-color: var(--bg-glass-hover); /* 悬停显示白圆 */
   transform: scale(1.05);
 }
 
@@ -577,20 +536,20 @@ onMounted(() => {
 
 /* 3. 停止状态 (Stop) - 实体常驻模式 */
 .action-btn.is-stop {
-  color: #818cf8; /* 薰衣草紫文字 */
+  color: var(--color-primary); /* 薰衣草紫文字 */
   
   /* 关键修改：默认显示蓝紫色背景，而不是透明 */
-  background-color: rgba(165,195,245, 0.2); 
+  background-color: var(--bg-button-active); 
   opacity: 1; 
 }
 
 .action-btn.is-stop:hover {
   /* 悬停时加深背景 */
-  background-color: rgba(165, 195, 245, 0.35); 
+  background-color: var(--bg-glass-active); 
 }
 
 .modern-scroll::-webkit-scrollbar { width: 4px; }
-.modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+.modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
 
 /* 搜索菜单样式 */
 /* 搜索菜单样式 - 极致毛玻璃 */
@@ -601,13 +560,14 @@ onMounted(() => {
   right: 0;     /* 设为 0 */
   margin: 0 auto; /* 配合 width: 92% 实现完美居中 */
   width: 92%;
-  background: rgba(24, 24, 26, 0.98);
+  width: 92%;
+  background: var(--bg-menu);
   backdrop-filter: blur(40px) saturate(200%);
   -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-menu);
   border-bottom: none;
   border-radius: 20px 20px 0 0;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-main);
   z-index: 1000;
   overflow: hidden;
   padding: 6px;
@@ -630,20 +590,21 @@ onMounted(() => {
 }
 
 .menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass-hover);
 }
 
 .menu-item.active {
-  background: rgba(74, 222, 128, 0.1);
-  border: 1px solid rgba(74, 222, 128, 0.15);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
 }
 
 .menu-item.active .provider-name {
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .menu-item.active .free-badge {
-  color: rgba(74, 222, 128, 0.5);
+  color: var(--color-success);
+  opacity: 0.5;
 }
 
 .menu-item-left {
@@ -667,13 +628,13 @@ onMounted(() => {
 
 .provider-name {
   font-size: 14px;
-  color: #efefef;
+  color: var(--text-color);
   font-weight: 500;
 }
 
 .free-badge {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-dim);
 }
 
 .menu-footer {
@@ -681,13 +642,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-glass);
   margin-top: 6px;
 }
 
 .footer-left {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-dim);
   font-weight: 500;
 }
 
@@ -696,12 +657,12 @@ onMounted(() => {
   align-items: center;
   gap: 16px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-dim);
 }
 
 .menu-shortcuts .key {
-  color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-tertiary);
+  background: var(--bg-glass-active);
   padding: 1px 4px;
   border-radius: 4px;
   margin-right: 2px;
@@ -722,11 +683,11 @@ onMounted(() => {
   bottom: calc(100% + 10px);
   left: 0;
   width: 200px;
-  background: rgba(24, 24, 26, 0.98);
+  background: var(--bg-menu);
   backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-menu);
   border-radius: 12px;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-main);
   z-index: 1000;
   padding: 6px;
 }
@@ -741,18 +702,18 @@ onMounted(() => {
 }
 
 .preset-dropdown .new-preset {
-  color: #4ade80;
+  color: var(--color-success);
   font-weight: 500;
 }
 
 .preset-dropdown .menu-sep {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-menu);
   margin: 4px 0;
 }
 
 .check-icon {
-  color: #4ade80;
+  color: var(--color-success);
   font-weight: bold;
 }
 </style>

@@ -45,6 +45,9 @@ export interface AppSettings {
     fontSize: number;
     lineRatio: number;
     themeColor: string;
+    theme: 'light' | 'dark';
+    darkThemeId: string; // 用户选择的深色主题 ID
+    lightThemeId: string; // 用户选择的浅色主题 ID
     scrollbarWidth: number;
 
     // AI 模型设置
@@ -158,7 +161,10 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
 export const DEFAULT_SETTINGS: AppSettings = {
     fontSize: 16,
     lineRatio: 1.7,
-    themeColor: '#1E1F20',
+    themeColor: 'var(--theme-preset-1)',
+    theme: 'dark',
+    darkThemeId: 'nord', // 默认深色主题
+    lightThemeId: 'light', // 默认浅色主题
     scrollbarWidth: 12,
     providers: DEFAULT_PROVIDERS,
     defaultProviderId: 'deepseek',

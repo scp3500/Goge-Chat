@@ -32,15 +32,15 @@ defineEmits(['confirm', 'cancel']);
 .modern-confirm-popup {
   position: fixed;
   z-index: 10000;
-  background: rgba(30, 30, 32, 0.8);
+  background: var(--bg-dropdown);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-dropdown);
   border-radius: 12px;
   padding: 12px;
   width: 180px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  color: #fff;
+  box-shadow: var(--shadow-main);
+  color: var(--text-color-white);
   pointer-events: auto;
 }
 
@@ -49,7 +49,8 @@ defineEmits(['confirm', 'cancel']);
   font-weight: 500;
   margin-bottom: 12px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-color-white);
+  opacity: 0.9;
   letter-spacing: 0.2px;
 }
 
@@ -70,23 +71,25 @@ defineEmits(['confirm', 'cancel']);
 }
 
 .pop-cancel {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--bg-glass);
+  color: var(--text-color);
+  opacity: 0.7;
 }
 
 .pop-cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--bg-glass-hover);
+  color: var(--text-color-white);
+  opacity: 1;
 }
 
 .pop-confirm {
-  background: #6366f1; /* Indigo matching premium themes */
+  background: var(--color-primary);
   color: #fff;
 }
 
 .pop-confirm:hover {
-  background: #818cf8;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  background: var(--color-primary-light);
+  box-shadow: 0 0 10px var(--color-primary-border);
 }
 
 .popup-overlay {
@@ -106,10 +109,10 @@ defineEmits(['confirm', 'cancel']);
   transform: translateX(-50%) rotate(45deg);
   width: 10px;
   height: 10px;
-  background: rgba(30, 30, 32, 0.8);
+  background: var(--bg-dropdown);
   backdrop-filter: blur(24px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--border-dropdown);
+  border-bottom: 1px solid var(--border-dropdown);
 }
 
 /* 动画 */

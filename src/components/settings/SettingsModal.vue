@@ -19,7 +19,12 @@ const { allProviders, toggleProvider, updateProvidersOrder } = useProviderConfig
 const emit = defineEmits(['close']);
 
 // 主题列表
-const themes = ['#202124', '#1b1b1f', '#0f0f10', '#2c2c32'];
+const themes = [
+  'var(--theme-preset-1)',
+  'var(--theme-preset-2)',
+  'var(--theme-preset-3)',
+  'var(--theme-preset-4)'
+];
 
 // 提供商列表（转换为旧格式以兼容现有组件）
 const providersForList = computed(() => 
@@ -251,16 +256,16 @@ const handleClose = () => {
 </template>
 
 <style scoped>
-.settings-layout { display: flex; width: 100%; height: 100%; background: #131314; color: #e3e3e3; overflow: hidden; }
-.detail-panel { flex: 1; background: #1e1f22; overflow-y: auto; }
+.settings-layout { display: flex; width: 100%; height: 100%; background: var(--bg-sidebar); color: var(--text-color); overflow: hidden; }
+.detail-panel { flex: 1; background: var(--bg-main); overflow-y: auto; }
 .detail-container { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-.detail-header h2 { font-size: 20px; font-weight: 600; color: #fff; margin: 0; }
-.placeholder { display: flex; align-items: center; justify-content: center; height: 200px; color: #888; }
+.detail-header h2 { font-size: 20px; font-weight: 600; color: var(--text-color-white); margin: 0; }
+.placeholder { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-tertiary); }
 
 /* 滚动条样式复原 */
 .modern-scroll::-webkit-scrollbar { width: 8px; }
 .modern-scroll::-webkit-scrollbar-track { background: transparent; }
-.modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
-.modern-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
+.modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
+.modern-scroll::-webkit-scrollbar-thumb:hover { background: var(--bg-glass-hover); }
 </style>

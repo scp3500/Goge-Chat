@@ -14,11 +14,11 @@
 
 /* 消息气泡样式 */
 .message-row.user .message-bubble {
-  background: #3c4043;
-  padding: 14px 20px;
-  border-radius: 20px 20px 4px 20px;
-  color: #fff;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background: var(--bg-user-bubble);
+    padding: 14px 20px;
+    border-radius: 20px 20px 4px 20px;
+    color: var(--color-user-bubble-text);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }

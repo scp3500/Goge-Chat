@@ -50,8 +50,8 @@ const handleOpenFile = (path) => {
 .message-file-card {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 12px;
   padding: 8px 12px;
   gap: 10px;
@@ -61,12 +61,12 @@ const handleOpenFile = (path) => {
 }
 
 .message-file-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--bg-glass-hover);
+  border-color: var(--border-glass-bright);
 }
 
 .m-file-icon {
-  color: #818cf8;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
 }
@@ -83,7 +83,7 @@ const handleOpenFile = (path) => {
 
 .m-file-name {
   font-size: 13px;
-  color: #efefef;
+  color: var(--text-color-white);
   display: block;
 }
 
@@ -96,7 +96,7 @@ const handleOpenFile = (path) => {
 .m-open-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -106,7 +106,7 @@ const handleOpenFile = (path) => {
 }
 
 .m-open-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color-white);
+  background: var(--bg-glass-hover);
 }
 </style>

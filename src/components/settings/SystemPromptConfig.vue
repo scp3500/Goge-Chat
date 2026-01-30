@@ -170,18 +170,18 @@ const applyLibraryItem = (item) => {
   justify-content: space-between;
   align-items: flex-start;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-glass);
 }
 
-.header-info h2 { margin: 0; font-size: 18px; color: #fff; font-weight: 700; letter-spacing: -0.5px; }
-.subtitle { margin: 4px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.4); }
+.header-info h2 { margin: 0; font-size: 18px; color: var(--text-color-white); font-weight: 700; letter-spacing: -0.5px; }
+.subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-tertiary); }
 
 .add-btn-premium {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
+  background: var(--color-primary);
   border: none;
   border-radius: 12px;
   color: #fff;
@@ -189,12 +189,12 @@ const applyLibraryItem = (item) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px var(--color-primary-alpha-30);
 }
 
 .add-btn-premium:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 6px 20px var(--color-primary-alpha-50);
 }
 
 .add-btn-premium .icon :deep(svg) { width: 14px; height: 14px; }
@@ -211,8 +211,8 @@ const applyLibraryItem = (item) => {
 
 .library-card-premium {
   position: relative;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 16px;
   padding: 12px 20px;
   cursor: pointer;
@@ -224,8 +224,8 @@ const applyLibraryItem = (item) => {
 }
 
 .library-card-premium:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(129, 140, 248, 0.3);
+  background: var(--bg-glass-hover);
+  border-color: var(--color-primary-border);
   transform: translateX(4px);
 }
 
@@ -235,7 +235,7 @@ const applyLibraryItem = (item) => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, rgba(129, 140, 248, 0.05) 0%, transparent 100%);
+  background: linear-gradient(90deg, var(--color-primary-alpha-5) 0%, transparent 100%);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -243,7 +243,7 @@ const applyLibraryItem = (item) => {
 .library-card-premium:hover .card-glow { opacity: 1; }
 
 .drag-handle {
-  color: rgba(255, 255, 255, 0.15);
+  color: var(--text-tertiary);
   cursor: grab;
   z-index: 5;
   display: flex;
@@ -251,13 +251,13 @@ const applyLibraryItem = (item) => {
   justify-content: center;
   flex-shrink: 0;
 }
-.drag-handle:hover { color: rgba(255, 255, 255, 0.4); }
+.drag-handle:hover { color: var(--text-color-white); opacity: 0.6; }
 .drag-handle :deep(svg) { width: 16px; height: 16px; }
 
 .card-icon-wrapper {
   width: 36px;
   height: 36px;
-  background: rgba(129, 140, 248, 0.1);
+  background: var(--color-primary-bg);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -269,7 +269,7 @@ const applyLibraryItem = (item) => {
 .card-title {
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-color-white);
   flex: 1;
 }
 
@@ -279,10 +279,10 @@ const applyLibraryItem = (item) => {
   flex-shrink: 0;
 }
 .mini-action-btn {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
   width: 28px;
   height: 28px;
   display: flex;
@@ -291,12 +291,12 @@ const applyLibraryItem = (item) => {
   cursor: pointer;
   transition: all 0.2s;
 }
-.mini-action-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.mini-action-btn.edit:hover { color: #818cf8; border-color: rgba(129, 140, 248, 0.3); }
-.mini-action-btn.delete:hover { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+.mini-action-btn:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
+.mini-action-btn.edit:hover { color: var(--color-primary); border-color: var(--color-primary-border); }
+.mini-action-btn.delete:hover { color: var(--color-danger); border-color: var(--color-danger-alpha-30); }
 .mini-action-btn :deep(svg) { width: 14px; height: 14px; }
 
-.ghost-card { opacity: 0.3; transform: scale(0.95); border: 2px dashed #818cf8; }
+.ghost-card { opacity: 0.3; transform: scale(0.95); border: 2px dashed var(--color-primary); }
 
 /* Empty State */
 .empty-library {
@@ -308,8 +308,8 @@ const applyLibraryItem = (item) => {
   padding: 60px 0;
   opacity: 0.5;
 }
-.empty-icon :deep(svg) { width: 48px; height: 48px; color: #818cf8; }
-.empty-text { font-size: 14px; color: #fff; }
+.empty-icon :deep(svg) { width: 48px; height: 48px; color: var(--color-primary); }
+.empty-text { font-size: 14px; color: var(--text-secondary); }
 
 /* Modal Premium Styles */
 .modal-overlay-premium {
@@ -318,7 +318,7 @@ const applyLibraryItem = (item) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--bg-mask);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -327,56 +327,56 @@ const applyLibraryItem = (item) => {
 }
 
 .edit-modal-premium {
-  background: #1a1b1e;
+  background: var(--bg-main);
   width: 500px;
   max-width: 90vw;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-glass-bright);
   padding: 32px;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-main);
 }
 
 .modal-header { margin-bottom: 24px; }
-.modal-header h3 { margin: 0; font-size: 20px; color: #fff; font-weight: 700; }
-.modal-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.3); margin-top: 4px; }
+.modal-header h3 { margin: 0; font-size: 20px; color: var(--text-color-white); font-weight: 700; }
+.modal-subtitle { font-size: 13px; color: var(--text-tertiary); margin-top: 4px; }
 
 .form-body { display: flex; flex-direction: column; gap: 20px; }
 .form-row.split { display: grid; grid-template-columns: 80px 1fr; gap: 16px; }
 .form-group { display: flex; flex-direction: column; gap: 8px; }
-.form-group label { font-size: 12px; color: rgba(255, 255, 255, 0.3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group label { font-size: 12px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
 .premium-input, .premium-input-mini, .premium-textarea {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-input);
+  border: 1px solid var(--border-glass);
   border-radius: 12px;
   padding: 12px 16px;
-  color: #fff;
+  color: var(--text-color);
   font-size: 14px;
   outline: none;
   transition: all 0.2s;
 }
 
 .premium-input:focus, .premium-input-mini:focus, .premium-textarea:focus {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: #818cf8;
+  background: var(--bg-input-focus);
+  border-color: var(--color-primary);
 }
 
 .premium-textarea { resize: vertical; line-height: 1.6; }
 
 .modal-footer { display: flex; justify-content: flex-end; gap: 16px; margin-top: 32px; }
-.cancel-btn-premium { background: transparent; border: none; color: rgba(255, 255, 255, 0.4); font-weight: 600; cursor: pointer; padding: 10px 20px; }
+.cancel-btn-premium { background: transparent; border: none; color: var(--text-tertiary); font-weight: 600; cursor: pointer; padding: 10px 20px; }
 .confirm-btn-premium {
-  background: #fff;
+  background: var(--text-color-white);
   border: none;
   border-radius: 12px;
-  color: #000;
+  color: var(--bg-main);
   padding: 10px 24px;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
 }
-.confirm-btn-premium:hover { background: #818cf8; color: #fff; transform: scale(1.02); }
+.confirm-btn-premium:hover { background: var(--color-primary); color: #fff; transform: scale(1.02); }
 
 /* Transitions */
 .modal-fade-enter-active, .modal-fade-leave-active { transition: all 0.3s ease; }

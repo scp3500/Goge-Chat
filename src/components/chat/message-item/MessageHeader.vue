@@ -40,19 +40,20 @@ defineProps({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-color-white);
 }
 .avatar-icon :deep(svg) { width: 100%; height: 100%; }
 
 .model-name-text {
   font-size: 15px;
   font-weight: 600;
-  color: #e3e3e3;
+  color: var(--text-color-white);
   letter-spacing: 0.3px;
 }
 
 .divider {
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--text-color);
+  opacity: 0.25;
   font-size: 14px;
   margin: 0 4px;
 }

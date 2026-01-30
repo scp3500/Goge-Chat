@@ -1,8 +1,6 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref } from 'vue';
 import { useConfigStore } from '../../stores/config';
-import { PREBUILT_PROMPTS, DEFAULT_SYSTEM_PROMPT } from '../../constants/prompts';
-import { BRAIN_SVG } from '../../constants/icons';
 
 const props = defineProps({
   presetId: String
@@ -19,23 +17,6 @@ const handleParamChange = (key, value) => {
     configStore.updatePreset(props.presetId, { [key]: value });
   }
 };
-
-const showPrebuiltDropdown = ref(false);
-
-const applyPrebuilt = (prompt) => {
-  if (preset.value) {
-    configStore.updatePreset(props.presetId, { systemPrompt: prompt.content });
-    showPrebuiltDropdown.value = false;
-  }
-};
-
-onMounted(() => {
-  window.addEventListener('click', (e) => {
-    if (!e.target.closest('.prebuilt-container-mini')) {
-      showPrebuiltDropdown.value = false;
-    }
-  });
-});
 
 // UI Icons
 const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M2 14h4m4-8h4m4 8h4"/></svg>`;
@@ -98,52 +79,8 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
       </div>
     </div>
 
-    <!-- System Prompt Section -->
-    <div class="prompt-section">
-      <div class="section-header">
-        <div class="header-left">
-          <h3 class="sub-title">系统提示词</h3>
-          <span class="tag-outline">System Prompt</span>
-        </div>
-        
-        <div class="prebuilt-container">
-          <button class="text-btn" @click.stop="showPrebuiltDropdown = !showPrebuiltDropdown">
-            <span class="icon" v-html="BRAIN_SVG"></span>
-            <span>提示词库</span>
-          </button>
-          
-          <Transition name="slide-fade">
-            <div v-if="showPrebuiltDropdown" class="dropdown-menu modern-scroll">
-              <div 
-                v-for="p in configStore.settings.promptLibrary" 
-                :key="`preset-dropdown-${p.id}`" 
-                class="dropdown-item"
-                @click="applyPrebuilt(p)"
-              >
-                <span class="item-icon">{{ p.icon }}</span>
-                <span class="item-name">{{ p.name }}</span>
-              </div>
-            </div>
-          </Transition>
-        </div>
-      </div>
 
-      <div class="textarea-wrapper">
-        <textarea 
-          v-model="preset.systemPrompt" 
-          :placeholder="configStore.settings.defaultSystemPrompt"
-          @input="handleParamChange('systemPrompt', preset.systemPrompt)"
-          class="modern-textarea modern-scroll"
-          spellcheck="false"
-        ></textarea>
-        <!-- Placeholder overlay if empty to show it uses default -->
-        <div v-if="!preset.systemPrompt?.trim()" class="placeholder-hint">
-          <span class="hint-icon" v-html="BRAIN_SVG"></span>
-          <span>将使用全局默认提示词...</span>
-        </div>
-      </div>
-      <p class="section-hint">在此设定模型的角色和行为准则。留空则使用全局默认设置。</p>
-    </div>
+
 
     <!-- Advanced Settings (Collapsed/Visual Only for now) -->
     <div class="advanced-section">
@@ -171,7 +108,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   flex-direction: column;
   gap: 32px;
   padding: 8px 4px;
-  color: #e3e3e3;
+  color: var(--text-color);
   animation: fadeIn 0.3s ease;
 }
 
@@ -191,7 +128,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 .section-title {
   font-size: 18px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-color-white);
   margin: 0;
   letter-spacing: -0.02em;
 }
@@ -199,19 +136,19 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 .sub-title {
   font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-color-white);
   margin: 0;
 }
 
 .header-subtitle {
   font-size: 13px;
-  color: #8a8d95;
+  color: var(--text-secondary);
 }
 
 /* Cards */
 .config-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -239,36 +176,36 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   gap: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #fff;
+  color: var(--text-color-white);
 }
 
 .tag {
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #aeb4bb;
+  color: var(--text-secondary);
   font-family: monospace;
 }
 
 .tag-outline {
   font-size: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-glass-bright);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #aeb4bb;
+  color: var(--text-tertiary);
   font-family: monospace;
 }
 
 .setting-desc {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-tertiary);
   line-height: 1.4;
 }
 
 .divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-card);
   margin: 0 -20px;
 }
 
@@ -284,8 +221,8 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 .slider-display {
   font-family: monospace;
   font-size: 13px;
-  color: #818cf8;
-  background: rgba(129, 140, 248, 0.1);
+  color: var(--color-primary);
+  background: var(--color-primary-bg);
   padding: 2px 8px;
   border-radius: 4px;
   min-width: 36px;
@@ -297,7 +234,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   appearance: none;
   width: 140px;
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass-active);
   border-radius: 3px;
   outline: none;
   position: relative;
@@ -310,7 +247,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   left: 0;
   height: 100%;
   width: var(--progress, 0%);
-  background: #818cf8;
+  background: var(--color-primary);
   border-radius: 3px;
 }
 
@@ -322,7 +259,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   background: #fff;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-main);
   position: relative;
   z-index: 2;
   transition: transform 0.1s;
@@ -334,11 +271,11 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 }
 
 .modern-input {
-  background: #18191b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-glass);
   border-radius: 6px;
   padding: 6px 10px;
-  color: #fff;
+  color: var(--text-color-white) !important;
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
@@ -347,149 +284,21 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 }
 
 .modern-input:focus {
-  border-color: #818cf8;
+  border-color: var(--color-primary);
 }
 
-/* Prompt Section */
-.prompt-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.text-btn {
-  background: transparent;
-  border: none;
-  color: #818cf8;
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.text-btn:hover {
-  background: rgba(129, 140, 248, 0.1);
-}
-
-.text-btn .icon :deep(svg) {
-  width: 14px;
-  height: 14px;
-}
-
-.prebuilt-container {
-  position: relative;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 8px;
-  background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  width: 200px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  padding: 4px;
-  z-index: 50;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #d1d5db;
-  transition: all 0.2s;
-}
-
-.dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-}
-
-/* Textarea */
-.textarea-wrapper {
-  position: relative;
-  border-radius: 12px;
-  background: #111214;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.textarea-wrapper:focus-within {
-  border-color: rgba(129, 140, 248, 0.5);
-  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.1);
-}
-
-.modern-textarea {
-  width: 100%;
-  height: 160px;
-  background: transparent;
-  border: none;
-  color: #e5e7eb;
-  padding: 16px;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: vertical;
-  outline: none;
-  font-family: inherit;
-}
-
-.placeholder-hint {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  color: rgba(255, 255, 255, 0.25);
-  font-size: 13px;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hint-icon :deep(svg) {
-  width: 14px;
-  height: 14px;
-}
-
-.section-hint {
-  font-size: 12px;
-  color: #6b7280;
-  margin: -8px 0 0 0;
-}
 
 /* Advanced Section */
 .advanced-section {
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-glass);
 }
 
 .badge-dev {
   font-size: 10px;
-  background: #374151;
-  color: #9ca3af;
+  background: var(--bg-glass-active);
+  color: var(--text-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -510,13 +319,13 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
 .adv-item label {
   display: block;
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
 .fake-slider {
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass-active);
   border-radius: 3px;
   position: relative;
 }
@@ -529,7 +338,7 @@ const TWEAK_ICON_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" fill="no
   transform: translate(-50%, -50%);
   width: 12px;
   height: 12px;
-  background: #6b7280;
+  background: var(--text-tertiary);
   border-radius: 50%;
 }
 

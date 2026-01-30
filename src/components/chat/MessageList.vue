@@ -196,6 +196,6 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 .list-fade-enter-from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
 
 .modern-scroll::-webkit-scrollbar { width: 6px; }
-.modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+.modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
 .modern-scroll::-webkit-scrollbar-track { background: transparent; }
 </style>

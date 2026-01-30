@@ -130,11 +130,11 @@ html, body, #app {
   display: flex; 
   flex-direction: column; 
   height: 100vh; 
-  background: var(--bg-main, #1e1e1f); 
-  color: #e3e3e3; 
+  background: var(--bg-main); 
+  color: var(--text-color); 
   border-radius: 12px; 
   overflow: hidden; 
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-glass);
   box-sizing: border-box;
   transition: border-radius 0.2s ease;
   
@@ -168,7 +168,8 @@ html, body, #app {
   display: flex; 
   align-items: center; 
   justify-content: center; 
-  color: #555; 
+  color: var(--text-color); 
+  opacity: 0.4;
   font-size: 0.9rem;
 }
 </style>

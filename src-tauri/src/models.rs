@@ -78,6 +78,11 @@ pub struct Session {
     #[serde(alias = "modelId")]
     #[serde(alias = "model_id")]
     pub model_id: Option<String>,
+
+    #[serde(rename = "system_prompt")]
+    #[serde(alias = "systemPrompt")]
+    #[serde(alias = "system_prompt")]
+    pub system_prompt: Option<String>,
 }
 
 /// 文件夹结构：完全兼容蛇形和驼峰

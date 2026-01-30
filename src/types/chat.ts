@@ -7,6 +7,7 @@ export interface ChatSession {
     folder_id?: string | null;
     preset_id?: string | null;
     model_id?: string | null;
+    system_prompt?: string | null;
 }
 
 // 文件夹类型

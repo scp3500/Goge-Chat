@@ -74,7 +74,7 @@ const emit = defineEmits(['click', 'newFolder']);
 
 .action-pill:hover,
 .icon-btn-pill:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass-hover);
   color: var(--text-color-white);
 }
 

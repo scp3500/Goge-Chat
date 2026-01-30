@@ -161,6 +161,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     // 如果会话有特定配置，则使用；否则回滚到全局默认值
                     configStore.settings.defaultPresetId = session.preset_id || configStore.settings.globalPresetId;
                     configStore.settings.selectedModelId = session.model_id || configStore.settings.globalModelId;
+                    // 同步会话系统提示词（如果有）
+                    configStore.settings.defaultSystemPrompt = session.system_prompt || configStore.settings.defaultSystemPrompt;
                     setTimeout(() => { isInternalSync = false; }, 0);
                 }
             }
@@ -378,6 +380,22 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 msgsToSend[0].content = finalSystemPrompt;
             }
 
+            // 注入会话特定的系统提示词（覆盖预设提示词，如果存在）
+            const sessionSpecificPrompt = activeSession.value?.system_prompt;
+            if (sessionSpecificPrompt) {
+                if (msgsToSend.length === 0 || msgsToSend[0].role !== 'system') {
+                    msgsToSend.unshift({
+                        role: 'system',
+                        content: sessionSpecificPrompt,
+                        reasoningContent: null,
+                        fileMetadata: null,
+                        searchMetadata: null
+                    });
+                } else {
+                    msgsToSend[0].content = sessionSpecificPrompt;
+                }
+            }
+
             console.log("📤 Final messages to send:", {
                 count: msgsToSend.length,
                 preset: activePreset?.name,
@@ -528,7 +546,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 await invoke("update_session_config", {
                     id: activeId.value,
                     presetId: newPreset,
-                    modelId: newModel
+                    modelId: newModel,
+                    systemPrompt: activeSession.value?.system_prompt || null
                 });
 
                 // 同步本地内存状态

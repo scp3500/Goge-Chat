@@ -70,7 +70,8 @@ const toggleSearch = async (state) => {
 .minimal-search-trigger {
   background: transparent;
   border: none;
-  color: #666;
+  color: var(--text-color);
+  opacity: 0.6;
   cursor: pointer;
   padding: 8px;
   border-radius: 8px;
@@ -81,16 +82,16 @@ const toggleSearch = async (state) => {
 }
 
 .minimal-search-trigger:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-color-white);
+  background: var(--bg-glass-hover);
 }
 
 /* 🚩 胶囊：现代化设计的精髓（内嵌、微光、无界） */
 .search-capsule {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.03); /* 极低透明度，显得高级 */
-  border: 1px solid rgba(255, 255, 255, 0.08); /* 微微的边缘线 */
+  background: var(--bg-glass); /* 极低透明度，显得高级 */
+  border: 1px solid var(--border-glass); /* 微微的边缘线 */
   border-radius: 10px;
   padding: 0 10px;
   width: 100%;
@@ -99,7 +100,8 @@ const toggleSearch = async (state) => {
 }
 
 .inner-icon {
-  color: #555;
+  color: var(--text-color);
+  opacity: 0.5;
   flex-shrink: 0;
 }
 
@@ -109,7 +111,7 @@ const toggleSearch = async (state) => {
   background: transparent;
   border: none;
   outline: none;
-  color: #fff;
+  color: var(--text-color-white);
   font-size: 13px;
   padding: 0 8px;
   height: 30px;      /* 略小于父容器，留出余地 */
@@ -118,13 +120,15 @@ const toggleSearch = async (state) => {
 }
 
 .modern-input::placeholder {
-  color: #444;
+  color: var(--text-color);
+  opacity: 0.4;
 }
 
 .clear-btn {
   background: transparent;
   border: none;
-  color: #555;
+  color: var(--text-color);
+  opacity: 0.4;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -135,8 +139,8 @@ const toggleSearch = async (state) => {
 }
 
 .clear-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color-white);
+  background: var(--bg-glass-hover);
 }
 
 /* 动画：丝滑淡入淡出 */

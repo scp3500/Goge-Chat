@@ -50,7 +50,15 @@ const searchResults = computed(() => {
 </template>
 
 <style scoped>
-.markdown-body { font-size: 16px; line-height: 1.7; color: #e3e3e3; }
+
+.assistant-bubble-content {
+  background: var(--bg-assistant-bubble);
+  border: 1px solid var(--border-assistant-bubble);
+  border-radius: 12px;
+  padding: 0 12px; /* Add some padding if a background is set */
+}
+
+.markdown-body { font-size: 16px; line-height: 1.7; color: var(--text-color-white); }
 
 /* Modern Typing Indicator - Minimal & Clean */
 .typing-indicator {
@@ -75,7 +83,8 @@ const searchResults = computed(() => {
 .typing-indicator span {
   width: 6px;
   height: 6px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--text-color);
+  opacity: 0.5;
   border-radius: 50%;
   animation: liquid-flow 1.4s ease-in-out infinite both;
   box-shadow: none;
@@ -93,7 +102,7 @@ const searchResults = computed(() => {
   50% {
     transform: translateY(-4px);
     opacity: 1;
-    background: #ffffff;
+    background: var(--text-color-white);
   }
 }
 </style>

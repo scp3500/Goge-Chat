@@ -36,6 +36,7 @@ pub fn get_sessions(state: State<DbState>) -> Result<Vec<Session>, String> {
             folder_id: cs.folder_id.map(|id| id.to_string()),
             preset_id: cs.preset_id,
             model_id: cs.model_id,
+            system_prompt: cs.system_prompt,
         })
         .collect();
     Ok(sessions)
@@ -48,12 +49,19 @@ pub fn update_session_config(
     id: String,
     preset_id: Option<String>,
     model_id: Option<String>,
+    system_prompt: Option<String>,
     state: State<DbState>,
 ) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     let numeric_id = parse_id(&id)?;
-    crate::db::update_session_config(&conn, numeric_id, preset_id.as_deref(), model_id.as_deref())
-        .map_err(|e| e.to_string())?;
+    crate::db::update_session_config(
+        &conn,
+        numeric_id,
+        preset_id.as_deref(),
+        model_id.as_deref(),
+        system_prompt.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

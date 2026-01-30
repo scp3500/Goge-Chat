@@ -267,8 +267,10 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   background: transparent;
   border: none;
   border-radius: 99px;
+  border-radius: 99px;
   padding: 4px 16px; /* 稍微增加内边距 */
-  color: #a1a1a1; /* 稍微调亮一点基础颜色 */
+  color: var(--text-color); /* 稍微调亮一点基础颜色 */
+  opacity: 0.8;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -276,13 +278,15 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .selector-btn:hover {
-  background: rgba(255, 255, 255, 0.08); /* 现代透明悬浮感 */
-  color: #fff;
+  background: var(--bg-glass-hover); /* 现代透明悬浮感 */
+  color: var(--text-color-white);
+  opacity: 1;
 }
 
 .selector-btn.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: var(--bg-glass-active);
+  color: var(--text-color-white);
+  opacity: 1;
 }
 
 /* 简约小图标模式 */
@@ -301,14 +305,14 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .selector-btn.minimal-mode:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass-hover);
   opacity: 1;
 }
 
 .selector-btn.minimal-mode.active {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-glass-active);
   opacity: 1;
-  color: #fff;
+  color: var(--text-color-white);
 }
 
 /* 极简模式去掉箭头 */
@@ -321,13 +325,14 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-color-white);
 }
 
 .ai-logo-white {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-color-white);
 }
 
 .ai-logo-white :deep(svg) {
@@ -364,12 +369,12 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   position: absolute;
   left: 0;
   width: 320px;
-  background: rgba(24, 24, 26, 0.98);
+  background: var(--bg-dropdown);
   backdrop-filter: blur(40px) saturate(200%);
   -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-dropdown);
   border-radius: 20px;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-main);
   z-index: 1000;
   overflow: hidden;
   display: flex;
@@ -406,28 +411,28 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-input);
   border-radius: 10px;
   padding: 8px 12px;
   transition: all 0.2s;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass-bright);
 }
 
 .search-box:focus-within {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--bg-input-focus);
+  border-color: var(--border-glass-bright);
 }
 
 
 .search-icon {
-  color: #888;
+  color: var(--token-operator); /* 使用稍微淡一点的颜色 */
   display: flex;
 }
 
 .search-box input {
   background: transparent;
   border: none;
-  color: #eee;
+  color: var(--text-color-white);
   font-size: 13px;
   width: 100%;
   outline: none;
@@ -443,7 +448,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 
 .filter-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -460,11 +465,12 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 8px;
   padding: 4px 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-color);
+  opacity: 0.6;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -472,14 +478,16 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .filter-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ccc;
+  background: var(--bg-glass-hover);
+  color: var(--text-color-white);
+  opacity: 1;
 }
 
 .filter-chip.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--bg-glass-active);
+  color: var(--text-color-white);
+  border-color: var(--border-glass-bright);
+  opacity: 1;
 }
 
 
@@ -502,7 +510,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 .provider-label {
   padding: 8px 12px 4px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-dim);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -521,20 +529,20 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .model-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass-hover);
 }
 
 .model-item.selected {
-  background: rgba(74, 222, 128, 0.1);
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
 }
 
 .model-item.selected .model-text {
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .model-item.selected .badge.check {
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .model-item.selected::before {
@@ -555,25 +563,25 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(220, 220, 225, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-model-icon);
+  border: 1px solid var(--border-glass);
   border-radius: 8px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  color: #1a1a1b;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
+  color: var(--color-model-icon);
+  box-shadow: var(--shadow-main);
 }
 
 .model-item:hover .model-icon {
   transform: translateY(-1px);
-  background: rgba(230, 230, 235, 0.95);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  background: var(--bg-model-icon-hover);
+  box-shadow: 0 3px 8px var(--bg-mask);
 }
 
 .model-item.selected .model-icon {
-  background: #f0f0f5;
-  border-color: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15);
+  background: var(--bg-model-icon-active);
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success-border), 0 2px 6px var(--bg-mask);
 }
 
 .model-icon :deep(svg) {
@@ -597,12 +605,14 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 
 .model-text {
   font-size: 13px;
-  color: #ccc;
+  color: var(--text-color);
+  opacity: 0.8;
 }
 
 .model-item.selected .model-text {
-  color: #fff;
+  color: var(--text-color-white);
   font-weight: 500;
+  opacity: 1;
 }
 
 .model-badges {
@@ -621,9 +631,9 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   opacity: 0.6;
 }
 
-.badge.vision { color: #a18cd1; }
-.badge.reasoning { color: #fbc2eb; }
-.badge.check { opacity: 1; color: #4facfe; }
+.badge.vision { color: var(--badge-vision); }
+.badge.reasoning { color: var(--badge-reasoning); }
+.badge.check { opacity: 1; color: var(--badge-blue); }
 
 /* 滚动条 */
 .custom-scrollbar::-webkit-scrollbar {
@@ -633,17 +643,18 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass-active);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--bg-glass-hover);
 }
 
 .no-results {
   padding: 20px;
   text-align: center;
-  color: #555;
+  color: var(--text-color);
+  opacity: 0.6;
   font-size: 13px;
 }
 
@@ -652,9 +663,10 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   justify-content: center;
   gap: 16px;
   padding: 10px 12px;
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--text-color);
+  opacity: 0.4;
   font-size: 11px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-glass);
   margin-top: 8px;
 }
 

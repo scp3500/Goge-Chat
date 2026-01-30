@@ -56,7 +56,7 @@ const handleRename = () => {
 /* 🚩 定义布局变量，方便未来做外观设置 */
 .history-item {
   --item-padding-left: 20px; /* 统一的文字起始留白 */
-  --accent-white: #ffffff;
+  --accent-white: var(--text-color-white);
   
   height: 40px;
   margin: 2px 8px;
@@ -68,11 +68,11 @@ const handleRename = () => {
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
-  color: #9aa0a6;
+  color: var(--text-color);
 }
 
-.history-item:hover { background: rgba(255, 255, 255, 0.05); color: #e8eaed; }
-.history-item.active { background: rgba(255, 255, 255, 0.1); color: var(--accent-white); }
+.history-item:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
+.history-item.active { background: var(--bg-glass-active); color: var(--accent-white); }
 
 .history-item.collapsed {
   margin: 2px 0;
@@ -121,9 +121,9 @@ const handleRename = () => {
 /* 🚩 核心：带留白的对齐修复 */
 .edit-input {
   width: 100%;
-  background: #2b2c2e;
-  border: 1px solid #5f6368;
-  color: #ffffff;
+  background: var(--bg-input-focus);
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-color-white);
   font-size: 13px;
   border-radius: 4px;
   outline: none;
@@ -142,7 +142,8 @@ const handleRename = () => {
   opacity: 0;
   background: transparent;
   border: none;
-  color: #5f6368;
+  color: var(--text-color);
+  opacity: 0.5;
   font-size: 18px;
   cursor: pointer;
   margin-left: 8px;

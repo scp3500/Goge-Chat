@@ -108,36 +108,35 @@ const getFavicon = (url: string) => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
-  background: rgba(129, 140, 248, 0.05);
+  background: var(--bg-glass-active);
   border-radius: 12px;
-  border: 1px solid rgba(129, 140, 248, 0.1);
+  border: 1px solid var(--border-glass-bright);
   width: fit-content;
 }
 
 .pulse-dot {
   width: 8px;
   height: 8px;
-  background-color: #818cf8;
+  background-color: var(--color-primary);
   border-radius: 50%;
   animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.7); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 var(--color-primary-alpha-70); }
   70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(129, 140, 248, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
 }
 
 .status-text {
   font-size: 13px;
-  color: #818cf8;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
 .results-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
   border-radius: 14px;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -145,8 +144,8 @@ const getFavicon = (url: string) => {
 }
 
 .results-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--bg-glass-hover);
+  border-color: var(--border-glass-bright);
 }
 
 .card-header {
@@ -164,7 +163,7 @@ const getFavicon = (url: string) => {
 }
 
 .results-icon {
-  color: #818cf8;
+  color: var(--color-primary);
   display: flex;
 }
 
@@ -202,7 +201,7 @@ const getFavicon = (url: string) => {
 }
 
 .results-list-wrapper {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-glass);
 }
 
 .results-list {
@@ -216,14 +215,14 @@ const getFavicon = (url: string) => {
 
 .result-item {
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-glass);
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .result-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-glass-hover);
 }
 
 .result-top {
@@ -250,7 +249,7 @@ const getFavicon = (url: string) => {
 }
 
 .external-icon {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
 }
 
 .external-icon svg {
@@ -285,8 +284,8 @@ const getFavicon = (url: string) => {
   gap: 8px;
   padding: 8px 12px;
   font-size: 12px;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.05);
+  color: var(--color-danger);
+  background: var(--color-danger-alpha-10);
   border-radius: 8px;
 }
 
@@ -306,5 +305,5 @@ const getFavicon = (url: string) => {
 }
 
 .modern-scroll::-webkit-scrollbar { width: 4px; }
-.modern-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+.modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
 </style>

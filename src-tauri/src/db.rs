@@ -17,6 +17,7 @@ pub struct ChatSession {
     pub updated_at: String,
     pub preset_id: Option<String>,
     pub model_id: Option<String>,
+    pub system_prompt: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -121,6 +122,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         let _ = conn.execute("ALTER TABLE sessions ADD COLUMN model_id TEXT", []);
     }
 
+    if !columns_sessions.contains(&"system_prompt".to_string()) {
+        let _ = conn.execute("ALTER TABLE sessions ADD COLUMN system_prompt TEXT", []);
+    }
+
     let mut stmt = conn.prepare("PRAGMA table_info(folders)")?;
     let columns_folders: Vec<String> = stmt
         .query_map([], |row| row.get::<_, String>(1))?
@@ -179,7 +184,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
 pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
     let mut stmt = conn.prepare(
-        "SELECT id, folder_id, title, last_scroll_pos, sort_order, updated_at, preset_id, model_id FROM sessions ORDER BY sort_order ASC, updated_at DESC"
+        "SELECT id, folder_id, title, last_scroll_pos, sort_order, updated_at, preset_id, model_id, system_prompt FROM sessions ORDER BY sort_order ASC, updated_at DESC"
     )?;
 
     let session_iter = stmt.query_map([], |row| {
@@ -192,6 +197,7 @@ pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
             updated_at: row.get(5)?,
             preset_id: row.get(6)?,
             model_id: row.get(7)?,
+            system_prompt: row.get(8)?,
         })
     })?;
 
@@ -305,10 +311,11 @@ pub(crate) fn update_session_config(
     id: i64,
     preset_id: Option<&str>,
     model_id: Option<&str>,
+    system_prompt: Option<&str>,
 ) -> Result<()> {
     conn.execute(
-        "UPDATE sessions SET preset_id = ?1, model_id = ?2 WHERE id = ?3",
-        params![preset_id, model_id, id],
+        "UPDATE sessions SET preset_id = ?1, model_id = ?2, system_prompt = ?3 WHERE id = ?4",
+        params![preset_id, model_id, system_prompt, id],
     )?;
     Ok(())
 }
