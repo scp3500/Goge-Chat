@@ -1,7 +1,39 @@
-# Tauri + Vue 3
+# Goge Chat 🚀
 
-This template should help get you started developing with Tauri + Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A premium, modern AI chat interface built with **Tauri**, **Vue 3**, and **Rust**.
 
-## Recommended IDE Setup
+## ✨ Features
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- **Dual-Slot Themes**: Separate sub-theme choices for Dark and Light modes.
+- **Premium Presets**: Curated styles like *Nord*, *One Dark*, *Sakura*, and *Midnight*.
+- **Local Persistence**: All settings and chat history are saved locally in a portable `data/` directory.
+- **Cross-Platform**: Powerful Rust backend with a sleek Vue-driven frontend.
+
+## 🔗 Links
+
+- **Repository**: [Goge-Chat](https://github.com/scp3500/Goge-Chat)
+- **Author**: [scp3500](https://github.com/scp3500)
+
+## 🛠️ Development
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Run in development mode:
+
+   ```bash
+   npm run tauri dev
+   ```
+
+3. Build for production:
+
+   ```bash
+   npm run tauri build
+   ```
+
+## 📄 License
+
+MIT
