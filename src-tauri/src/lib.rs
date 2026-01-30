@@ -226,17 +226,45 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_handle = app.handle();
-            let app_dir = app_handle
-                .path()
-                .app_data_dir()
-                .expect("无法获取 C 盘数据目录");
 
-            if !app_dir.exists() {
-                std::fs::create_dir_all(&app_dir).expect("无法在 C 盘创建数据目录");
+            // --- 1. 计算新的便携式数据目录 (EXE同级/data) ---
+            let exe_path =
+                std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let exe_dir = exe_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
+            let data_dir = exe_dir.join("data");
+
+            if !data_dir.exists() {
+                std::fs::create_dir_all(&data_dir).expect("无法创建便携式数据目录 (data)");
             }
 
-            let db_path = app_dir.join("alice_data.db");
-            let conn = Connection::open(&db_path).expect("无法初始化数据库连接");
+            let target_db_path = data_dir.join("shell.db");
+
+            // --- 2. 检查遗留数据并迁移 ---
+            if !target_db_path.exists() {
+                // 尝试获取旧的 AppData 路径
+                if let Ok(old_app_dir) = app_handle.path().app_data_dir() {
+                    let old_db_path = old_app_dir.join("alice_data.db"); // 旧文件名
+                    if old_db_path.exists() {
+                        println!("📦 [Setup] 发现旧数据库，正在迁移到: {:?}", target_db_path);
+                        match std::fs::copy(&old_db_path, &target_db_path) {
+                            Ok(_) => println!("✅ [Setup] 数据库迁移成功"),
+                            Err(e) => eprintln!("❌ [Setup] 数据库迁移失败: {}", e),
+                        }
+                    } else {
+                        // 检查是否是改名后的旧文件 (shell.db) 在旧路径
+                        let old_db_path_renamed = old_app_dir.join("shell.db");
+                        if old_db_path_renamed.exists() {
+                            println!("📦 [Setup] 发现旧数据库(shell.db)，正在迁移...");
+                            let _ = std::fs::copy(&old_db_path_renamed, &target_db_path);
+                        }
+                    }
+                }
+            }
+
+            println!("💾 [Setup] 使用数据库路径: {:?}", target_db_path);
+            let conn = Connection::open(&target_db_path).expect("无法初始化数据库连接");
             db::init_db(&conn).expect("数据库初始化或升级失败");
 
             // ✨ 【状态管理】：注入数据库连接

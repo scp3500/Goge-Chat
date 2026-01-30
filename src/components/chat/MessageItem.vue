@@ -132,6 +132,7 @@ const handleOpenFile = async (path) => {
 };
 
 // 💡 保持原功能的按钮注入
+// 💡 保持原功能的按钮注入
 const messageRef = ref(null);
 const injectCodeButtons = () => {
   nextTick(() => {
@@ -193,10 +194,82 @@ const injectCodeButtons = () => {
 };
 
 onMounted(injectCodeButtons);
-watch(() => props.m.content, injectCodeButtons);
+// watch(() => props.m.content, injectCodeButtons); // Moved to throttler
 watch(showActionButtons, (val) => {
   if (val) injectCodeButtons();
 });
+
+// --- 🚅 Adaptive Performance-Based Throttling ---
+const renderedContent = ref("");
+let renderTimeout = null;
+let lastRenderTime = 0;
+let currentThrottleDelay = 16; // Start with 60fps assumption
+
+// Measure how expensive the render is
+const updateRenderedContent = (content) => {
+  if (content === "__LOADING__") {
+      renderedContent.value = "";
+      return;
+  }
+  
+  const start = performance.now();
+  renderedContent.value = renderMarkdown(content);
+  const duration = performance.now() - start;
+
+  // 🏎️ Adaptive Logic:
+  // If render takes < 5ms, we can run at 60fps (16ms delay)
+  // If render takes > 5ms, throttle to 50ms
+  // If render takes > 16ms (dropping frames), throttle to 100-150ms
+  if (duration < 5) {
+      currentThrottleDelay = 16;
+  } else if (duration < 16) {
+      currentThrottleDelay = 50;
+  } else {
+      currentThrottleDelay = 150;
+  }
+  
+  injectCodeButtons(); 
+};
+
+watch(() => props.m.content, (newVal) => {
+    // Determine if we should throttle: only if generating and this is the active message
+    const isActiveMessage = props.index === chatStore.currentMessages.length - 1;
+    const shouldThrottle = chatStore.isGenerating && isActiveMessage;
+
+    if (!shouldThrottle) {
+        // Update immediately
+        if (renderTimeout) clearTimeout(renderTimeout);
+        updateRenderedContent(newVal);
+    } else {
+        // Throttle
+        const now = Date.now();
+        const timeSinceLast = now - lastRenderTime;
+
+        if (timeSinceLast >= currentThrottleDelay) {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            updateRenderedContent(newVal);
+            lastRenderTime = now;
+        } else {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(() => {
+                updateRenderedContent(newVal);
+                lastRenderTime = Date.now();
+            }, currentThrottleDelay - timeSinceLast);
+        }
+    }
+}, { immediate: true });
+
+// 💧 Flush when generation stops to catch last characters
+watch(() => chatStore.isGenerating, (isGen) => {
+    if (!isGen) {
+        const isActiveMessage = props.index === chatStore.currentMessages.length - 1;
+        if (isActiveMessage) {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            updateRenderedContent(props.m.content);
+        }
+    }
+});
+// --------------------------------------
 
 const editTextarea = ref(null);
 
@@ -319,7 +392,7 @@ const handleLinkClick = async (event) => {
           :query="m.searchQuery"
         />
 
-        <div v-if="m.content !== '__LOADING__'" v-html="renderMarkdown(m.content)" class="markdown-body" @click="handleLinkClick"></div>
+        <div v-if="m.content !== '__LOADING__'" v-html="renderedContent" class="markdown-body" @click="handleLinkClick"></div>
         <div v-else-if="m.reasoningContent" class="typing-indicator small"><span></span><span></span><span></span></div>
         
         <div v-if="m.content !== '__LOADING__' && showActionButtons" class="msg-action-bar-bottom">

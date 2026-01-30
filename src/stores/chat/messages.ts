@@ -242,6 +242,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         // 设置正在生成消息的会话 ID 并清空之前的缓存
         generatingSessionId.value = sessionId;
         pausedChunks.value = { content: [], reasoning: [] };
+        streamQueue.value = []; // Clear queue at start
 
         try {
             await invoke("reset_ai_generation");
@@ -423,9 +424,9 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         } finally {
             isGenerating.value = false;
             // 清空生成会话状态和缓存
-            generatingSessionId.value = null;
+            // generatingSessionId.value = null; // DO NOT clear here. It breaks the "isCurrentSession" check in the queue loop for the last few chars.
             pausedChunks.value = { content: [], reasoning: [] };
-            streamQueue.value = []; // Clear queue on stop
+            // streamQueue.value = []; // DO NOT clear queue here, let it drain naturally
         }
     };
 

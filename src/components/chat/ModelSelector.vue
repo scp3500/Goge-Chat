@@ -218,7 +218,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
               v-for="model in provider.matchedModels" 
               :key="model"
               class="model-item"
-              :class="{ 'selected': configStore.settings.selectedModelId === model }"
+              :class="{ 'selected': configStore.settings.selectedModelId === model && configStore.settings.defaultProviderId === provider.id }"
               @click="selectModel(provider.id, model)"
             >
               <div class="model-info">
@@ -228,7 +228,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
               <div class="model-badges">
                 <span v-if="isVisionModel(model)" class="badge vision" v-html="VISION_SVG" title="支持视觉"></span>
                 <span v-if="isReasoningModel(model)" class="badge reasoning" v-html="BRAIN_SVG" title="支持推理"></span>
-                <span v-if="configStore.settings.selectedModelId === model" class="badge check" v-html="CHECK_SVG"></span>
+                <span v-if="configStore.settings.selectedModelId === model && configStore.settings.defaultProviderId === provider.id" class="badge check" v-html="CHECK_SVG"></span>
               </div>
             </div>
           </div>
