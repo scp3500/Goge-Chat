@@ -1,8 +1,8 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "GeminiShell",
+    "productName": "Goge Chat",
     "version": "0.0.1",
-    "identifier": "com.alice.gemini.shell",
+    "identifier": "com.goge.chat",
     "build": {
         "beforeDevCommand": "npm run dev",
         "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
     "app": {
         "windows": [
             {
-                "title": "Gemini Shell",
+                "title": "Goge Chat",
                 "width": 1000,
                 "height": 700,
                 "resizable": true,

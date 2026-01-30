@@ -135,7 +135,7 @@ fn default_theme() -> String {
     "dark".into()
 }
 fn default_dark_theme_id() -> String {
-    "nord".into()
+    "dark".into()
 }
 fn default_light_theme_id() -> String {
     "light".into()

@@ -239,24 +239,24 @@ pub fn run() {
                 std::fs::create_dir_all(&data_dir).expect("无法创建便携式数据目录 (data)");
             }
 
-            let target_db_path = data_dir.join("shell.db");
+            let target_db_path = data_dir.join("goge.db");
 
             // --- 2. 检查遗留数据并迁移 ---
             if !target_db_path.exists() {
-                // 尝试获取旧的 AppData 路径
-                if let Ok(old_app_dir) = app_handle.path().app_data_dir() {
-                    let old_db_path = old_app_dir.join("alice_data.db"); // 旧文件名
+                // 优先检查同级目录下的 shell.db (上一个版本的名字)
+                let local_old_db = data_dir.join("shell.db");
+                if local_old_db.exists() {
+                    println!("📦 [Setup] 发现旧数据库 (shell.db)，正在迁移到 goge.db...");
+                    let _ = std::fs::rename(&local_old_db, &target_db_path);
+                } else if let Ok(old_app_dir) = app_handle.path().app_data_dir() {
+                    // 尝试从 AppData 迁移 (更久远的版本)
+                    let old_db_path = old_app_dir.join("alice_data.db");
                     if old_db_path.exists() {
-                        println!("📦 [Setup] 发现旧数据库，正在迁移到: {:?}", target_db_path);
-                        match std::fs::copy(&old_db_path, &target_db_path) {
-                            Ok(_) => println!("✅ [Setup] 数据库迁移成功"),
-                            Err(e) => eprintln!("❌ [Setup] 数据库迁移失败: {}", e),
-                        }
+                        println!("📦 [Setup] 发现 AppData 旧数据库，正在迁移...");
+                        let _ = std::fs::copy(&old_db_path, &target_db_path);
                     } else {
-                        // 检查是否是改名后的旧文件 (shell.db) 在旧路径
                         let old_db_path_renamed = old_app_dir.join("shell.db");
                         if old_db_path_renamed.exists() {
-                            println!("📦 [Setup] 发现旧数据库(shell.db)，正在迁移...");
                             let _ = std::fs::copy(&old_db_path_renamed, &target_db_path);
                         }
                     }

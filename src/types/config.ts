@@ -163,7 +163,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     lineRatio: 1.7,
     themeColor: 'var(--theme-preset-1)',
     theme: 'dark',
-    darkThemeId: 'nord', // 默认深色主题
+    darkThemeId: 'dark', // 默认深色主题
     lightThemeId: 'light', // 默认浅色主题
     scrollbarWidth: 12,
     providers: DEFAULT_PROVIDERS,

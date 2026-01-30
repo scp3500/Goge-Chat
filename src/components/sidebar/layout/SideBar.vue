@@ -64,7 +64,7 @@ const toggleSidebar = () => {
 
       <footer class="sidebar-footer">
         <div class="user-info">
-          {{ isCollapsed ? 'V2' : 'GeminiShell v2' }}
+          {{ isCollapsed ? 'V2' : 'Goge Chat v2' }}
         </div>
       </footer>
     </div>

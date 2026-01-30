@@ -126,7 +126,7 @@ const handleScrollUpdate = (pos) => {
   
   /* --- 🛠️ [可调参数] 悬浮外边距：上 右 下 左 --- */
   /* 这里控制对话框距离窗口边缘的距离，例如 "0 6px 6px 0" 代表右边和下边有6px缝隙 */
-  padding: 0 4px 4px 4px; 
+  padding: 0 4px 4px 0px; 
   /* ---------------------------------- */
   
   box-sizing: border-box;
