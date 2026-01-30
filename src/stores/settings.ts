@@ -10,14 +10,11 @@ import { SettingsCategory } from '../types/config';
 export const useSettingsStore = defineStore('settings', () => {
     // ========== 状态 ==========
 
-    /** 当前激活的设置分类 */
-    const activeCategory = ref<SettingsCategory>('models');
+    const savedCategory = localStorage.getItem('activeCategory') as SettingsCategory | null;
+    const activeCategory = ref<SettingsCategory>(savedCategory || 'models');
 
-    /** 当前选中的提供商 ID（在模型服务界面） */
-    const activeProviderId = ref<string>('deepseek');
-
-    /** 当前选中的预设 ID（在模型配置界面） */
-    const activePresetId = ref<string>('default_preset');
+    const activeProviderId = ref<string>(localStorage.getItem('activeProviderId') || 'deepseek');
+    const activePresetId = ref<string>(localStorage.getItem('activePresetId') || 'default_preset');
 
 
     /** 设置面板是否打开 */
@@ -38,6 +35,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const openSettings = (category?: SettingsCategory) => {
         if (category) {
             activeCategory.value = category;
+            localStorage.setItem('activeCategory', category);
         }
         isModalOpen.value = true;
     };
@@ -57,6 +55,7 @@ export const useSettingsStore = defineStore('settings', () => {
      */
     const setCategory = (category: SettingsCategory) => {
         activeCategory.value = category;
+        localStorage.setItem('activeCategory', category);
     };
 
     /**
@@ -64,6 +63,7 @@ export const useSettingsStore = defineStore('settings', () => {
      */
     const setActiveProvider = (providerId: string) => {
         activeProviderId.value = providerId;
+        localStorage.setItem('activeProviderId', providerId);
     };
 
     /**
@@ -71,6 +71,7 @@ export const useSettingsStore = defineStore('settings', () => {
      */
     const setActivePreset = (presetId: string) => {
         activePresetId.value = presetId;
+        localStorage.setItem('activePresetId', presetId);
     };
 
     const markAsChanged = () => {

@@ -5,6 +5,7 @@ import { useChatStore } from "../../stores/chat";
 import { useScrollRestore } from '../../composables/useScrollRestore';
 import MessageItem from './MessageItem.vue';
 import ModernConfirm from './ModernConfirm.vue';
+import SystemPromptBanner from './SystemPromptBanner.vue';
 
 const props = defineProps(['messages', 'sessionId', 'initialScrollPos']);
 const emit = defineEmits(['update-pos']);
@@ -157,8 +158,10 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
   <div class="message-display modern-scroll" ref="scrollRef">
     <Transition name="list-fade">
       <div v-if="!chatStore.isLoading" :key="sessionId" class="scroll-content-wrapper">
+        <SystemPromptBanner />
+        
         <MessageItem 
-          v-for="(m, i) in messages" 
+          v-for="(m, i) in messages.filter(msg => msg.role !== 'system')" 
           :key="i"
           :m="m"
           :index="i"

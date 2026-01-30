@@ -306,6 +306,7 @@ pub fn run() {
             commands::db_cmd::move_session_to_folder,
             commands::db_cmd::update_folder_collapsed,
             commands::db_cmd::update_folders_order,
+            commands::db_cmd::update_session_config,
             // 文件指令
             commands::file_cmd::open_file,
             commands::file_cmd::read_file_text_content,

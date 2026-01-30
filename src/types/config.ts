@@ -15,6 +15,15 @@ export interface ModelProviderConfig {
     isCustom?: boolean;
 }
 
+// 提示词库项
+export interface PromptLibraryItem {
+    id: string;
+    name: string;
+    icon: string;
+    content: string;
+    description: string;
+}
+
 // 模型预设配置
 export interface ModelPreset {
     id: string;
@@ -42,6 +51,7 @@ export interface AppSettings {
     providers: ModelProviderConfig[];
     defaultProviderId: string;
     selectedModelId: string;
+    globalModelId: string;    // 新增：全局默认模型
     useReasoning: boolean;
     useSearch: boolean;
     searchProvider: string;
@@ -49,6 +59,11 @@ export interface AppSettings {
     // 预设设置
     presets: ModelPreset[];
     defaultPresetId: string;
+    globalPresetId: string;   // 新增：全局默认预设
+
+    // 预置提示词库
+    promptLibrary: PromptLibraryItem[];
+    defaultSystemPrompt: string;
 
     // 搜索设置
     searchInstanceUrl: string;
@@ -148,6 +163,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     providers: DEFAULT_PROVIDERS,
     defaultProviderId: 'deepseek',
     selectedModelId: 'deepseek-chat',
+    globalModelId: 'deepseek-chat',
     useReasoning: false,
     useSearch: false,
     searchProvider: 'all',
@@ -164,12 +180,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
         }
     ],
     defaultPresetId: 'default_preset',
+    globalPresetId: 'default_preset',
+    promptLibrary: [], // 将在 store init 时根据内置常量初始化
+    defaultSystemPrompt: "你是一个简洁专业的 AI 助手。请提供准确、客观、且有见地的回答。",
     apiKey: '' // 兼容旧版本
 };
 
 
 // 设置分类
-export type SettingsCategory = 'models' | 'presets' | 'appearance' | 'advanced' | 'about';
+export type SettingsCategory = 'models' | 'presets' | 'prompts' | 'appearance' | 'advanced' | 'about';
 
 // 配置类别（向后兼容别名）
 export type ConfigCategory = SettingsCategory;

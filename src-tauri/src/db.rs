@@ -15,6 +15,8 @@ pub struct ChatSession {
     pub last_scroll_pos: i32,
     pub sort_order: i32,
     pub updated_at: String,
+    pub preset_id: Option<String>,
+    pub model_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -111,6 +113,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         let _ = conn.execute("ALTER TABLE sessions ADD COLUMN folder_id INTEGER", []);
     }
 
+    if !columns_sessions.contains(&"preset_id".to_string()) {
+        let _ = conn.execute("ALTER TABLE sessions ADD COLUMN preset_id TEXT", []);
+    }
+
+    if !columns_sessions.contains(&"model_id".to_string()) {
+        let _ = conn.execute("ALTER TABLE sessions ADD COLUMN model_id TEXT", []);
+    }
+
     let mut stmt = conn.prepare("PRAGMA table_info(folders)")?;
     let columns_folders: Vec<String> = stmt
         .query_map([], |row| row.get::<_, String>(1))?
@@ -169,7 +179,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
 pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
     let mut stmt = conn.prepare(
-        "SELECT id, folder_id, title, last_scroll_pos, sort_order, updated_at FROM sessions ORDER BY sort_order ASC, updated_at DESC"
+        "SELECT id, folder_id, title, last_scroll_pos, sort_order, updated_at, preset_id, model_id FROM sessions ORDER BY sort_order ASC, updated_at DESC"
     )?;
 
     let session_iter = stmt.query_map([], |row| {
@@ -180,6 +190,8 @@ pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
             last_scroll_pos: row.get(3)?,
             sort_order: row.get(4)?,
             updated_at: row.get(5)?,
+            preset_id: row.get(6)?,
+            model_id: row.get(7)?,
         })
     })?;
 
@@ -284,6 +296,19 @@ pub(crate) fn update_session_scroll(conn: &Connection, id: i64, pos: i32) -> Res
     conn.execute(
         "UPDATE sessions SET last_scroll_pos = ?1 WHERE id = ?2",
         params![pos, id],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn update_session_config(
+    conn: &Connection,
+    id: i64,
+    preset_id: Option<&str>,
+    model_id: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE sessions SET preset_id = ?1, model_id = ?2 WHERE id = ?3",
+        params![preset_id, model_id, id],
     )?;
     Ok(())
 }

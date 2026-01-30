@@ -2,7 +2,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { configCommands } from '../tauri/commands';
-import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset } from '../types/config';
+import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset, PromptLibraryItem } from '../types/config';
+import { PREBUILT_PROMPTS } from '../constants/prompts';
 
 export const useConfigStore = defineStore('config', () => {
     // ========== 状态 ==========
@@ -62,7 +63,11 @@ export const useConfigStore = defineStore('config', () => {
                     ...DEFAULT_SETTINGS,
                     ...saved,
                     // 确保 providers 数组完整（处理新增的提供商）
-                    providers: mergeProviders(saved.providers || [], DEFAULT_SETTINGS.providers)
+                    providers: mergeProviders(saved.providers || [], DEFAULT_SETTINGS.providers),
+                    // 确保 presets 数组完整
+                    presets: mergePresets(saved.presets || [], DEFAULT_SETTINGS.presets),
+                    // 确保 promptLibrary 完整
+                    promptLibrary: mergePromptLibrary(saved.promptLibrary || [], PREBUILT_PROMPTS)
                 };
 
                 console.log('[ConfigStore INIT] After merge, final order:',
@@ -113,6 +118,42 @@ export const useConfigStore = defineStore('config', () => {
         return merged;
     };
 
+    /**
+     * 合并已保存的预设和默认预设
+     * 确保默认预设始终存在，并保留用户的修改
+     */
+    const mergePresets = (
+        savedPresets: ModelPreset[],
+        defaultPresets: ModelPreset[]
+    ): ModelPreset[] => {
+        const merged = [...(savedPresets || [])];
+
+        // 确保默认预设存在
+        for (const def of defaultPresets) {
+            if (!merged.find(p => p.id === def.id)) {
+                merged.push({ ...def });
+            }
+        }
+
+        return merged;
+    };
+
+    /**
+     * 合并已保存的提示词库和内置提示词库
+     */
+    const mergePromptLibrary = (
+        saved: PromptLibraryItem[],
+        builtin: any[]
+    ): PromptLibraryItem[] => {
+        const merged = [...(saved || [])];
+        // 如果库为空，则初始化为内置库
+        if (merged.length === 0) {
+            return builtin.map(p => ({ ...p }));
+        }
+        // 过滤掉可能存在的 malformed 数据
+        return merged.filter(item => item && item.id);
+    };
+
     // ========== 配置更新 ==========
 
     /**
@@ -126,7 +167,15 @@ export const useConfigStore = defineStore('config', () => {
             settings.value = { ...settings.value, ...newPartialSettings };
             applyToCss(settings.value);
 
-            await configCommands.saveConfig(settings.value);
+            // 🛡️ [隔离修复]：在持久化到 config.json 时，剔除与“当前活跃会话”相关的 transient 状态
+            // 这确保了不同会话/窗口不会竞争同一个全局配置文件中的 active 模型/预设
+            const {
+                selectedModelId,
+                defaultPresetId,
+                ...persistentSettings
+            } = settings.value;
+
+            await configCommands.saveConfig(persistentSettings as AppSettings);
             lastError.value = null;
         } catch (e) {
             console.error("持久化配置失败:", e);
@@ -234,6 +283,42 @@ export const useConfigStore = defineStore('config', () => {
             console.error("[ConfigStore PRESETS_REORDER] FAILED:", error);
             throw error;
         }
+    };
+
+    // ========== 提示词库管理 ==========
+
+    /** 更新提示词库项 */
+    const updatePrompt = async (id: string, config: Partial<PromptLibraryItem>) => {
+        const index = settings.value.promptLibrary.findIndex(p => p.id === id);
+        if (index === -1) return;
+
+        const updated = JSON.parse(JSON.stringify(settings.value.promptLibrary));
+        updated[index] = { ...updated[index], ...config };
+        await updateConfig({ promptLibrary: updated });
+    };
+
+    /** 添加提示词库项 */
+    const addPrompt = async (item: Omit<PromptLibraryItem, 'id'>) => {
+        const id = `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const newItem: PromptLibraryItem = { ...item, id };
+        const updated = [...settings.value.promptLibrary, newItem];
+        await updateConfig({ promptLibrary: updated });
+        return id;
+    };
+
+    /** 删除提示词库项 */
+    const removePrompt = async (id: string) => {
+        const updated = settings.value.promptLibrary.filter(p => p.id !== id);
+        await updateConfig({ promptLibrary: updated });
+    };
+
+    /** 提示词库管理排序 */
+    const handlePromptsReorder = async (newSimplePrompts: { id: string }[]) => {
+        const originalPrompts = [...settings.value.promptLibrary];
+        const newOrder = newSimplePrompts
+            .map(simple => originalPrompts.find(p => p.id === simple.id))
+            .filter((p): p is PromptLibraryItem => Boolean(p));
+        await updateConfig({ promptLibrary: JSON.parse(JSON.stringify(newOrder)) });
     };
 
 
@@ -391,6 +476,12 @@ export const useConfigStore = defineStore('config', () => {
         updatePreset,
         addPreset,
         removePreset,
-        handlePresetsReorder
+        handlePresetsReorder,
+
+        // 提示词库管理
+        updatePrompt,
+        addPrompt,
+        removePrompt,
+        handlePromptsReorder
     };
 });

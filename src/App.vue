@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
+import { useSettingsStore } from './stores/settings';
 
 // 导入组件
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
@@ -15,17 +16,17 @@ const configStore = useConfigStore();
 const chatStore = useChatStore();
 
 const isMaximized = ref(false); 
-const showSettings = ref(false); 
+const settingsStore = useSettingsStore();
 
 // 处理打开设置
 const handleOpenSettings = () => {
-    showSettings.value = true;
+    settingsStore.openSettings();
     chatStore.setChatViewActive(false);  // 通知聊天 store 视图已切换
 };
 
 // 处理返回聊天
 const handleBackToChat = () => {
-    showSettings.value = false;
+    settingsStore.closeSettings();
     chatStore.setChatViewActive(true);  // 通知聊天 store 视图已激活
 }; 
 
@@ -70,7 +71,7 @@ onUnmounted(() => {
     @drop.prevent
   >
     <TitleBar 
-      :is-settings="showSettings" 
+      :is-settings="settingsStore.isModalOpen" 
       @open-settings="handleOpenSettings" 
       @back-home="handleBackToChat" 
     />
@@ -78,7 +79,7 @@ onUnmounted(() => {
     <div class="content-area">
       <!-- 使用 v-show 替代 v-if，保持 ChatContainer 不被卸载 -->
       <transition name="view-fade">
-        <div v-show="!showSettings" class="main-view">
+        <div v-show="!settingsStore.isModalOpen" class="main-view">
           <SideBar 
             :active="chatStore.activeId" 
             :list="chatStore.historyList" 
@@ -102,7 +103,7 @@ onUnmounted(() => {
       </transition>
 
       <transition name="view-fade">
-        <SettingsModal v-show="showSettings" @close="handleBackToChat" />
+        <SettingsModal v-show="settingsStore.isModalOpen" @close="handleBackToChat" />
       </transition>
     </div>
   </div>

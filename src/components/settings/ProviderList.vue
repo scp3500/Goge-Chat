@@ -183,8 +183,8 @@ const list = computed({
 
 .list-item.active .p-icon {
   background: #f0f0f5;
-  border-color: #2ecc71;
-  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .p-icon :deep(svg) {
@@ -197,10 +197,10 @@ const list = computed({
 .list-item:hover .drag-handle { color: #888; }
 .item-right { display: flex; align-items: center; gap: 8px; }
 .p-name { font-size: 14px; font-weight: 500; }
-.status-tag.on { background: rgba(46, 204, 113, 0.15); color: #2ecc71; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+.status-tag.on { background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
 .status-tag.off { background: rgba(255, 255, 255, 0.05); color: #888; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
 .toggle-btn { width: 36px; height: 20px; background: #555; border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.3s; }
-.toggle-btn.on { background: #2ecc71; }
+.toggle-btn.on { background: #3b82f6; }
 .toggle-slider { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
 .toggle-btn.on .toggle-slider { left: 18px; }
 

@@ -68,6 +68,16 @@ pub struct Session {
     #[serde(alias = "folderId")]
     #[serde(alias = "folder_id")]
     pub folder_id: Option<String>,
+
+    #[serde(rename = "preset_id")]
+    #[serde(alias = "presetId")]
+    #[serde(alias = "preset_id")]
+    pub preset_id: Option<String>,
+
+    #[serde(rename = "model_id")]
+    #[serde(alias = "modelId")]
+    #[serde(alias = "model_id")]
+    pub model_id: Option<String>,
 }
 
 /// 文件夹结构：完全兼容蛇形和驼峰

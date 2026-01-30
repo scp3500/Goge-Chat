@@ -5,6 +5,8 @@ export interface ChatSession {
     last_scroll_pos?: number;
     sort_order?: number;
     folder_id?: string | null;
+    preset_id?: string | null;
+    model_id?: string | null;
 }
 
 // 文件夹类型

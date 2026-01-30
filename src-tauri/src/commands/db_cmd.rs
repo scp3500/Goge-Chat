@@ -34,9 +34,27 @@ pub fn get_sessions(state: State<DbState>) -> Result<Vec<Session>, String> {
             sort_order: cs.sort_order,
             updated_at: cs.updated_at,
             folder_id: cs.folder_id.map(|id| id.to_string()),
+            preset_id: cs.preset_id,
+            model_id: cs.model_id,
         })
         .collect();
     Ok(sessions)
+}
+
+// ... existing code ... lines 42-287
+
+#[tauri::command]
+pub fn update_session_config(
+    id: String,
+    preset_id: Option<String>,
+    model_id: Option<String>,
+    state: State<DbState>,
+) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let numeric_id = parse_id(&id)?;
+    crate::db::update_session_config(&conn, numeric_id, preset_id.as_deref(), model_id.as_deref())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]

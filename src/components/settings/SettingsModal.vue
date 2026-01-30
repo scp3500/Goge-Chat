@@ -7,7 +7,9 @@ import ProviderList from './ProviderList.vue';
 import ModelConfig from './ModelConfig.vue';
 import PresetList from './PresetList.vue';
 import PresetConfig from './PresetConfig.vue';
+import SystemPromptConfig from './SystemPromptConfig.vue';
 import AppearanceConfig from './AppearanceConfig.vue';
+import GeneralConfig from './GeneralConfig.vue';
 
 
 // 使用 composables
@@ -201,7 +203,9 @@ const handleClose = () => {
             <h2>{{ 
                 settingsStore.activeCategory === 'models' ? activeProviderName : 
                 settingsStore.activeCategory === 'presets' ? activePresetName : 
-                '界面外观与显示' 
+                settingsStore.activeCategory === 'prompts' ? '系统提示词管理' :
+                settingsStore.activeCategory === 'appearance' ? '界面外观与显示' :
+                '通用项设置' 
             }}</h2>
           </div>
 
@@ -219,11 +223,22 @@ const handleClose = () => {
           :presetId="settingsStore.activePresetId"
         />
 
+        <!-- 系统提示词专区 -->
+        <SystemPromptConfig
+          v-else-if="settingsStore.activeCategory === 'prompts'"
+          :presetId="settingsStore.activePresetId"
+        />
+
 
         <!-- 显示设置 -->
         <AppearanceConfig 
           v-else-if="settingsStore.activeCategory === 'appearance'"
           :themes="themes"
+        />
+
+        <!-- 通用设置 -->
+        <GeneralConfig
+          v-else-if="settingsStore.activeCategory === 'general'"
         />
 
         <!-- 占位符 -->

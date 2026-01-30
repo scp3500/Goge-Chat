@@ -1,6 +1,203 @@
+
+<template>
+  <div class="model-config-container" v-if="providerConfig">
+    <!-- Header -->
+    <div class="config-header-row">
+      <div class="header-info">
+        <h2 class="provider-title">{{ providerConfig.name }}</h2>
+        <span class="provider-id-badge">{{ providerId }}</span>
+      </div>
+      <label class="switch-modern">
+        <input type="checkbox" :checked="providerConfig.enabled" @change="toggleEnabled" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Main Settings Card -->
+    <div class="config-card">
+      <!-- API Key -->
+      <div class="setting-group">
+        <div class="group-header">
+          <label class="group-label">API 密钥</label>
+          <button class="text-action-btn" :disabled="testingConnection" @click="testingConnection = true">
+            {{ testingConnection ? '连接中...' : '测试连接' }}
+          </button>
+        </div>
+        <div class="input-wrapper-modern">
+          <input
+            :type="showApiKey ? 'text' : 'password'"
+            v-model="providerConfig.apiKey"
+            placeholder="sk-..."
+            @change="handleApiKeyChange"
+            class="full-width-input"
+          />
+          <button class="icon-toggle-btn" @click="showApiKey = !showApiKey" v-html="showApiKey ? EYE_OPEN_SVG : EYE_CLOSED_SVG"></button>
+        </div>
+        <p class="field-hint">用于鉴权的私有密钥，将安全存储在本地。</p>
+      </div>
+      
+      <div class="divider"></div>
+
+      <!-- Base URL -->
+      <div class="setting-group">
+        <div class="group-header">
+          <label class="group-label">Base URL</label>
+          <label class="checkbox-label">
+            <input 
+              type="checkbox" 
+              v-model="providerConfig.disableUrlSuffix" 
+              @change="handleParamChange('disableUrlSuffix', providerConfig.disableUrlSuffix)"
+            />
+            <span>完全自定义</span>
+          </label>
+        </div>
+        <div class="input-wrapper-modern">
+          <input
+            type="text"
+            v-model="providerConfig.baseUrl"
+            placeholder="https://api.example.com/v1"
+            class="full-width-input"
+            @change="handleBaseUrlChange"
+          />
+        </div>
+        <p class="field-hint">
+          当前请求地址: <span class="code-snippet">{{ providerConfig.baseUrl || 'https://...' }}{{ 
+            providerConfig.disableUrlSuffix ? '' : 
+            (providerConfig.id === 'gemini' ? '/v1beta/models' : '/chat/completions') 
+          }}</span>
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Parameters (Temperature & Tokens) -->
+       <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">
+            <span>回复随机度</span>
+            <span class="tag">Temperature</span>
+          </div>
+        </div>
+        <div class="control-wrapper">
+          <div class="slider-display">{{ providerConfig.temperature }}</div>
+          <input 
+            type="range" 
+            v-model.number="providerConfig.temperature" 
+            min="0" 
+            max="2" 
+            step="0.1" 
+             class="modern-range"
+            :style="{ '--progress': (providerConfig.temperature / 2) * 100 + '%' }"
+            @input="handleParamChange('temperature', providerConfig.temperature)"
+          />
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">
+            <span>最大回复长度</span>
+            <span class="tag">Max Tokens</span>
+          </div>
+        </div>
+        <div class="control-wrapper">
+          <input 
+            type="number" 
+            v-model.number="providerConfig.maxTokens" 
+            placeholder="默认"
+            @change="handleParamChange('maxTokens', providerConfig.maxTokens)"
+            class="modern-input number-input"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Models Management -->
+    <div class="models-section">
+      <div class="section-header">
+        <h3 class="sub-title">模型列表</h3>
+        <div class="actions-right">
+          <button class="icon-btn-modern" title="添加模型" @click="addModel">
+            <span v-html="PLUS_SVG"></span>
+          </button> 
+        </div>
+      </div>
+
+      <div class="tree-box-modern">
+        <div class="tree-inner-group">
+          <div class="tree-header-v2">
+            <span class="tree-chev-v2" v-html="CHEVRON_DOWN_SVG"></span>
+            <span class="tree-title-v2">{{ providerConfig.models?.length || 0 }} 个模型</span>
+          </div>
+          <div class="tree-items-v2">
+            <draggable 
+              v-model="modelsList" 
+              item-key="self"
+              @end="handleModelsReorder"
+              animation="200"
+              ghost-class="sortable-ghost"
+              handle=".sparkle-avatar"
+            >
+              <template #item="{ element: model, index }">
+                <div class="tree-row-v2 draggable-model">
+                  <div class="row-info-v2">
+                    <div class="sparkle-avatar">
+                      <svg viewBox="0 0 24 24" width="20" height="20">
+                        <defs>
+                          <linearGradient :id="'fire-grad-' + index" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#fbbf24" />
+                            <stop offset="100%" stop-color="#ea580c" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M12 2l2.3 7 7 2.3-7 2.3-2.3 7-2.3-7-7-2.3 7-2.3z" :fill="'url(#fire-grad-' + index + ')'" />
+                      </svg>
+                    </div>
+                    
+                    <!-- Inline Edit -->
+                    <input 
+                      v-if="editingIndex === index"
+                      ref="editInputRef"
+                      v-model="editingModelName"
+                      class="model-edit-input"
+                      @blur="saveEdit(index)"
+                      @keydown.enter="saveEdit(index)"
+                      @keydown.esc="cancelEdit"
+                    />
+                    <span 
+                      v-else 
+                      class="row-name-v2" 
+                      @dblclick="startEdit(index, model)"
+                    >
+                      {{ model }}
+                    </span>
+
+                    <div class="circles-group">
+                      <div v-for="(cap, idx) in getCapabilities(model)" :key="idx" class="cap-dot-v2" :style="{ backgroundColor: cap.bg, color: cap.color }">
+                        {{ cap.icon }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row-actions-v2">
+                    <button class="row-mini-btn" v-html="SETTINGS_SVG" @click="startEdit(index, model)"></button>
+                    <button class="row-mini-btn remove-btn" @click="removeModel(index)">
+                      <span>–</span>
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </draggable>
+          </div>
+        </div>
+      </div>
+      
+      <div class="list-footer-hint">双击名称可修改，拖拽头像可排序。</div>
+    </div>
+  </div>
+</template>
+
 <script setup>
 import draggable from 'vuedraggable';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useProviderConfig } from '../../composables/useProviderConfig';
 import { useConfigStore } from '../../stores/config';
 import { 
@@ -37,6 +234,11 @@ const providerConfig = computed(() => currentProvider.value);
 // 本地模型列表状态，用于拖拽
 const modelsList = ref([...(providerConfig.value?.models || [])]);
 
+// Editing State
+const editingIndex = ref(-1);
+const editingModelName = ref('');
+const editInputRef = ref(null);
+
 // 同步逻辑：仅在集合实质变化时更新本地列表，保持拖拽后的顺序稳定
 watch(() => providerConfig.value?.models, (newVal) => {
   if (!newVal) {
@@ -49,6 +251,7 @@ watch(() => providerConfig.value?.models, (newVal) => {
   
   if (localKeys === remoteKeys) return;
   
+  // Checking distinct changes
   const localSorted = [...modelsList.value].sort().join(',');
   const remoteSorted = [...newVal].sort().join(',');
   
@@ -61,6 +264,47 @@ const handleModelsReorder = async () => {
   if (providerConfig.value) {
     await updateCurrentProvider({ models: [...modelsList.value] });
   }
+};
+
+// CRUD Operations
+const addModel = async () => {
+  const newModelName = 'new-model-' + Math.floor(Math.random() * 1000);
+  modelsList.value.push(newModelName);
+  await handleModelsReorder();
+  
+  // Automatically start editing the new model
+  const newIndex = modelsList.value.length - 1;
+  startEdit(newIndex, newModelName);
+};
+
+const removeModel = async (index) => {
+  modelsList.value.splice(index, 1);
+  await handleModelsReorder();
+};
+
+const startEdit = (index, model) => {
+  editingIndex.value = index;
+  editingModelName.value = model;
+  nextTick(() => {
+    if (editInputRef.value) editInputRef.value.focus();
+  });
+};
+
+const saveEdit = async (index) => {
+  if (editingIndex.value === -1) return;
+  
+  const newName = editingModelName.value.trim();
+  if (newName) {
+    modelsList.value[index] = newName;
+    await handleModelsReorder();
+  }
+  
+  cancelEdit();
+};
+
+const cancelEdit = () => {
+  editingIndex.value = -1;
+  editingModelName.value = '';
 };
 
 // 模型能力配置
@@ -97,393 +341,375 @@ const handleParamChange = (key, value) => {
 };
 </script>
 
-<template>
-  <div class="config-pane-wrapper" v-if="providerConfig">
-    <!-- Header -->
-    <header class="top-nav">
-      <div class="title-area">
-        <span class="main-title">{{ providerConfig.name }}</span>
-      </div>
-      <label class="switch-green">
-        <input type="checkbox" :checked="providerConfig.enabled" @change="toggleEnabled" />
-        <span class="switch-blob"></span>
-      </label>
-    </header>
-
-    <div class="thin-sep"></div>
-
-    <!-- API Key Section -->
-    <section class="pane-section">
-      <div class="pane-header-row">
-        <span class="pane-label">API 密钥</span>
-        <button class="ghost-tool-btn" v-html="TWEAK_ICON"></button>
-      </div>
-      <div class="input-action-row">
-        <div class="search-style-input">
-          <input
-            :type="showApiKey ? 'text' : 'password'"
-            v-model="providerConfig.apiKey"
-            placeholder="••••••••••••••••••••••••••••••••••••••••••••••••••"
-            @change="handleApiKeyChange"
-          />
-          <button class="eye-toggle-btn" @click="showApiKey = !showApiKey" v-html="showApiKey ? EYE_OPEN_SVG : EYE_CLOSED_SVG"></button>
-        </div>
-        <button class="check-btn" :disabled="testingConnection" @click="testingConnection = true">
-          {{ testingConnection ? '检测中' : '检测' }}
-        </button>
-      </div>
-      <div class="pane-hint text-end">多个密钥使用逗号分隔</div>
-    </section>
-
-    <!-- API Base URL Section -->
-    <section class="pane-section">
-      <div class="pane-header-row">
-        <div class="label-group">
-          <span class="pane-label">API 地址</span>
-          <span class="tiny-meta" v-html="ARROWS_ICON"></span>
-          <span class="tiny-meta" v-html="HELP_CIRCLE_ICON"></span>
-        </div>
-        
-        <!-- 自定义地址开关 -->
-        <label class="custom-url-check">
-          <input 
-            type="checkbox" 
-            v-model="providerConfig.disableUrlSuffix" 
-            @change="handleParamChange('disableUrlSuffix', providerConfig.disableUrlSuffix)"
-          />
-          <span>自定义地址</span>
-        </label>
-      </div>
-      <div class="search-style-input w-full-input">
-        <input
-          type="text"
-          v-model="providerConfig.baseUrl"
-          placeholder="https://ai.example.com"
-          @change="handleBaseUrlChange"
-        />
-      </div>
-      <div class="pane-hint">
-        预览: {{ providerConfig.baseUrl || 'https://...' }}{{ 
-          providerConfig.disableUrlSuffix ? '' : 
-          (providerConfig.id === 'gemini' ? '/v1beta/models' : '/chat/completions') 
-        }}
-      </div>
-    </section>
-
-    <!-- Parameters Section (New) -->
-    <section class="pane-section">
-      <div class="pane-header-row">
-        <span class="pane-label">参数设置</span>
-        <button class="ghost-tool-btn" v-html="TWEAK_ICON"></button>
-      </div>
-      <div class="params-grid">
-        <div class="param-item">
-          <div class="param-top">
-            <label>回复随机度 (Temperature)</label>
-            <span>{{ providerConfig.temperature }}</span>
-          </div>
-          <input 
-            type="range" 
-            v-model.number="providerConfig.temperature" 
-            min="0" 
-            max="2" 
-            step="0.1" 
-            @input="handleParamChange('temperature', providerConfig.temperature)"
-          />
-        </div>
-        <div class="param-item">
-          <div class="param-top">
-            <label>单次回复最大长度 (Max Tokens)</label>
-            <span>{{ providerConfig.maxTokens }}</span>
-          </div>
-          <input 
-            type="number" 
-            v-model.number="providerConfig.maxTokens" 
-            placeholder="默认"
-            @change="handleParamChange('maxTokens', providerConfig.maxTokens)"
-            class="param-number-input"
-          />
-        </div>
-      </div>
-    </section>
-
-    <!-- Models Section -->
-    <section class="pane-section">
-      <div class="pane-header-row">
-        <div class="label-group">
-          <span class="pane-label">模型</span>
-          <span class="mini-badge-v2">{{ providerConfig.models?.length || 0 }}</span>
-          <button class="search-v2-btn" v-html="SEARCH_SVG"></button>
-        </div>
-        <button class="ghost-tool-btn" v-html="MAGIC_STAR_ICON"></button>
-      </div>
-
-      <div class="tree-box-modern">
-        <div class="tree-inner-group">
-          <div class="tree-header-v2">
-            <span class="tree-chev-v2" v-html="CHEVRON_DOWN_SVG"></span>
-            <span class="tree-title-v2">{{ providerId }}</span>
-          </div>
-          <div class="tree-items-v2">
-            <draggable 
-              v-model="modelsList" 
-              item-key="self"
-              @end="handleModelsReorder"
-              animation="200"
-              ghost-class="sortable-ghost"
-              handle=".sparkle-avatar"
-            >
-              <template #item="{ element: model }">
-                <div class="tree-row-v2 draggable-model">
-                  <div class="row-info-v2">
-                    <div class="sparkle-avatar">
-                      <svg viewBox="0 0 24 24" width="20" height="20">
-                        <defs>
-                          <linearGradient :id="'fire-grad-' + model.replace(/[^a-zA-Z0-9]/g, '-')" x1="0" y1="0" x2="1" y2="1">
-                            <stop offset="0%" stop-color="#fbbf24" />
-                            <stop offset="100%" stop-color="#ea580c" />
-                          </linearGradient>
-                        </defs>
-                        <path d="M12 2l2.3 7 7 2.3-7 2.3-2.3 7-2.3-7-7-2.3 7-2.3z" :fill="'url(#fire-grad-' + model.replace(/[^a-zA-Z0-9]/g, '-') + ')'" />
-                      </svg>
-                    </div>
-                    <span class="row-name-v2">{{ model }}</span>
-                    <div class="circles-group">
-                      <div v-for="(cap, idx) in getCapabilities(model)" :key="idx" class="cap-dot-v2" :style="{ backgroundColor: cap.bg, color: cap.color }">
-                        {{ cap.icon }}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="row-actions-v2">
-                    <button class="row-mini-btn" v-html="SETTINGS_SVG"></button>
-                    <button class="row-mini-btn">➖</button>
-                  </div>
-                </div>
-              </template>
-            </draggable>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer-btn-layout">
-        <button class="manage-green-btn">
-          <span class="btn-icon-wrap" v-html="LIST_MANAGE_ICON"></span>
-          管理
-        </button>
-        <button class="add-dark-btn">
-          <span class="btn-icon-wrap" v-html="PLUS_SVG"></span>
-          添加
-        </button>
-      </div>
-    </section>
-  </div>
-</template>
-
 <style scoped>
-.config-pane-wrapper {
+/* HMR Trigger Force */
+.model-config-container {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  color: #d1d1d1;
+  gap: 24px;
+  padding: 8px 4px;
+  color: #e3e3e3;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Header */
-.top-nav {
+.config-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 4px;
 }
 
-.title-area { display: flex; align-items: center; gap: 8px; }
-.main-title { font-size: 18px; font-weight: 600; color: #fff; }
-
-.ghost-tool-btn { background: transparent; border: none; padding: 4px; border-radius: 4px; color: #666; cursor: pointer; display: flex; width: 24px; height: 24px; }
-.ghost-tool-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
-.thin-sep {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.04);
-  margin-top: -12px;
-}
-
-/* Green Switch */
-.switch-green {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-
-.switch-green input { opacity: 0; width: 0; height: 0; }
-
-.switch-blob {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #313338;
-  transition: .3s;
-  border-radius: 24px;
-}
-
-.switch-blob:before {
-  position: absolute;
-  content: "";
-  height: 20px;
-  width: 20px;
-  left: 2px;
-  bottom: 2px;
-  background-color: #fff;
-  transition: .3s;
-  border-radius: 50%;
-}
-
-input:checked + .switch-blob { background-color: #23a559; }
-input:checked + .switch-blob:before { transform: translateX(20px); }
-
-/* Pane Sections */
-.pane-section {
+.header-info {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
 
-.pane-header-row {
+.provider-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.provider-id-badge {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-family: monospace;
+}
+
+/* Modern Switch */
+.switch-modern {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+.switch-modern input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #374151;
+  transition: .3s;
+  border-radius: 22px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #9ca3af;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: #10b981; }
+input:checked + .slider:before { transform: translateX(18px); background-color: #fff; }
+
+/* Config Card */
+.config-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 -20px;
+}
+
+/* Setting Groups */
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.label-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pane-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.2px;
-}
-
-.tiny-meta {
-  color: #777;
-  display: flex;
-}
-
-.mini-badge-v2 {
-  background: #2b2d31;
-  padding: 1px 7px;
-  border-radius: 12px;
-  font-size: 11px;
-  color: #777;
-}
-
-.search-v2-btn {
-  background: transparent;
-  border: none;
-  color: #777;
-  padding: 0;
-  display: flex;
-}
-
-/* Inputs */
-.input-action-row {
-  display: flex;
-  gap: 8px;
-  height: 40px;
-}
-
-.search-style-input {
-  flex: 1;
-  background: #111214;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-}
-
-.w-full-input { height: 42px; }
-
-.search-style-input input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: #fff;
-  font-size: 14px;
-  font-family: monospace;
-  outline: none;
-  height: 100%;
-}
-
-.eye-toggle-btn {
-  background: transparent;
-  border: none;
-  color: #666;
-  cursor: pointer;
-}
-
-.check-btn {
-  background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  color: #fff;
-  padding: 0 16px;
-  border-radius: 6px;
+.group-label {
   font-size: 14px;
   font-weight: 500;
+  color: #fff;
+}
+
+.text-action-btn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: #818cf8;
+  cursor: pointer;
+  padding: 0;
+}
+.text-action-btn:hover { text-decoration: underline; }
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9ca3af;
   cursor: pointer;
 }
 
-.check-btn:hover { background: #2b2d31; }
+/* Modern Input Wrapper */
+.input-wrapper-modern {
+  display: flex;
+  align-items: center;
+  background: #18191b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0 10px;
+  transition: border-color 0.2s;
+}
 
-.pane-hint {
+.input-wrapper-modern:focus-within {
+  border-color: #818cf8;
+}
+
+.full-width-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  padding: 10px 0;
+  outline: none;
+  font-family: monospace;
+}
+
+.icon-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+.icon-toggle-btn:hover { color: #d1d5db; }
+
+.field-hint {
   font-size: 12px;
-  color: #4a4d52;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.code-snippet {
+  font-family: monospace;
+  background: rgba(0,0,0,0.3);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* Slider & Params (Copied from PresetConfig for consistency) */
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.setting-info { flex: 1; }
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.tag {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #aeb4bb;
+  font-family: monospace;
+}
+
+.control-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+  justify-content: flex-end;
+}
+
+.slider-display {
+  font-family: monospace;
+  font-size: 13px;
+  color: #818cf8;
+  background: rgba(129, 140, 248, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  min-width: 36px;
+  text-align: center;
+}
+
+.modern-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 140px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  position: relative;
+}
+
+.modern-range::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: #818cf8;
+  border-radius: 3px;
+}
+
+.modern-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 2;
+  transition: transform 0.1s;
+  margin-top: 0;
+}
+.modern-range::-webkit-slider-thumb:hover { transform: scale(1.1); }
+
+.modern-input {
+  background: #18191b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  text-align: right;
+  width: 100px;
+}
+.modern-input:focus { border-color: #818cf8; }
+
+/* Models Section */
+.models-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sub-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
   margin: 0;
 }
 
-.text-end { text-align: right; }
+.icon-btn-modern {
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d1d5db;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.icon-btn-modern:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.icon-btn-modern :deep(svg) { width: 16px; height: 16px; }
 
-/* Tree Box */
+/* Tree Box Modern (Restored & Refined) */
 .tree-box-modern {
   background: rgba(0, 0, 0, 0.1);
   border-radius: 8px;
-  border: 1px solid #2b2d31;
+  border: 1px solid rgba(255, 255, 255, 0.08); /* Slightly lighter border */
   overflow: hidden;
 }
 
 .tree-header-v2 {
-  background: #2b2d31;
+  background: rgba(43, 45, 49, 0.5); /* Slightly transparent */
   padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .tree-chev-v2 { color: #777; display: flex; transform: scale(0.8); }
-.tree-title-v2 { font-size: 14px; font-weight: 700; color: #fff; }
+.tree-title-v2 { font-size: 13px; font-weight: 600; color: #aeb4bb; }
 
 .tree-row-v2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 16px;
+  background: transparent;
+  transition: background 0.2s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
 
-.tree-row-v2:hover { background: rgba(255, 255, 255, 0.02); }
+.tree-row-v2:last-child { border-bottom: none; }
+.tree-row-v2:hover { background: rgba(255, 255, 255, 0.03); }
 
 .draggable-model {
   cursor: default;
 }
 
+/* Sparkle Avatar */
 .sparkle-avatar {
   cursor: grab;
+  width: 28px;
+  height: 28px;
+  background: #2b2d31;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-
-.sparkle-avatar:active {
-  cursor: grabbing;
-}
+.sparkle-avatar:active { cursor: grabbing; }
 
 .sortable-ghost {
   opacity: 0.4;
@@ -494,38 +720,52 @@ input:checked + .switch-blob:before { transform: translateX(20px); }
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
-.sparkle-avatar {
-  width: 28px;
-  height: 28px;
-  background: #2b2d31;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.row-name-v2 { 
+  font-size: 14px; 
+  color: #dbdee1; 
+  font-weight: 500; 
+  cursor: text;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.row-name-v2 { font-size: 14px; color: #dbdee1; font-weight: 500; }
+.model-edit-input {
+  background: #18191b;
+  border: 1px solid #818cf8;
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 14px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
 
 .circles-group {
   display: flex;
   gap: 6px;
+  margin-left: auto; /* Push to right of info area */
+  padding-right: 12px;
 }
 
 .cap-dot-v2 {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .row-actions-v2 {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .row-mini-btn {
@@ -533,93 +773,19 @@ input:checked + .switch-blob:before { transform: translateX(20px); }
   border: none;
   color: #666;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   display: flex;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.row-mini-btn:hover { color: #fff; }
+.row-mini-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.remove-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
 
-/* Parameters Styles */
-.params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.param-item { display: flex; flex-direction: column; gap: 8px; }
-.param-top { display: flex; justify-content: space-between; font-size: 13px; color: #777; }
-.param-top span { color: #fff; font-weight: 600; font-family: monospace; }
-.param-number-input {
-  background: #111214;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  padding: 8px 12px;
-  color: #fff;
-  font-size: 14px;
-  outline: none;
+.list-footer-hint {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 4px;
 }
-.param-item input[type="range"] {
-  width: 100%;
-  height: 4px;
-  background: #2b2d31;
-  border-radius: 2px;
-  appearance: none;
-  outline: none;
-}
-.param-item input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
-}
-
-/* Footer Group */
-.footer-btn-layout {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.manage-green-btn {
-  background: #248046;
-  border: none;
-  color: #fff;
-  padding: 10px 24px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-icon-wrap { display: flex; }
-
-.add-dark-btn {
-  background: #2b2d31;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #fff;
-  padding: 10px 24px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.custom-url-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #888;
-  cursor: pointer;
-  user-select: none;
-}
-
-.custom-url-check input {
-  cursor: pointer;
-}
-
-.custom-url-check:hover { color: #ccc; }
 </style>
