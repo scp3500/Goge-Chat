@@ -143,14 +143,33 @@ export const useConfigStore = defineStore('config', () => {
      */
     const mergePromptLibrary = (
         saved: PromptLibraryItem[],
-        builtin: any[]
+        builtin: PromptLibraryItem[]
     ): PromptLibraryItem[] => {
-        const merged = [...(saved || [])];
-        // 如果库为空，则初始化为内置库
-        if (merged.length === 0) {
-            return builtin.map(p => ({ ...p }));
+        // 1. Start with saved items (preserves order)
+        let merged = [...(saved || [])];
+
+        // 2. Sync built-in content updates (e.g. edited .md files)
+        merged = merged.map(item => {
+            const freshBuiltin = builtin.find(b => b.id === item.id);
+            if (freshBuiltin) {
+                // If it's a built-in item, force update the content/metadata from file
+                // keeping the user's "id" position in the list
+                return {
+                    ...item,
+                    ...freshBuiltin // Overwrite with fresh data from .md
+                };
+            }
+            return item; // Keep custom user items as is
+        });
+
+        // 3. Add new built-in items that aren't in saved list yet
+        for (const fresh of builtin) {
+            if (!merged.find(m => m.id === fresh.id)) {
+                merged.push({ ...fresh });
+            }
         }
-        // 过滤掉可能存在的 malformed 数据
+
+        // 4. Filter malformed
         return merged.filter(item => item && item.id);
     };
 
