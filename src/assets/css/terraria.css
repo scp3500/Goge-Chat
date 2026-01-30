@@ -1,0 +1,42 @@
+/* 🌍 Terraria (泰拉瑞亚) - Vibrant Pixel */
+[data-theme='terraria'] {
+    --bg-main: #2d1e12;
+    --bg-sidebar: #2d1e12;
+    --bg-titlebar: #2d1e12;
+    --bg-chat-island: #1a110a;
+
+    --bg-input: #2d1e12;
+    --bg-input-focus: #2d1e12;
+    --bg-input-dim: #1a110a;
+    --bg-card: #2d1e12;
+    --border-card: #4d3621;
+
+    --bg-code: #1a110a;
+    --bg-code-header: #4d3621;
+
+    --text-color: #a3e062;
+    /* Forest Green */
+    --text-color-white: #ffffff;
+
+    --color-primary: #5ba32b;
+    /* Grass Green */
+    --color-primary-bg: rgba(91, 163, 43, 0.1);
+
+    --border-glass: rgba(91, 163, 43, 0.3);
+    --bg-glass: rgba(0, 0, 0, 0.4);
+
+    --bg-user-bubble: #3498db;
+    /* Mana Blue */
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens - Pixel Art */
+    --token-keyword: #5ba32b;
+    --token-control: #ff69b4;
+    --token-type: #f1c40f;
+    --token-fn: #3498db;
+    --token-string: #e67e22;
+    --token-number: #9b59b6;
+    --token-comment: #7f8c8d;
+    --token-var: #ecf0f1;
+    --token-operator: #f39c12;
+}

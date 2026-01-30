@@ -152,8 +152,8 @@ const onSelectPromptTemplate = (e) => {
 }
 
 .config-card {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -281,8 +281,8 @@ const onSelectPromptTemplate = (e) => {
 
 .input-wrap select, .input-wrap textarea {
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-input-dim);
+  border: 1px solid var(--border-card);
   border-radius: 10px;
   color: var(--text-color-white);
   padding: 10px 12px;

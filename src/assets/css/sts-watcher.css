@@ -1,0 +1,26 @@
+/* 🧘 Watcher (观者) - Divinity & Insight */
+[data-theme='sts-watcher'] {
+    --bg-main: #1a0a1a;
+    --bg-sidebar: #1a0a1a;
+    --bg-titlebar: #1a0a1a;
+    --bg-chat-island: #120612;
+    /* Deeper divine */
+
+    --bg-input: #1a0a1a;
+    --bg-input-focus: #1a0a1a;
+    --bg-input-dim: #120612;
+    --bg-card: #1a0a1a;
+    --border-card: #2b122b;
+    --text-color-white: #ffffff;
+
+    --color-primary: #9b59b6;
+    --color-primary-bg: rgba(155, 89, 182, 0.1);
+
+    --bg-user-bubble: #9b59b6;
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens */
+    --token-keyword: #da70d6;
+    --token-control: #ffd700;
+    --token-type: #ffffff;
+}

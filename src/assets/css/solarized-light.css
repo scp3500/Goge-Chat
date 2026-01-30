@@ -1,0 +1,48 @@
+/* 🍦 Solarized Light (护眼象牙) */
+[data-theme='solarized-light'] {
+    --bg-main: #FDF6E3;
+    --bg-sidebar: #FDF6E3;
+    --bg-titlebar: #FDF6E3;
+    --bg-chat-island: #EEE8D5;
+    /* Deeper / Base3 -> Base2 */
+    --bg-input: #FDF6E3;
+    --bg-input-focus: #FDF6E3;
+    --bg-input-dim: #EEE8D5;
+    --bg-card: #FDF6E3;
+    --border-card: #E3D9BC;
+    --bg-code: #EEE8D5;
+    --bg-code-header: #93A1A1;
+    --text-color: #657B83;
+    --text-color-white: #073642;
+    --color-primary: #268BD2;
+    --color-primary-bg: rgba(38, 139, 210, 0.1);
+    --border-glass: rgba(0, 0, 0, 0.05);
+    --bg-glass: rgba(0, 0, 0, 0.03);
+
+    /* Tokens - Solarized */
+    --token-keyword: #859900;
+    /* Green */
+    --token-control: #d33682;
+    /* Magenta */
+    --token-type: #b58900;
+    /* Yellow */
+    --token-fn: #268bd2;
+    /* Blue */
+    --token-string: #2aa198;
+    /* Cyan */
+    --token-number: #d33682;
+    --token-comment: #93a1a1;
+    /* Base 1 */
+    --token-var: #268bd2;
+    --token-operator: #586e75;
+
+    /* Solarized User Bubble */
+    --bg-user-bubble: #268BD2;
+    /* Blue */
+    --color-user-bubble-text: #FDF6E3;
+
+    /* Settings & Cards Adaptation */
+    --bg-input-dim: #FDF6E3;
+    --bg-card: #FDF6E3;
+    --border-card: rgba(0, 0, 0, 0.05);
+}

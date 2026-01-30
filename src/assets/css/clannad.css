@@ -1,0 +1,29 @@
+/* 🍡 Big Dango Family (Clannad) - Heartwarming Soft */
+[data-theme='clannad'] {
+    --bg-main: #f0f7ff;
+    --bg-sidebar: #f0f7ff;
+    --bg-titlebar: #f0f7ff;
+    --bg-chat-island: #e6f0ff;
+    /* Deeper Blue */
+
+    --bg-input: #f0f7ff;
+    --bg-input-dim: #e6f0ff;
+    --bg-card: #ffffff;
+    --border-card: #dbeafe;
+
+    --text-color: #5d7fa3;
+    --text-color-white: #4a6685;
+
+    --color-primary: #87cefa;
+    /* Light Sky Blue */
+    --color-primary-bg: rgba(135, 206, 250, 0.1);
+
+    --bg-user-bubble: #ffb7c5;
+    /* Sakura Pink */
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens - Pastel Dreams */
+    --token-keyword: #87cefa;
+    --token-string: #ffb7c5;
+    --token-fn: #77dd77;
+}

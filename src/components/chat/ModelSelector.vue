@@ -343,6 +343,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 
 .provider-icon {
   font-size: 14px;
+  color: var(--color-header-icon);
 }
 
 .model-name {
@@ -369,17 +370,21 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   position: absolute;
   left: 0;
   width: 320px;
-  background: var(--bg-dropdown);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: linear-gradient(135deg, var(--bg-dropdown) 0%, rgba(20, 20, 25, 0.4) 100%);
+  backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
   border: 1px solid var(--border-dropdown);
-  border-radius: 20px;
-  box-shadow: var(--shadow-main);
+  border-radius: 14px;
+  box-shadow: 
+    0 40px 80px -12px rgba(0, 0, 0, 0.8),
+    0 18px 36px -18px rgba(0, 0, 0, 0.9),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2); /* Stronger Top highlight */
   z-index: 1000;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 6px;
+  padding: 8px;
+  background-clip: padding-box;
 }
 
 .dropdown-panel.pop-down {
@@ -498,7 +503,7 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 
 /* 模型列表 */
 .models-list {
-  max-height: 400px;
+  max-height: 50vh; /* 使用视口高度百分比更灵活 */
   overflow-y: auto;
   padding: 4px 0;
 }
@@ -533,16 +538,16 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 }
 
 .model-item.selected {
-  background: var(--color-success-bg);
-  border: 1px solid var(--color-success-border);
+  background: var(--bg-menu-active);
+  border: 1px solid var(--color-primary-border);
 }
 
 .model-item.selected .model-text {
-  color: var(--color-success);
+  color: var(--color-menu-active);
 }
 
 .model-item.selected .badge.check {
-  color: var(--color-success);
+  color: var(--color-menu-active);
 }
 
 .model-item.selected::before {
@@ -580,8 +585,8 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
 
 .model-item.selected .model-icon {
   background: var(--bg-model-icon-active);
-  border-color: var(--color-success);
-  box-shadow: 0 0 0 2px var(--color-success-border), 0 2px 6px var(--bg-mask);
+  border-color: var(--color-menu-active);
+  box-shadow: 0 0 0 2px var(--color-primary-border), 0 2px 6px var(--bg-mask);
 }
 
 .model-icon :deep(svg) {

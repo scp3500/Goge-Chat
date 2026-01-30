@@ -75,7 +75,7 @@ const emit = defineEmits(['click', 'newFolder']);
 .action-pill:hover,
 .icon-btn-pill:hover {
   background: var(--bg-glass-hover);
-  color: var(--text-color-white);
+  color: var(--color-sidebar-text-hover);
 }
 
 .new-folder-btn {

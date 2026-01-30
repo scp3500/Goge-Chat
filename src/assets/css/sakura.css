@@ -1,0 +1,52 @@
+/* 🌸 Sakura (樱花淡粉) */
+[data-theme='sakura'] {
+    --bg-main: rgba(255, 245, 247, 0.92);
+    --bg-sidebar: rgba(255, 245, 247, 0.95);
+    --bg-titlebar: rgba(255, 245, 247, 0.95);
+    --bg-chat-island: rgba(255, 241, 243, 0.6);
+    /* Deeper Pink */
+
+    --bg-input: rgba(255, 255, 255, 0.85);
+    --bg-input-focus: #ffffff;
+    --bg-input-dim: rgba(255, 241, 243, 0.8);
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --border-card: rgba(255, 225, 230, 0.5);
+    --bg-code: #FFF5F7;
+    --bg-code-header: #FFDDE2;
+    --text-color: #7D4F50;
+    --text-color-white: #4A2C2D;
+    --color-primary: #FF7EB9;
+    --color-primary-bg: rgba(255, 126, 185, 0.15);
+    --border-glass: rgba(255, 126, 185, 0.15);
+    --bg-glass: rgba(255, 255, 255, 0.6);
+    --bg-glass-active: rgba(255, 126, 185, 0.1);
+
+    /* Premium Glass Dropdowns (Light Mode) */
+    --bg-menu: rgba(255, 245, 247, 0.9);
+    --bg-dropdown: rgba(255, 255, 255, 0.92);
+    --border-dropdown: rgba(255, 126, 185, 0.15);
+    --border-menu: rgba(255, 126, 185, 0.1);
+    --bg-menu-active: rgba(255, 126, 185, 0.15);
+    --color-menu-active: #FF7EB9;
+
+    /* Tokens - Sakura Petals */
+    --token-keyword: #ff7eb9;
+    --token-control: #ff4d94;
+    --token-type: #7d4f50;
+    --token-fn: #ff7eb9;
+    --token-string: #ff99c8;
+    --token-number: #7d4f50;
+    --token-comment: #d4b2b3;
+    --token-var: #4a2c2d;
+    --token-operator: #7d4f50;
+
+    /* Sakura User Bubble */
+    --bg-user-bubble: #FFB7C5;
+    /* Cherry Blossom Pink */
+    --color-user-bubble-text: #4A2C2D;
+
+    /* Settings & Cards Adaptation */
+    --bg-input-dim: #FFF0F5;
+    --bg-card: #FFF0F5;
+    --border-card: rgba(255, 126, 185, 0.1);
+}

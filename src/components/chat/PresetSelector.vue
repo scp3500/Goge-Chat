@@ -174,6 +174,7 @@ const selectPreset = (presetId) => {
 .icon :deep(svg) {
   width: 14px;
   height: 14px;
+  color: var(--color-header-icon);
 }
 
 .preset-name {
@@ -200,14 +201,18 @@ const selectPreset = (presetId) => {
   top: calc(100% + 12px);
   right: 0;
   width: 220px;
-  background: var(--bg-menu);
-  backdrop-filter: blur(40px) saturate(200%);
+  background: linear-gradient(135deg, var(--bg-menu) 0%, rgba(20, 20, 25, 0.35) 100%);
+  backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
   border: 1px solid var(--border-menu);
-  border-radius: 16px;
-  box-shadow: var(--shadow-main);
+  border-radius: 18px;
+  box-shadow: 
+    0 35px 70px -12px rgba(0, 0, 0, 0.8),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18);
   z-index: 1000;
   overflow: hidden;
   padding: 8px;
+  background-clip: padding-box;
 }
 
 .panel-header {
@@ -220,7 +225,7 @@ const selectPreset = (presetId) => {
 }
 
 .presets-list {
-  max-height: 300px;
+  max-height: 50vh;
   overflow-y: auto;
 }
 

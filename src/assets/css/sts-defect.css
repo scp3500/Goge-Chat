@@ -1,0 +1,45 @@
+/* ⚡ Defect (故障机器人) - Plasma & Lightning */
+[data-theme='sts-defect'] {
+    --bg-main: #0a1229;
+    /* Saturated Cosmic Navy */
+    --bg-sidebar: #0a1229;
+    --bg-titlebar: #0a1229;
+    --bg-chat-island: #060c1c;
+    /* Even Deeper Space */
+
+    --bg-input: #0a1229;
+    --bg-input-focus: #0f1c40;
+    --bg-input-dim: #060c1c;
+    --bg-card: #0a1229;
+    --border-card: #223461;
+    /* Electric Border */
+
+    --text-color: #e3f2fd;
+    --text-color-white: #ffffff;
+
+    /* Plasma & Lightning */
+    --color-primary: #ffcc00;
+    /* Lightning Orb Gold */
+    --color-primary-bg: rgba(255, 204, 0, 0.15);
+    --color-primary-light: #ffeb3b;
+
+    --border-glass: rgba(0, 184, 255, 0.3);
+    --bg-glass: rgba(10, 18, 41, 0.85);
+
+    --bg-user-bubble: #1a2c5e;
+    /* Midnight Tech Blue */
+    --color-user-bubble-text: #00e5ff;
+
+    --shadow-main: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 204, 0, 0.1);
+
+    /* Tokens - High Energy */
+    --token-keyword: #00e5ff;
+    --token-control: #ffcc00;
+    --token-type: #ffffff;
+    --token-fn: #00e5ff;
+    --token-string: #ffd600;
+    --token-number: #ffffff;
+    --token-comment: #455a89;
+    --token-var: #00e5ff;
+    --token-operator: #ffffff;
+}

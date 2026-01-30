@@ -260,7 +260,7 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
   right: 6px;
   width: 6px;
   height: 6px;
-  background: var(--color-success);
+  background: var(--color-primary);
   border-radius: 50%;
   border: 1px solid var(--bg-main);
 }
@@ -273,19 +273,21 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
   right: 0;
   margin: 0 auto;
   width: 92%;
-  width: 92%;
-  background: var(--bg-menu);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: linear-gradient(0deg, var(--bg-menu) 0%, rgba(20, 20, 25, 0.4) 100%);
+  backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
   border: 1px solid var(--border-menu);
   border-bottom: none;
-  border-radius: 20px 20px 0 0;
-  box-shadow: var(--shadow-main);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 
+    0 -30px 60px -10px rgba(0, 0, 0, 0.8),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
   z-index: 1000;
   overflow: hidden;
-  padding: 6px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
+  background-clip: padding-box;
 }
 
 .menu-content {
@@ -344,7 +346,7 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 
 .menu-item-nested.active {
   background: var(--bg-menu-active);
-  border: 1px solid var(--color-success-border);
+  border: 1px solid var(--color-primary-border);
 }
 
 .item-left {
@@ -384,7 +386,7 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 }
 
 .menu-item-nested.active .p-name {
-  color: var(--color-success);
+  color: var(--color-menu-active);
 }
 
 .p-desc {
@@ -399,7 +401,7 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 .p-check :deep(svg) {
   width: 16px;
   height: 16px;
-  color: var(--color-success);
+  color: var(--color-menu-active);
 }
 
 /* Footer Styles (Mirroring Search Menu Footer) */

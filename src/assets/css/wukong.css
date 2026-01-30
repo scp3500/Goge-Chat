@@ -1,0 +1,42 @@
+/* 🐒 Destined One (黑神话:悟空) - Mythic Bronze */
+[data-theme='wukong'] {
+    --bg-main: #0f0d0b;
+    --bg-sidebar: #0f0d0b;
+    --bg-titlebar: #0f0d0b;
+    --bg-chat-island: #080605;
+    /* Blacker ink */
+
+    --bg-input: #0f0d0b;
+    --bg-input-focus: #0f0d0b;
+    --bg-input-dim: #080605;
+    --bg-card: #0f0d0b;
+    --border-card: #261f18;
+
+    --text-color: #bfa17a;
+    /* Ancient Bronze */
+    --text-color-white: #f2e6d9;
+    /* Ivory/Silk */
+
+    --color-primary: #d9a04a;
+    /* Golden Monkey Glow */
+    --color-primary-bg: rgba(217, 160, 74, 0.1);
+
+    --border-glass: rgba(191, 161, 122, 0.2);
+    --bg-glass: rgba(15, 13, 11, 0.9);
+
+    --bg-user-bubble: #4d3621;
+    --color-user-bubble-text: #f2e6d9;
+
+    --shadow-main: 0 4px 30px rgba(0, 0, 0, 0.6);
+
+    /* Tokens - Ink & Gold */
+    --token-keyword: #d9a04a;
+    --token-control: #bfa17a;
+    --token-type: #f2e6d9;
+    --token-fn: #d9a04a;
+    --token-string: #6e5e4a;
+    --token-number: #d9a04a;
+    --token-comment: #332d28;
+    --token-var: #bfa17a;
+    --token-operator: #f2e6d9;
+}

@@ -2,6 +2,7 @@
 defineProps({
   icon: String,
   modelName: String,
+  providerName: String,
   date: String
 });
 </script>
@@ -12,7 +13,7 @@ defineProps({
       <div class="avatar-icon" v-html="icon"></div>
       <span class="model-name-text">{{ modelName }}</span>
       <div class="divider">|</div>
-      <span class="model-name-text" style="opacity: 0.7;">New API</span>
+      <span class="model-name-text" style="opacity: 0.7;">{{ providerName }}</span>
     </div>
     <span class="time-text">{{ date }}</span>
   </div>
@@ -47,7 +48,7 @@ defineProps({
 .model-name-text {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-color-white);
+  color: var(--color-assistant-name);
   letter-spacing: 0.3px;
 }
 

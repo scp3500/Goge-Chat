@@ -1,0 +1,56 @@
+/* 🌿 Frieren (葬送的芙莉莲) - Light Theme */
+[data-theme='frieren'] {
+    /* Soft Paper/Snow White */
+    --bg-main: #f9fbfd;
+    --bg-sidebar: #f9fbfd;
+    --bg-titlebar: #f9fbfd;
+    --bg-chat-island: #f1f4f9;
+    /* Deeper/Darker */
+
+    --bg-input: #f9fbfd;
+    --bg-input-focus: #f9fbfd;
+    --bg-input-dim: #f1f4f9;
+    --bg-card: #f9fbfd;
+    --border-card: #e2e8f0;
+
+    --bg-code: #f2f4f8;
+    --bg-code-header: #e6eaf0;
+
+    /* Muted Colors */
+    --text-color: #64748b;
+    /* Cool Grey */
+    --text-color-white: #334155;
+    /* Darker Slate */
+
+    /* Magic Gold & Pale Green */
+    --color-primary: #bfa15f;
+    /* Ancient Gold */
+    --color-primary-bg: rgba(191, 161, 95, 0.1);
+    --color-primary-light: #d4b875;
+
+    --border-glass: rgba(191, 161, 95, 0.2);
+    --bg-glass: rgba(255, 255, 255, 0.6);
+
+    /* User Bubble - Fern's Magic / Nature */
+    --bg-user-bubble: #9ca3af;
+    /* Silver/White hair aesthetic or gentle Magic */
+    --color-user-bubble-text: #ffffff;
+
+    /* Clean, elegant borders */
+    --border-color: #e2e8f0;
+    --shadow-main: 0 4px 20px rgba(148, 163, 184, 0.15);
+
+    /* Token Colors - Muted/Storybook */
+    --token-keyword: #bfa15f;
+    /* Ancient Gold */
+    --token-control: #8c7a52;
+    --token-type: #7aa18f;
+    /* Muted Green */
+    --token-fn: #a5b4fc;
+    /* Magic blue */
+    --token-string: #7aa18f;
+    --token-number: #bfa15f;
+    --token-comment: #cbd5e1;
+    --token-var: #64748b;
+    --token-operator: #94a3b8;
+}

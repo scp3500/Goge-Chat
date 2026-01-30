@@ -1,0 +1,39 @@
+/* 🪲 Hallownest (空洞骑士) - Pale Mist */
+[data-theme='hollow-knight'] {
+    --bg-main: #0c0f12;
+    --bg-sidebar: #0c0f12;
+    --bg-titlebar: #0c0f12;
+    --bg-chat-island: #06080a;
+    /* Deeper Abyss */
+
+    --bg-input: #0c0f12;
+    --bg-input-focus: #0c0f12;
+    --bg-input-dim: #06080a;
+    --bg-card: #0c0f12;
+    --border-card: #1e242a;
+
+    --text-color: #aeb9bf;
+    /* Pale Mist Blue-Grey */
+    --text-color-white: #ffffff;
+
+    --color-primary: #e5eef2;
+    /* Pale Shell White */
+    --color-primary-bg: rgba(229, 238, 242, 0.05);
+
+    --border-glass: rgba(255, 255, 255, 0.1);
+    --bg-glass: rgba(12, 15, 18, 0.8);
+
+    --bg-user-bubble: #313a42;
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens - Melancholic */
+    --token-keyword: #e5eef2;
+    --token-control: #7a8a99;
+    --token-type: #aeb9bf;
+    --token-fn: #ffffff;
+    --token-string: #d1d9de;
+    --token-number: #ffffff;
+    --token-comment: #2c3338;
+    --token-var: #aeb9bf;
+    --token-operator: #ffffff;
+}

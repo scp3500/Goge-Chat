@@ -1,0 +1,34 @@
+/* 🗡️ Silent (静默猎手) - Poison & Shadows */
+[data-theme='sts-silent'] {
+    --bg-main: #0d1a0d;
+    --bg-sidebar: #0d1a0d;
+    --bg-titlebar: #0d1a0d;
+    --bg-chat-island: #061206;
+    /* Deeper poison */
+
+    --bg-input: #0d1a0d;
+    --bg-input-focus: #0d1a0d;
+    --bg-input-dim: #061206;
+    --bg-card: #0d1a0d;
+    --border-card: #142b14;
+    /* Poison Green */
+    --text-color-white: #bd93f9;
+    /* Ghostly Purple */
+
+    --color-primary: #2ecc71;
+    --color-primary-bg: rgba(46, 204, 113, 0.1);
+
+    --bg-user-bubble: #6272a4;
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens */
+    --token-keyword: #50fa7b;
+    --token-control: #ff79c6;
+    --token-type: #bd93f9;
+    --token-fn: #50fa7b;
+    --token-string: #f1fa8c;
+    --token-number: #bd93f9;
+    --token-comment: #6272a4;
+    --token-var: #f8f8f2;
+    --token-operator: #ffb86c;
+}

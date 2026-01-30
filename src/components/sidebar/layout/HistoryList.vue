@@ -295,7 +295,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
 }
 
 .folder-header:hover {
-  color: var(--text-color-white);
+  color: var(--color-sidebar-text-hover);
   background: var(--bg-glass-hover);
   opacity: 1;
 }

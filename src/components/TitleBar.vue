@@ -125,7 +125,14 @@ const openSettings = () => {
 .titlebar-center { flex: 1; height: 100%; }
 .titlebar-right { display: flex; align-items: center; gap: 12px; }
 
-.app-name { font-weight: 600; color: var(--color-title-text); font-size: 11px; margin-left: 2px; letter-spacing: 0.5px; opacity: 0.7; }
+.app-name { 
+  font-weight: 600; 
+  color: var(--color-title-text); 
+  font-size: 11px; 
+  margin-left: 2px; 
+  letter-spacing: 0.5px; 
+  opacity: 0.8; 
+}
 
 .selectors-group {
     display: flex;
@@ -144,7 +151,18 @@ const openSettings = () => {
     background: var(--border-selectors);
 }
 
-.titlebar-model-selector, .titlebar-preset-selector { z-index: 10; }
+/* Target selectors specifically for titlebar context */
+.selectors-group :deep(.selector-btn) {
+  color: var(--color-title-text);
+}
+.selectors-group :deep(.selector-btn:hover),
+.selectors-group :deep(.selector-btn.active) {
+  color: var(--color-title-text-bright);
+}
+.selectors-group :deep(.chevron) {
+  color: var(--color-title-text);
+}
+
 
 /* 返回按钮样式 */
 .back-btn {
@@ -153,7 +171,7 @@ const openSettings = () => {
   gap: 6px;
   background: transparent;
   border: none;
-  color: var(--text-color-white);
+  color: var(--color-title-text);
   font-size: 12px;
   font-weight: bold;
   cursor: pointer;
@@ -164,7 +182,7 @@ const openSettings = () => {
 }
 .back-btn:hover {
   background: var(--bg-glass-hover);
-  color: var(--text-color-white);
+  color: var(--color-title-text-bright);
 }
 
 .window-controls { display: flex; height: 100%; align-items: center; -webkit-app-region: no-drag; }
@@ -173,7 +191,7 @@ const openSettings = () => {
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   -webkit-app-region: no-drag;
 }
-.control-btn:hover { background: var(--bg-window-controls-hover); color: var(--text-color-white); }
+.control-btn:hover { background: var(--bg-window-controls-hover); color: var(--color-title-text-bright); }
 .settings-btn:hover { color: var(--text-color-white); }
 .theme-toggle:hover { color: var(--color-primary); }
 .theme-toggle :deep(svg) { width: 14px; height: 14px; }

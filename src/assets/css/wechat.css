@@ -1,0 +1,68 @@
+/* 💬 WeChat Classic (微信经典) - Authentic Mobile Experience */
+[data-theme='wechat'] {
+    --bg-main: #f3f3f3;
+    --bg-sidebar: #f3f3f3;
+    --bg-titlebar: #2e2e2e;
+    --bg-chat-island: #ededed;
+    --bg-input: #ffffff;
+    --bg-input-focus: #ffffff;
+    --bg-input-dim: #f3f3f3;
+    --bg-card: #ffffff;
+    --border-card: #e5e5e5;
+
+    --bg-code: #e8e8e8;
+    --bg-code-header: #d6d6d6;
+
+    --text-color: #333333;
+    --text-color-white: #333333;
+    --text-secondary: #888888;
+    --text-tertiary: #b2b2b2;
+
+    /* Titlebar Isolation (Dark Header) */
+    --color-title-text: #ffffff;
+    --color-title-text-bright: #ffffff;
+    --color-window-controls: #ffffff;
+    --bg-window-controls-hover: rgba(255, 255, 255, 0.1);
+
+    /* Selectors in Dark Header - Reset local text for Titlebar contents */
+    --bg-selectors: rgba(255, 255, 255, 0.1);
+    --border-selectors: rgba(255, 255, 255, 0.1);
+
+    /* Keep dropdowns readable but frosted */
+    --bg-dropdown: rgba(255, 255, 255, 0.85);
+    --border-dropdown: rgba(0, 0, 0, 0.1);
+
+    --bg-menu: rgba(255, 255, 255, 0.8);
+    --border-menu: rgba(0, 0, 0, 0.08);
+
+    /* Official WeChat Green */
+    --color-primary: #07c160;
+    --color-primary-bg: rgba(7, 193, 96, 0.1);
+    --color-primary-light: #06ad56;
+
+    --border-glass: rgba(0, 0, 0, 0.05);
+    --bg-glass: rgba(255, 255, 255, 0.9);
+
+    /* User Bubble - Iconic WeChat Green */
+    --bg-user-bubble: #95ec69;
+    --color-user-bubble-text: #000000;
+    --border-user-bubble: #82d65c;
+
+    /* Assistant Bubble */
+    --bg-assistant-bubble: #ffffff;
+    --color-assistant-bubble-text: #000000;
+    --border-assistant-bubble: #e5e5e5;
+
+    --shadow-main: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+    /* Tokens - Classic IDE Light */
+    --token-keyword: #07c160;
+    --token-control: #fa5151;
+    --token-type: #576b95;
+    --token-fn: #07c160;
+    --token-string: #888888;
+    --token-number: #fa9d3b;
+    --token-comment: #b2b2b2;
+    --token-var: #333333;
+    --token-operator: #000000;
+}

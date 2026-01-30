@@ -421,8 +421,8 @@ input:checked + .slider:before { transform: translateX(18px); background-color: 
 
 /* Config Card */
 .config-card {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -670,7 +670,7 @@ input:checked + .slider:before { transform: translateX(18px); background-color: 
 }
 
 .tree-header-v2 {
-  background: var(--bg-code-header); /* Slightly transparent */
+  background: var(--bg-input-dim);
   padding: 10px 14px;
   display: flex;
   align-items: center;

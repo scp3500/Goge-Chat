@@ -1,0 +1,26 @@
+/* ❄️ Snowy Melody (White Album 2) - Winter Cry */
+[data-theme='wa2'] {
+    --bg-main: #f5f8fa;
+    --bg-sidebar: #f5f8fa;
+    --bg-titlebar: #f5f8fa;
+    --bg-chat-island: #edf1f5;
+    /* Deeper Grey Blue */
+
+    --bg-input: #f5f8fa;
+    --bg-input-dim: #edf1f5;
+    --bg-card: #ffffff;
+    --border-card: #e1e8ed;
+    --text-color-white: #1c2e3d;
+
+    --color-primary: #0077cc;
+    /* Tears Blue */
+    --color-primary-bg: rgba(0, 119, 204, 0.1);
+
+    --bg-user-bubble: #e1e8ed;
+    --color-user-bubble-text: #1c2e3d;
+
+    /* Tokens - Cold Winter */
+    --token-keyword: #0077cc;
+    --token-string: #50667a;
+    --token-fn: #0077cc;
+}

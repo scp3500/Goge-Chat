@@ -1,0 +1,60 @@
+[data-theme='miku'] {
+    --bg-main: rgba(57, 197, 187, 0.85);
+    /* Unified Miku Teal with transparency */
+    --bg-sidebar: rgba(57, 197, 187, 0.95);
+    --bg-titlebar: rgba(57, 197, 187, 0.95);
+    --bg-chat-island: rgba(219, 228, 233, 0.7);
+    /* More Metallic Silver (Miku's Shirt) */
+
+    --bg-input: rgba(255, 255, 255, 0.9);
+    --bg-input-focus: #ffffff;
+    --bg-input-dim: rgba(240, 245, 247, 0.8);
+    --bg-card: rgba(219, 228, 233, 0.8);
+    --border-card: rgba(255, 255, 255, 0.3);
+
+    --bg-code: #f0f7f9;
+    --bg-code-header: #d1e2e6;
+
+    --text-color: #2e3b42;
+    --text-color-white: #1a2327;
+    /* Dark contrast for light background */
+    --text-secondary: #5c707a;
+    --text-tertiary: #a0b1ba;
+
+    /* 🎤 Iconic Miku Palette */
+    --color-primary: #39c5bb;
+    --color-primary-bg: rgba(57, 197, 187, 0.1);
+    --color-primary-light: #4ddad0;
+
+    --border-glass: rgba(57, 197, 187, 0.3);
+    --bg-glass: rgba(255, 255, 255, 0.7);
+
+    /* User Bubble - Iconic Pink Accent */
+    --bg-user-bubble: #ff4081;
+    --color-user-bubble-text: #ffffff;
+    --border-user-bubble: #f50057;
+
+    /* Assistant Bubble - Removed Effect */
+    --bg-assistant-bubble: transparent;
+    --color-assistant-bubble-text: #2e3b42;
+    --border-assistant-bubble: transparent;
+
+    --shadow-main: 0 4px 20px rgba(57, 197, 187, 0.15);
+
+    /* Titlebar Isolation */
+    --color-title-text: #ffffff;
+    --color-title-text-bright: #ffffff;
+    --color-window-controls: #ffffff;
+    --bg-window-controls-hover: rgba(255, 255, 255, 0.1);
+
+    /* Tokens - Digital Lights */
+    --token-keyword: #39c5bb;
+    --token-control: #e91e63;
+    --token-type: #2196f3;
+    --token-fn: #4ddad0;
+    --token-string: #e91e63;
+    --token-number: #ffffff;
+    --token-comment: #a5b1b7;
+    --token-var: #39c5bb;
+    --token-operator: #ffffff;
+}

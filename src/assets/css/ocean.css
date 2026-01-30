@@ -1,0 +1,36 @@
+/* 🌊 Ocean (深邃海洋) */
+[data-theme='ocean'] {
+    --bg-main: #0f172a;
+    --bg-sidebar: #0f172a;
+    --bg-titlebar: #0f172a;
+    --bg-chat-island: #020617;
+    --bg-input: #0f172a;
+    --bg-input-focus: #0f172a;
+    --bg-input-dim: #020617;
+    --bg-card: #0f172a;
+    --border-card: #1e293b;
+    --bg-code: #0F172A;
+    --bg-code-header: #1E293B;
+    --text-color: #94A3B8;
+    --text-color-white: #F1F5F9;
+    --color-primary: #38BDF8;
+    --color-primary-bg: rgba(56, 189, 248, 0.1);
+    --border-glass: rgba(255, 255, 255, 0.05);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+
+    /* Tokens - Deep Sea */
+    --token-keyword: #38bdf8;
+    --token-control: #f472b6;
+    --token-type: #fbbf24;
+    --token-fn: #38bdf8;
+    --token-string: #4ade80;
+    --token-number: #f472b6;
+    --token-comment: #64748b;
+    --token-var: #f1f5f9;
+    --token-operator: #94a3b8;
+
+    /* Ocean User Bubble */
+    --bg-user-bubble: #38BDF8;
+    /* Sky Blue */
+    --color-user-bubble-text: #0F172A;
+}

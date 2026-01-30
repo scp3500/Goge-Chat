@@ -1,0 +1,77 @@
+/* 🤖 Evangelion Unit-01 (初号机) */
+[data-theme='eva-01'] {
+    /* Main Backgrounds: Deep Dark Purple/Grey with Glass */
+    --bg-main: rgba(25, 20, 33, 0.9);
+    --bg-sidebar: rgba(25, 20, 33, 0.95);
+    --bg-titlebar: rgba(25, 20, 33, 0.95);
+    --bg-chat-island: rgba(18, 14, 26, 0.7);
+
+    --bg-input: rgba(25, 20, 33, 0.85);
+    --bg-input-focus: rgba(25, 20, 33, 0.95);
+    --bg-input-dim: rgba(18, 14, 26, 0.75);
+    --bg-card: rgba(18, 14, 26, 0.8);
+    --border-card: #281e36;
+
+    /* Code Blocks */
+    --bg-code: #0e0b13;
+    --bg-code-header: #281e36;
+
+    /* Text */
+    --text-color: #cbb4db;
+    /* Light purple-grey text */
+    --text-color-white: #e9d5f7;
+    /* Very light purple */
+
+    /* Primary Colors: Neon Green & Purple */
+    --color-primary: #5eff5e;
+    /* Fluorescent Green */
+    --color-primary-bg: rgba(94, 255, 94, 0.15);
+    --color-primary-border: rgba(94, 255, 94, 0.4);
+
+    --border-glass: rgba(144, 19, 254, 0.4);
+    /* Purple border */
+    --bg-glass: rgba(144, 19, 254, 0.08);
+    /* Purple tint */
+    --bg-glass-active: rgba(144, 19, 254, 0.2);
+
+    /* Premium Glass Dropdowns */
+    --bg-menu: rgba(25, 20, 33, 0.9);
+    --bg-dropdown: rgba(25, 20, 33, 0.95);
+    --border-dropdown: rgba(144, 19, 254, 0.3);
+    --border-menu: rgba(144, 19, 254, 0.2);
+    --bg-menu-active: rgba(94, 255, 94, 0.15);
+    --color-menu-active: #5eff5e;
+
+    /* User Bubble (Orange/Green accents) */
+    --bg-user-bubble: #5eff5e;
+    /* Green bubble */
+    --color-user-bubble-text: #000000;
+    /* Black text on neon green */
+
+    /* Accents (Orange for alerts/warnings) */
+    --color-warning: #ff8c00;
+
+    /* Tokens - Neon Eva Palette */
+    --token-keyword: #bc3fff;
+    /* Bright Purple */
+    --token-control: #9013fe;
+    /* Deep Purple */
+    --token-type: #5eff5e;
+    /* Neon Green */
+    --token-fn: #ffbc00;
+    /* Caution Yellow/Orange */
+    --token-string: #ff8c00;
+    /* Warning Orange */
+    --token-number: #00ffef;
+    /* LCL Blue */
+    --token-comment: #4a344d;
+    /* Muted Purple */
+    --token-var: #bc3fff;
+    --token-operator: #5eff5e;
+
+    /* Special Glows */
+    --shadow-main: 0 0 20px rgba(112, 0, 255, 0.15);
+    /* Purple glow */
+    --input-shadow: 0 0 10px rgba(94, 255, 94, 0.1);
+    /* Green glow */
+}

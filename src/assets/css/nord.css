@@ -1,0 +1,38 @@
+/* ❄️ Nord Theme (北欧冰雪) */
+[data-theme='nord'] {
+    --bg-main: #2E3440;
+    --bg-sidebar: #2E3440;
+    --bg-titlebar: #2E3440;
+    --bg-chat-island: #242933;
+    /* Darker Polar Night */
+
+    --bg-input: #2E3440;
+    --bg-input-focus: #2E3440;
+    --bg-input-dim: #242933;
+    --bg-card: #2E3440;
+    --border-card: #3B4252;
+    --bg-code: #2E3440;
+    --bg-code-header: #3B4252;
+    --text-color: #D8DEE9;
+    --text-color-white: #ECEFF4;
+    --color-primary: #88C0D0;
+    --color-primary-bg: rgba(136, 192, 208, 0.1);
+    --border-glass: rgba(255, 255, 255, 0.05);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+
+    /* Tokens - Nord Palette */
+    --token-keyword: #81a1c1;
+    --token-control: #b48ead;
+    --token-type: #8fbcbb;
+    --token-fn: #88c0d0;
+    --token-string: #a3be8c;
+    --token-number: #b48ead;
+    --token-comment: #4c566a;
+    --token-var: #d8dee9;
+    --token-operator: #81a1c1;
+
+    /* Nord User Bubble */
+    --bg-user-bubble: #5E81AC;
+    /* Nord10 (Blue) */
+    --color-user-bubble-text: #ECEFF4;
+}

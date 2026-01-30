@@ -387,7 +387,7 @@ onMounted(() => {
   cursor: pointer;
   border: none;
   background: transparent;
-  color: var(--text-color-white);
+  color: var(--color-input-icon);
   transition: all 0.2s ease;
   padding: 0;           /* 强烈清除所有默认内边距 */
   margin: 0;
@@ -561,16 +561,20 @@ onMounted(() => {
   margin: 0 auto; /* 配合 width: 92% 实现完美居中 */
   width: 92%;
   width: 92%;
-  background: var(--bg-menu);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: linear-gradient(0deg, var(--bg-menu) 0%, rgba(20, 20, 25, 0.4) 100%);
+  backdrop-filter: blur(1000px) saturate(250%) brightness(1.1); /* Extreme blur for "Frosted" feel */
+  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
   border: 1px solid var(--border-menu);
   border-bottom: none;
-  border-radius: 20px 20px 0 0;
-  box-shadow: var(--shadow-main);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 
+    0 -30px 60px -10px rgba(0, 0, 0, 0.8),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
   z-index: 1000;
-  overflow: hidden;
-  padding: 6px;
+  overflow-y: auto;
+  max-height: 50vh;
+  padding: 8px;
+  background-clip: padding-box;
 }
 
 .menu-list {
@@ -594,16 +598,16 @@ onMounted(() => {
 }
 
 .menu-item.active {
-  background: var(--color-success-bg);
-  border: 1px solid var(--color-success-border);
+  background: var(--bg-menu-active);
+  border: 1px solid var(--color-primary-border);
 }
 
 .menu-item.active .provider-name {
-  color: var(--color-success);
+  color: var(--color-menu-active);
 }
 
 .menu-item.active .free-badge {
-  color: var(--color-success);
+  color: var(--color-menu-active);
   opacity: 0.5;
 }
 
@@ -702,7 +706,7 @@ onMounted(() => {
 }
 
 .preset-dropdown .new-preset {
-  color: var(--color-success);
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -713,7 +717,7 @@ onMounted(() => {
 }
 
 .check-icon {
-  color: var(--color-success);
+  color: var(--color-menu-active);
   font-weight: bold;
 }
 </style>

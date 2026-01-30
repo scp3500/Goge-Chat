@@ -1,0 +1,84 @@
+/* 🌃 Cyberpunk Edgerunners (夜之城) */
+[data-theme='cyberpunk'] {
+    /* Night City Dark Blue/Black with Glass */
+    --bg-main: rgba(11, 12, 21, 0.9);
+    --bg-sidebar: rgba(11, 12, 21, 0.95);
+    --bg-titlebar: rgba(11, 12, 21, 0.95);
+    --bg-chat-island: rgba(5, 5, 8, 0.7);
+    /* Deeper black */
+
+    --bg-input: rgba(11, 12, 21, 0.85);
+    --bg-input-focus: rgba(11, 12, 21, 0.95);
+    --bg-input-dim: rgba(5, 5, 8, 0.7);
+    --bg-card: rgba(5, 5, 8, 0.8);
+    --border-card: #181a29;
+
+    --bg-code: #000000;
+    --bg-code-header: #181a29;
+
+    --text-color: #fcee0a;
+    /* Cyber Yellow - Sidebar/Main Text */
+    --text-color-white: #ffffff;
+    --text-secondary: #00f3ff;
+    /* Holographic Cyan for secondary text */
+    --text-tertiary: rgba(0, 243, 255, 0.6);
+    --color-sidebar-text-hover: #fcee0a;
+    /* Force Yellow on Hover */
+    --color-header-icon: #00f3ff;
+    /* Cyan Header Icons */
+    --color-assistant-name: #00f3ff;
+    /* Cyan Assistant Name */
+
+    /* Signiture Yellow */
+    --color-primary: #fcee0a;
+    --color-primary-bg: rgba(252, 238, 10, 0.15);
+    --color-primary-light: #fff655;
+
+    --border-glass: rgba(252, 238, 10, 0.5);
+    /* Strong Yellow borders */
+    --bg-glass: rgba(0, 243, 255, 0.05);
+    /* Cyan tint base */
+    --bg-glass-hover: rgba(0, 243, 255, 0.1);
+    /* Hover: Lighter, more transparent */
+    --bg-glass-active: rgba(0, 243, 255, 0.15);
+    /* Active: Bright but transparent Cyan */
+
+    /* Premium Glass Dropdowns */
+    --bg-menu: rgba(11, 12, 21, 0.9);
+    --bg-dropdown: rgba(11, 12, 21, 0.95);
+    --border-dropdown: rgba(252, 238, 10, 0.3);
+    --border-menu: rgba(252, 238, 10, 0.25);
+    --bg-menu-active: rgba(252, 238, 10, 0.15);
+    --color-menu-active: #fcee0a;
+
+    /* User Bubble - David's Jacket / Neon */
+    --bg-user-bubble: #fcee0a;
+    --color-user-bubble-text: #000000;
+
+    /* Accents & Tokens - Glitch/Neon */
+    --color-danger: #ff003c;
+    /* UI Red */
+    --token-keyword: #ff007f;
+    /* Neon Pink */
+    --token-control: #ff003c;
+    --token-type: #00f3ff;
+    /* Cyan */
+    --token-fn: #fcee0a;
+    /* Yellow */
+    --token-string: #fcee0a;
+    --token-number: #ffffff;
+    --token-comment: #32333b;
+    --token-var: #00f3ff;
+    --token-operator: #ffffff;
+
+    /* Glitchy Shadows */
+    --shadow-main: 2px 2px 0px rgba(0, 243, 255, 0.3), -2px -2px 0px rgba(255, 0, 60, 0.3);
+
+    /* Mutli-Colored Action Buttons -> Unified Holographic Cyan */
+    --btn-refresh-color: #00f3ff;
+    --btn-refresh-color-hover: #a0ffff;
+    --btn-copy-color: #00f3ff;
+    --btn-copy-color-hover: #a0ffff;
+    --btn-more-color: #00f3ff;
+    --btn-more-color-hover: #a0ffff;
+}

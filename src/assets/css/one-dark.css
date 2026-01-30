@@ -1,0 +1,36 @@
+/* 🌑 One Dark (Atom 经典) */
+[data-theme='one-dark'] {
+    --bg-main: #21252b;
+    --bg-sidebar: #21252b;
+    --bg-titlebar: #21252b;
+    --bg-chat-island: #181a1f;
+    --bg-input: #21252b;
+    --bg-input-focus: #21252b;
+    --bg-input-dim: #181a1f;
+    --bg-card: #21252b;
+    --border-card: #181a1f;
+    --bg-code: #1B1D23;
+    --bg-code-header: #21252B;
+    --text-color: #ABB2BF;
+    --text-color-white: #D7DAE0;
+    --color-primary: #61AFEF;
+    --color-primary-bg: rgba(97, 175, 239, 0.1);
+    --border-glass: rgba(255, 255, 255, 0.05);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+
+    /* Tokens - One Dark */
+    --token-keyword: #c678dd;
+    --token-control: #c678dd;
+    --token-type: #e5c07b;
+    --token-fn: #61afef;
+    --token-string: #98c379;
+    --token-number: #d19a66;
+    --token-comment: #5c6370;
+    --token-var: #e06c75;
+    --token-operator: #56b6c2;
+
+    /* One Dark User Bubble */
+    --bg-user-bubble: #61AFEF;
+    /* Blue */
+    --color-user-bubble-text: #FFFFFF;
+}

@@ -71,8 +71,8 @@ const handleRename = () => {
   color: var(--text-color);
 }
 
-.history-item:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
-.history-item.active { background: var(--bg-glass-active); color: var(--accent-white); }
+.history-item:hover { background: var(--bg-glass-hover); color: var(--color-sidebar-text-hover); }
+.history-item.active { background: var(--bg-glass-active); color: var(--color-primary); }
 
 .history-item.collapsed {
   margin: 2px 0;
@@ -91,7 +91,7 @@ const handleRename = () => {
   left: 0;
   width: 3px;
   height: 14px;
-  background: var(--accent-white);
+  background: var(--color-primary);
   border-radius: 0 4px 4px 0;
   opacity: 0;
   transform: scaleY(0.5);

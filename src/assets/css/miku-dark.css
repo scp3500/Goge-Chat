@@ -1,0 +1,54 @@
+/* 🎤 Midnight Diva (初音未来 - 深夜版) - Dark Cyber Teal */
+[data-theme='miku-dark'] {
+    --bg-main: #142b2b;
+    /* Deep Unified Teal */
+    --bg-sidebar: #142b2b;
+    --bg-titlebar: #142b2b;
+    --bg-chat-island: #0a1111;
+
+    --bg-input: #142b2b;
+    --bg-input-focus: #1a3a3a;
+    --bg-input-dim: #0a1111;
+    --bg-card: #142b2b;
+    --border-card: #1d4444;
+
+    --bg-code: #080c0d;
+    --bg-code-header: #1d3136;
+
+    --text-color: #cfd8dc;
+    --text-color-white: #ffffff;
+
+    /* Iconic Miku Palette */
+    --color-primary: #39c5bb;
+    --color-primary-bg: rgba(57, 197, 187, 0.2);
+    --color-primary-light: #4ddad0;
+
+    --border-glass: rgba(57, 197, 187, 0.35);
+    --bg-glass: rgba(12, 18, 20, 0.8);
+
+    /* User Bubble - Concert Gloom & Glow */
+    --bg-user-bubble: #1a262b;
+    /* Dark Petrol-Teal */
+    --color-user-bubble-text: #39c5bb;
+
+    /* Assistant Bubble - Removed Effect */
+    --bg-assistant-bubble: transparent;
+    --color-assistant-bubble-text: #cfd8dc;
+    --border-assistant-bubble: transparent;
+
+    --border-color: #1d3136;
+    --shadow-main: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 10px rgba(57, 197, 187, 0.05);
+
+    /* Tokens - Digital Glow */
+    --token-keyword: #39c5bb;
+    --token-control: #e91e63;
+    /* Ribbon Pink */
+    --token-type: #4ddad0;
+    --token-fn: #39c5bb;
+    --token-string: #ff4081;
+    /* Accent Pink */
+    --token-number: #ffffff;
+    --token-comment: #546e7a;
+    --token-var: #4ddad0;
+    --token-operator: #ffffff;
+}

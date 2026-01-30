@@ -53,8 +53,8 @@ defineEmits(['update:activeCategory']);
 <style scoped>
 .nav-sidebar { width: 180px; background: var(--bg-sidebar); padding: 12px 8px; border-right: none; }
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; cursor: pointer; margin-bottom: 2px; color: var(--text-color); opacity: 0.7; font-size: 14px; transition: all 0.2s; }
-.nav-item.active { background: var(--bg-glass-active); color: var(--text-color-white); opacity: 1; }
-.nav-item:hover:not(.active) { background: var(--bg-glass-hover); color: var(--text-color-white); opacity: 0.9; }
+.nav-item.active { background: var(--bg-glass-active); color: var(--color-menu-active); opacity: 1; }
+.nav-item:hover:not(.active) { background: var(--bg-glass-hover); color: var(--color-sidebar-text-hover); opacity: 0.9; }
 .icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; opacity: 0.7; }
 .nav-item.active .icon { opacity: 1; }
 .icon :deep(svg) { width: 100%; height: 100%; }

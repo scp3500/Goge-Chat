@@ -1,0 +1,44 @@
+/* 🤠 Red Dead (荒野大镖客) - Western Sunset Dark */
+[data-theme='rdr2'] {
+    --bg-main: #1a1512;
+    --bg-sidebar: #1a1512;
+    --bg-titlebar: #1a1512;
+    --bg-chat-island: #0f0b09;
+
+    --bg-input: #1a1512;
+    --bg-input-focus: #1a1512;
+    --bg-input-dim: #0f0b09;
+    --bg-card: #1a1512;
+    --border-card: #2d241f;
+
+    --bg-code: #0f0b09;
+    --bg-code-header: #2d241f;
+
+    --text-color: #d2b48c;
+    /* Tan/Leather */
+    --text-color-white: #f5deb3;
+
+    --color-primary: #e62222;
+    /* Rockstar Red */
+    --color-primary-bg: rgba(230, 34, 34, 0.1);
+
+    --border-glass: rgba(210, 180, 140, 0.2);
+    --bg-glass: rgba(26, 21, 18, 0.6);
+
+    --bg-user-bubble: #e62222;
+    --color-user-bubble-text: #ffffff;
+
+    --shadow-main: 0 4px 20px rgba(0, 0, 0, 0.5);
+
+    /* Tokens - Dusty Western */
+    --token-keyword: #e62222;
+    --token-control: #ff4d4d;
+    --token-type: #d2b48c;
+    --token-fn: #ffa500;
+    --token-string: #c0c0c0;
+    /* Silver */
+    --token-number: #ffa500;
+    --token-comment: #5c4033;
+    --token-var: #d2b48c;
+    --token-operator: #ffffff;
+}

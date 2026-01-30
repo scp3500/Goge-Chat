@@ -140,6 +140,10 @@ html, body, #app {
   
   /* 🩺 增加视觉稳定性补丁 */
   user-select: none;
+  
+  /* 🧊 全局毛玻璃层：让窗口背后带一点透感 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .app-layout.is-maximized { 

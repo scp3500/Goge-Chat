@@ -91,6 +91,9 @@ const toggleSidebar = () => {
   border-right: none;
   /* ---------------------------------- */
 
+  /* Local overrides for dark/vibrant sidebar frames */
+
+
   /* 🛡️ 核心：切掉所有溢出内容 */
   overflow: hidden; 
   box-sizing: border-box; 

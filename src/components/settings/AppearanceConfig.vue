@@ -28,8 +28,32 @@ const designStyles = [
   
   // Light Themes
   { id: 'light', name: '亮洁模式', bg: '#FFFFFF', mode: 'light', defaultFor: 'light' },
+  { id: 'wechat', name: '微信经典 (WeChat)', bg: '#f3f3f3', mode: 'light' },
   { id: 'solarized-light', name: '象牙白 (Solarized)', bg: '#FDF6E3', mode: 'light' },
-  { id: 'sakura', name: '樱花粉 (Sakura)', bg: '#FFF5F7', mode: 'light' }
+  { id: 'sakura', name: '樱花粉 (Sakura)', bg: '#FFF5F7', mode: 'light' },
+  { id: 'frieren', name: '芙莉莲 (Frieren)', bg: '#f9fbfd', mode: 'light' },
+  { id: 'twilight', name: '黄昏 (Twilight)', bg: '#fffdfc', mode: 'light' },
+  { id: 'ghibli', name: '吉卜力 (Ghibli)', bg: '#fcfaf2', mode: 'light' },
+  { id: 'violet', name: '薇尔莉特 (Violet)', bg: '#fdfdfb', mode: 'light' },
+  { id: 'miku', name: '初音未来 (Miku)', bg: '#f5fafd', mode: 'light' },
+  { id: 'clannad', name: '大团子 (Clannad)', bg: '#f0f7ff', mode: 'light' },
+  { id: 'wa2', name: '冬马和纱 (WA2)', bg: '#f5f8fa', mode: 'light' },
+
+  // Dark/Gaming Themes
+  { id: 'eva-01', name: '初号机 (Eva-01)', bg: '#191421', mode: 'dark' },
+  { id: 'cyberpunk', name: '夜之城 (Cyberpunk)', bg: '#0b0c15', mode: 'dark' },
+  { id: 'terraria', name: '泰拉瑞亚 (Terraria)', bg: '#2d1e12', mode: 'dark' },
+  { id: 'rdr2', name: '大镖客2 (RDR2)', bg: '#1a1512', mode: 'dark' },
+  { id: 'sts-ironclad', name: '铁甲战士 (StS)', bg: '#1a0a0a', mode: 'dark' },
+  { id: 'sts-silent', name: '静默猎手 (StS)', bg: '#0d1a0d', mode: 'dark' },
+  { id: 'sts-defect', name: '故障机器 (StS)', bg: '#0a0d1a', mode: 'dark' },
+  { id: 'sts-watcher', name: '观者 (StS)', bg: '#1a0a1a', mode: 'dark' },
+  { id: 'hollow-knight', name: '空洞骑士 (Hallownest)', bg: '#0c0f12', mode: 'dark' },
+  { id: 'wukong', name: '天命人 (Wukong)', bg: '#0f0d0b', mode: 'dark' },
+  { id: 'steins-gate', name: '凤凰院凶真 (S;G)', bg: '#1c1c1c', mode: 'dark' },
+  { id: 'fate', name: '圣杯战争 (Fate)', bg: '#0d1117', mode: 'dark' },
+  { id: 'danganronpa', name: '希望与绝望 (Danganronpa)', bg: '#000000', mode: 'dark' },
+  { id: 'miku-dark', name: '深夜未来 (Miku Dark)', bg: '#0a1a1a', mode: 'dark' }
 ];
 
 const applyThemePreset = (styleId) => {
@@ -152,7 +176,7 @@ const filteredStyles = computed(() => {
 .config-group { margin-bottom: 24px; }
 .group-header { margin-bottom: 12px; }
 .group-header label { display: block; font-size: 13px; color: var(--text-secondary); opacity: 0.7; }
-.settings-card { background: var(--bg-glass); border-radius: 12px; padding: 20px; border: 1px solid var(--border-glass); }
+.settings-card { background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border-card); }
 .control-item { margin-bottom: 24px; }
 .control-item label { display: block; font-size: 13px; color: var(--text-color); opacity: 0.7; margin-bottom: 12px; }
 
@@ -195,7 +219,7 @@ const filteredStyles = computed(() => {
     background: var(--bg-input-dim);
     padding: 10px;
     border-radius: 10px;
-    border: 1px solid var(--border-glass);
+    border: 1px solid var(--border-card);
     cursor: pointer;
     display: flex;
     flex-direction: column;

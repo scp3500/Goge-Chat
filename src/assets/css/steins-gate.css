@@ -1,0 +1,34 @@
+/* 🔬 Steins;Gate (命运石之门) - Lab Member 001 */
+[data-theme='steins-gate'] {
+    --bg-main: #1c1c1c;
+    --bg-sidebar: #1c1c1c;
+    --bg-titlebar: #1c1c1c;
+    --bg-chat-island: #121212;
+    /* Deeper */
+
+    --bg-input: #1c1c1c;
+    --bg-input-focus: #1c1c1c;
+    --bg-input-dim: #121212;
+    --bg-card: #1c1c1c;
+    --border-card: #333333;
+
+    --text-color: #ffa500;
+    /* Divergence Meter Amber */
+    --text-color-white: #00ff00;
+    /* Nixie Tube Green */
+
+    --color-primary: #ffa500;
+    --color-primary-bg: rgba(255, 165, 0, 0.1);
+
+    --bg-user-bubble: #333333;
+    --color-user-bubble-text: #00ff00;
+
+    /* Tokens - CRT Debug */
+    --token-keyword: #ffa500;
+    --token-control: #ff4500;
+    --token-type: #00ff00;
+    --token-fn: #00ff00;
+    --token-string: #ffff00;
+    --token-number: #ffa500;
+    --token-comment: #444444;
+}

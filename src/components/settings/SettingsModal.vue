@@ -257,7 +257,7 @@ const handleClose = () => {
 
 <style scoped>
 .settings-layout { display: flex; width: 100%; height: 100%; background: var(--bg-sidebar); color: var(--text-color); overflow: hidden; }
-.detail-panel { flex: 1; background: var(--bg-main); overflow-y: auto; }
+.detail-panel { flex: 1; background: var(--bg-chat-island); overflow-y: auto; }
 .detail-container { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
 .detail-header h2 { font-size: 20px; font-weight: 600; color: var(--text-color-white); margin: 0; }

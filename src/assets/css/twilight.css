@@ -1,0 +1,52 @@
+/* 🌅 Twilight Horizon (君の名は / Your Name) - Light Warm */
+[data-theme='twilight'] {
+    --bg-main: #fffdfc;
+    --bg-sidebar: #fffdfc;
+    --bg-titlebar: #fffdfc;
+    --bg-chat-island: #fff5f2;
+    /* Deeper/Warmer */
+
+    --bg-input: #fffdfc;
+    --bg-input-focus: #fffdfc;
+    --bg-input-dim: #fff5f2;
+    --bg-card: #ffffff;
+    --border-card: #fcece8;
+
+    --bg-code: #fdf6f2;
+    --bg-code-header: #fee9e0;
+
+    --text-color: #6d5b6b;
+    /* Muted Purple Grey */
+    --text-color-white: #4a3447;
+    /* Darker Purple */
+
+    /* Sunset Palette */
+    --color-primary: #ff8e72;
+    /* Salmon Pink */
+    --color-primary-bg: rgba(255, 142, 114, 0.1);
+    --color-primary-light: #ffa48f;
+
+    --border-glass: rgba(144, 106, 175, 0.2);
+    /* Soft Purple */
+    --bg-glass: rgba(255, 255, 255, 0.7);
+
+    /* User Bubble - Twilight Glow */
+    --bg-user-bubble: #ffbd9a;
+    --color-user-bubble-text: #4a3447;
+
+    --border-color: #fcece8;
+    --shadow-main: 0 4px 25px rgba(255, 142, 114, 0.12);
+
+    /* Tokens - Starry Evening */
+    --token-keyword: #8c76ad;
+    /* Purple */
+    --token-control: #b08bbd;
+    --token-type: #64b4c7;
+    --token-fn: #ffa48f;
+    --token-string: #ff8e72;
+    /* Sunset Orange */
+    --token-number: #ffbd9a;
+    --token-comment: #c3b2c1;
+    --token-var: #6d5b6b;
+    --token-operator: #4a3447;
+}

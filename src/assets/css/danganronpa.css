@@ -1,0 +1,30 @@
+/* 📺 Hope & Despair (Danganronpa) - Psycho-Pop Black */
+[data-theme='danganronpa'] {
+    --bg-main: #000000;
+    --bg-sidebar: #000000;
+    --bg-titlebar: #000000;
+    --bg-chat-island: #000000;
+    /* Already pure black */
+
+    --bg-input: #000000;
+    --bg-input-focus: #000000;
+    --bg-input-dim: #111111;
+    --bg-card: #000000;
+    --border-card: #333333;
+    --text-color-white: #ff00ff;
+    /* Neon Pink Blood */
+
+    --color-primary: #ff00ff;
+    --color-primary-bg: rgba(255, 0, 255, 0.1);
+
+    --bg-user-bubble: #ffffff;
+    --color-user-bubble-text: #000000;
+
+    /* Tokens - Despair Debug */
+    --token-keyword: #ff00ff;
+    --token-control: #ffffff;
+    --token-type: #00ff00;
+    --token-fn: #ff00ff;
+    --token-string: #00ffff;
+    --token-number: #ffffff;
+}

@@ -1,0 +1,52 @@
+/* ✉️ Letter in Ivory (紫罗兰永恒花园 / Violet Evergarden) - Elegant */
+[data-theme='violet'] {
+    --bg-main: #fdfdfb;
+    /* Ivory Silk */
+    --bg-sidebar: #fdfdfb;
+    --bg-titlebar: #fdfdfb;
+    --bg-chat-island: #f7f7f2;
+    /* Deeper */
+
+    --bg-input: #fdfdfb;
+    --bg-input-focus: #fdfdfb;
+    --bg-input-dim: #f7f7f2;
+    --bg-card: #ffffff;
+    --border-card: #e8e8df;
+
+    --bg-code: #f7f7f2;
+    --bg-code-header: #eeeede;
+
+    --text-color: #444b5a;
+    /* Navy Slate */
+    --text-color-white: #1a1e26;
+    /* Deep Navy */
+
+    /* Classy Palette */
+    --color-primary: #1e3a5f;
+    /* Leiden Navy */
+    --color-primary-bg: rgba(30, 58, 95, 0.1);
+    --color-primary-light: #2c5282;
+
+    --border-glass: rgba(30, 58, 95, 0.15);
+    --bg-glass: rgba(255, 255, 255, 0.6);
+
+    /* User Bubble - Emerald Brooch */
+    --bg-user-bubble: #2d5a27;
+    /* Emerald Green */
+    --color-user-bubble-text: #ffffff;
+
+    --border-color: #e8e8df;
+    --shadow-main: 0 4px 30px rgba(30, 58, 95, 0.08);
+
+    /* Tokens - Royal Tint */
+    --token-keyword: #1e3a5f;
+    --token-control: #4a6fa5;
+    --token-type: #2d5a27;
+    --token-fn: #1e3a5f;
+    --token-string: #8b6d43;
+    /* Antique Gold */
+    --token-number: #bfa15f;
+    --token-comment: #a5a9b3;
+    --token-var: #444b5a;
+    --token-operator: #1a1e26;
+}

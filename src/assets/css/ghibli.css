@@ -1,0 +1,54 @@
+/* 🍃 Forest Spirit (龙猫 / Totoro / Ghibli) - Light Nature */
+[data-theme='ghibli'] {
+    --bg-main: #fcfaf2;
+    /* Aged Paper / Cream */
+    --bg-sidebar: #fcfaf2;
+    --bg-titlebar: #fcfaf2;
+    --bg-chat-island: #f4f2e9;
+    /* Deeper */
+
+    --bg-input: #fcfaf2;
+    --bg-input-focus: #fcfaf2;
+    --bg-input-dim: #f4f2e9;
+    --bg-card: #ffffff;
+    --border-card: #ece9d8;
+
+    --bg-code: #f4f2e9;
+    --bg-code-header: #e9e4d1;
+
+    --text-color: #5c5c4d;
+    /* Earthy Brownish Grey */
+    --text-color-white: #2d2d24;
+    /* Near Black */
+
+    /* Forest Palette */
+    --color-primary: #78866b;
+    /* Sage / Moss Green */
+    --color-primary-bg: rgba(120, 134, 107, 0.1);
+    --color-primary-light: #8fa17f;
+
+    --border-glass: rgba(120, 134, 107, 0.2);
+    --bg-glass: rgba(255, 255, 255, 0.6);
+
+    /* User Bubble - Organic Feel */
+    --bg-user-bubble: #d6e0cc;
+    /* Pale Moss */
+    --color-user-bubble-text: #2d2d24;
+
+    --border-color: #ece9d8;
+    --shadow-main: 0 4px 20px rgba(120, 134, 107, 0.1);
+
+    /* Tokens - Natural Tones */
+    --token-keyword: #8b5e3c;
+    /* Tree Bark */
+    --token-control: #5c5c4d;
+    --token-type: #78866b;
+    /* Moss */
+    --token-fn: #a67c52;
+    /* Clay */
+    --token-string: #78866b;
+    --token-number: #8b5e3c;
+    --token-comment: #c2c0b4;
+    --token-var: #5c5c4d;
+    --token-operator: #8b5e3c;
+}

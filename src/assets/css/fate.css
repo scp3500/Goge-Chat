@@ -1,0 +1,33 @@
+/* ⚔️ Unlimited Codes (Fate/stay night) - Holy Grail War */
+[data-theme='fate'] {
+    --bg-main: #0d1117;
+    --bg-sidebar: #0d1117;
+    --bg-titlebar: #0d1117;
+    --bg-chat-island: #010409;
+    /* Deeper black/blue (Recessed) */
+
+    --bg-input: #0d1117;
+    --bg-input-focus: #0d1117;
+    --bg-input-dim: #010409;
+    --bg-card: #0d1117;
+    --border-card: #30363d;
+
+    --text-color: #8b949e;
+    --text-color-white: #ffffff;
+
+    --color-primary: #1f6feb;
+    /* Mana Blue */
+    --color-primary-bg: rgba(31, 111, 235, 0.1);
+
+    --bg-user-bubble: #eb1f1f;
+    /* Command Seal Red */
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens - Mystic Code */
+    --token-keyword: #58a6ff;
+    --token-control: #bc8cff;
+    --token-type: #ffa657;
+    --token-fn: #79c0ff;
+    --token-string: #a5d6ff;
+    --token-number: #ffffff;
+}

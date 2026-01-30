@@ -1,0 +1,35 @@
+
+/* 🛡️ Ironclad (铁甲战士) - Blood & Iron */
+[data-theme='sts-ironclad'] {
+    --bg-main: #1a0a0a;
+    --bg-sidebar: #1a0a0a;
+    --bg-titlebar: #1a0a0a;
+    --bg-chat-island: #120606;
+    /* Deeper blood */
+
+    --bg-input: #1a0a0a;
+    --bg-input-focus: #1a0a0a;
+    --bg-input-dim: #120606;
+    --bg-card: #1a0a0a;
+    --border-card: #3d1a1a;
+    /* Burnished Gold */
+    --text-color: #d4af37;
+    /* Blood Red */
+
+    --color-primary: #b01c1c;
+    --color-primary-bg: rgba(176, 28, 28, 0.1);
+
+    --bg-user-bubble: #b01c1c;
+    --color-user-bubble-text: #ffffff;
+
+    /* Tokens */
+    --token-keyword: #b01c1c;
+    --token-control: #d4af37;
+    --token-type: #ffffff;
+    --token-fn: #ff4d4d;
+    --token-string: #d4af37;
+    --token-number: #ffffff;
+    --token-comment: #3d3d3d;
+    --token-var: #ff4d4d;
+    --token-operator: #ffffff;
+}

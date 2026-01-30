@@ -1,0 +1,36 @@
+/* 🍬 Catppuccin (莫卡粉) */
+[data-theme='catppuccin'] {
+    --bg-main: #1e1e2e;
+    --bg-sidebar: #1e1e2e;
+    --bg-titlebar: #1e1e2e;
+    --bg-chat-island: #11111b;
+    --bg-input: #1e1e2e;
+    --bg-input-focus: #1e1e2e;
+    --bg-input-dim: #11111b;
+    --bg-card: #1e1e2e;
+    --border-card: #313244;
+    --bg-code: #181825;
+    --bg-code-header: #313244;
+    --text-color: #CDD6F4;
+    --text-color-white: #F5E0DC;
+    --color-primary: #CBA6F7;
+    --color-primary-bg: rgba(203, 166, 247, 0.1);
+    --border-glass: rgba(255, 255, 255, 0.05);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+
+    /* Tokens - Catppuccin Mocha */
+    --token-keyword: #cba6f7;
+    --token-control: #f5c2e7;
+    --token-type: #f9e2af;
+    --token-fn: #89b4fa;
+    --token-string: #a6e3a1;
+    --token-number: #fab387;
+    --token-comment: #6c7086;
+    --token-var: #cdd6f4;
+    --token-operator: #89dceb;
+
+    /* Catppuccin User Bubble */
+    --bg-user-bubble: #CBA6F7;
+    /* Mauve */
+    --color-user-bubble-text: #1E1E2E;
+}

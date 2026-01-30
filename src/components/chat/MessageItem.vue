@@ -55,6 +55,18 @@ const displayModelName = computed(() => {
     return "Gemini";
 });
 
+// 💡 获取显示的服务商名称
+const displayProviderName = computed(() => {
+    const modelId = props.m.model;
+    if (modelId) {
+        const provider = configStore.settings.providers.find(p => p.models.includes(modelId));
+        if (provider) {
+            return provider.name;
+        }
+    }
+    return "Google";
+});
+
 // 💡 展开/折叠推理过程
 const isReasoningExpanded = ref(false);
 const toggleReasoning = () => {
@@ -263,6 +275,7 @@ const handleLinkClick = async (event) => {
         v-if="m.content !== '__LOADING__'"
         :icon="modelIcon"
         :model-name="displayModelName"
+        :provider-name="displayProviderName"
         :date="formattedDate"
       />
 

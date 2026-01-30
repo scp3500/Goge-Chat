@@ -100,8 +100,8 @@ const handleInput = (e) => {
 .icon-btn {
   background: transparent;
   border: none;
-  /* 🚩 使用纯白色调，极简风格 */
-  color: var(--text-color-white);
+  /* 🚩 使用主题头部图标颜色变量 */
+  color: var(--color-header-icon);
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
