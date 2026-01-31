@@ -16,9 +16,61 @@ export const useChatStore = defineStore('chat', () => {
     const historyList = ref<ChatSession[]>([]);
     const folders = ref<Folder[]>([]);
     const activeId = ref<string | null>(null);
+    const activeSocialContactId = ref<number | null>(null); // 👥 Social Mode Active Contact Persistence
     const currentMessages = ref<any[]>([]);
     const isGenerating = ref(false);
     const isLoading = ref(false);
+
+    // 📜 Scroll Position Persistence
+    const sessionScrollPositions = ref<Record<string, number>>({});
+
+    // Load initial scroll positions from localStorage
+    try {
+        const savedScroll = localStorage.getItem('session_scroll_positions');
+        if (savedScroll) {
+            sessionScrollPositions.value = JSON.parse(savedScroll);
+        }
+    } catch (e) {
+        console.error("Failed to load scroll positions:", e);
+    }
+
+    // Persist scroll positions on change
+    watch(sessionScrollPositions, (newVal) => {
+        localStorage.setItem('session_scroll_positions', JSON.stringify(newVal));
+    }, { deep: true });
+
+    const updateSessionScroll = (sessionId: string, position: number) => {
+        if (!sessionId) return;
+        sessionScrollPositions.value[sessionId] = position;
+    };
+
+    const getSessionScroll = (sessionId: string) => {
+        return sessionScrollPositions.value[sessionId] || 0;
+    };
+
+    // 👥 Load Social Contact Persistence
+    try {
+        const savedSocialId = localStorage.getItem('active_social_contact_id');
+        if (savedSocialId) {
+            activeSocialContactId.value = parseInt(savedSocialId, 10);
+            console.log("📍 [PERSISTENCE] Loaded active social contact:", activeSocialContactId.value);
+        }
+    } catch (e) {
+        console.error("Failed to load active social contact:", e);
+    }
+
+    // Persist social contact changes
+    watch(activeSocialContactId, (newId) => {
+        if (newId) {
+            localStorage.setItem('active_social_contact_id', newId.toString());
+        } else {
+            localStorage.removeItem('active_social_contact_id');
+        }
+    });
+
+    const updateSocialContactId = (id: number | null) => {
+        activeSocialContactId.value = id;
+    };
 
     // --- 暂停/恢复相关状态 ---
     const generatingSessionId = ref<string | null>(null);  // 记录正在生成消息的会话 ID
@@ -180,6 +232,8 @@ export const useChatStore = defineStore('chat', () => {
         isChatViewActive,
         isLoading,
         activeSession,
+        activeSocialContactId, // 👥 Exposed State
+        sessionScrollPositions, // 📜 Exposed State
 
         // Config proxy
         useReasoning,
@@ -189,14 +243,15 @@ export const useChatStore = defineStore('chat', () => {
         // Root Actions
         loadData,
         switchSession,
-
-        // Folder Actions
-        ...folderActions,
-
         // Session Actions
         ...sessionActions,
 
         // Message Actions
         ...messageActions,
+
+        // 📜 Exposed Action (Placed AFTER spread to ensure our local version takes precedence)
+        updateSessionScroll,
+        getSessionScroll,
+        updateSocialContactId, // 👥 Exposed Action
     };
 });

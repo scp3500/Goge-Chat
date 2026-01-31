@@ -1,5 +1,5 @@
 /* 💬 WeChat Classic (微信经典) - Authentic Mobile Experience */
-[data-theme='wechat'] {
+:root[data-theme='wechat'] {
     --bg-main: #f3f3f3;
     --bg-sidebar: #f3f3f3;
     --bg-titlebar: #2e2e2e;

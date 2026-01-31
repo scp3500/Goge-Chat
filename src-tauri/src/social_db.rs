@@ -70,21 +70,45 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
         ",
     )?;
 
-    // Schema Migrations
+    // Schema Migrations - contacts
     let mut stmt = conn.prepare("PRAGMA table_info(contacts)")?;
     let columns: Vec<String> = stmt
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>>>()?;
 
     if !columns.contains(&"prompt".to_string()) {
-        conn.execute("ALTER TABLE contacts ADD COLUMN prompt TEXT", [])?;
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN prompt TEXT", []);
     }
     if !columns.contains(&"model".to_string()) {
-        conn.execute("ALTER TABLE contacts ADD COLUMN model TEXT", [])?;
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN model TEXT", []);
+    }
+
+    // Schema Migrations - profiles
+    let mut stmt_prof = conn.prepare("PRAGMA table_info(profiles)")?;
+    let prof_columns: Vec<String> = stmt_prof
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>>>()?;
+
+    // If we have an old table without nickname, we might need to fix it.
+    // In SQLite, adding a NOT NULL column requires a default.
+    if !prof_columns.contains(&"nickname".to_string()) {
+        println!("🔧 Migrating profiles table: adding nickname");
+        // Try adding it with default
+        if let Err(e) = conn.execute(
+            "ALTER TABLE profiles ADD COLUMN nickname TEXT NOT NULL DEFAULT 'GoleUser'",
+            [],
+        ) {
+            println!(
+                "⚠️ Failed to add nickname column: {}. Recreating table recommended if dev.",
+                e
+            );
+        }
     }
 
     // Seed data if empty
-    let group_count: i64 = conn.query_row("SELECT COUNT(*) FROM groups", [], |r| r.get(0))?;
+    let group_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM groups", [], |r| r.get(0))
+        .unwrap_or(0);
     if group_count == 0 {
         conn.execute(
             "INSERT INTO groups (name, sort_order) VALUES ('我的好友', 1)",
@@ -96,7 +120,9 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
         )?;
     }
 
-    let profile_count: i64 = conn.query_row("SELECT COUNT(*) FROM profiles", [], |r| r.get(0))?;
+    let profile_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM profiles", [], |r| r.get(0))
+        .unwrap_or(0);
     if profile_count == 0 {
         conn.execute(
             "INSERT INTO profiles (nickname, bio) VALUES ('GoleUser', '探索沉浸式社交新体验')",
@@ -125,6 +151,21 @@ pub async fn get_social_profile(state: tauri::State<'_, SocialDbState>) -> Resul
         })
         .map_err(|e| e.to_string())?;
     Ok(profile)
+}
+
+#[tauri::command]
+pub async fn update_social_profile(
+    state: tauri::State<'_, SocialDbState>,
+    nickname: String,
+    avatar: Option<String>,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE profiles SET nickname = ?1, avatar = ?2 WHERE id = (SELECT id FROM profiles LIMIT 1)",
+        params![nickname, avatar],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -287,6 +328,47 @@ pub async fn save_social_message(
 }
 
 #[tauri::command]
+pub async fn delete_social_message(
+    state: tauri::State<'_, SocialDbState>,
+    id: i64,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM social_messages WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_social_messages_after(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    message_id: i64,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM social_messages WHERE contact_id = ?1 AND id >= ?2",
+        params![contact_id, message_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_social_message(
+    state: tauri::State<'_, SocialDbState>,
+    id: i64,
+    content: String,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE social_messages SET content = ?1 WHERE id = ?2",
+        params![content, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn set_social_setting(
     state: tauri::State<'_, SocialDbState>,
     key: String,
@@ -314,4 +396,57 @@ pub async fn get_social_setting(
         .optional()
         .map_err(|e| e.to_string())?;
     Ok(value)
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SocialConversation {
+    pub contact: Contact,
+    pub last_message: Option<String>,
+    pub last_message_time: Option<String>,
+    pub unread_count: i32,
+}
+
+#[tauri::command]
+pub async fn get_recent_social_chats(
+    state: tauri::State<'_, SocialDbState>,
+) -> Result<Vec<SocialConversation>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT c.id, c.name, c.avatar, c.group_id, c.status, c.prompt, c.model, 
+                    m.content, m.created_at
+             FROM contacts c
+             LEFT JOIN (
+                SELECT contact_id, content, created_at,
+                       ROW_NUMBER() OVER (PARTITION BY contact_id ORDER BY created_at DESC) as rn
+                FROM social_messages
+             ) m ON c.id = m.contact_id AND m.rn = 1
+             WHERE m.content IS NOT NULL
+             ORDER BY m.created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let chat_iter = stmt
+        .query_map([], |row| {
+            Ok(SocialConversation {
+                contact: Contact {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    avatar: row.get(2)?,
+                    group_id: row.get(3)?,
+                    status: row.get(4)?,
+                    prompt: row.get(5)?,
+                    model: row.get(6)?,
+                },
+                last_message: row.get(7)?,
+                last_message_time: row.get(8)?,
+                unread_count: 0, // Placeholder
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut chats = Vec::new();
+    for chat in chat_iter {
+        chats.push(chat.map_err(|e| e.to_string())?);
+    }
+    Ok(chats)
 }

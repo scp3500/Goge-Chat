@@ -1,6 +1,8 @@
-/* 🌖 浅色模式定义 (Light Mode) */
-[data-theme='light'] {
+/* Ensure this applies to ANY light mode scenario */
+:root.light-mode {
     --bg-main: #FFFFFF;
+
+
     --bg-sidebar: #FFFFFF;
     --bg-titlebar: #FFFFFF;
     --bg-chat-island: #F5F7F9;
@@ -87,8 +89,8 @@
     --bg-button-active: rgba(99, 102, 241, 0.2);
 
     /* Extracted Component Variables (Light) */
-    --bg-assistant-bubble: transparent;
-    --border-assistant-bubble: transparent;
+    --bg-assistant-bubble: #ffffff;
+    --border-assistant-bubble: rgba(0, 0, 0, 0.05);
 
     --bg-dropdown: rgba(255, 255, 255, 0.82);
     --border-dropdown: rgba(0, 0, 0, 0.1);
@@ -102,7 +104,9 @@
 
     /* Theme Presets (Light) */
     --theme-preset-1: #FFFFFF;
-    --theme-preset-2: #F2F3F5;
-    --theme-preset-3: #EBEDF0;
-    --theme-preset-4: #E3E5E8;
+    --bg-social-item-hover: #f0f0f0;
+    --bg-social-item-active: #e2e2e2;
+    /* Light box for Light Mode */
+    --bg-social-icon-hover: rgba(0, 0, 0, 0.05);
+    --bg-social-icon-active: rgba(0, 0, 0, 0.1);
 }

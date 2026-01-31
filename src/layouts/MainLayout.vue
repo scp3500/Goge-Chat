@@ -1,50 +1,57 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import AppNavBar from '../components/layout/AppNavBar.vue';
+import { ref, watch, onMounted } from 'vue';
 import SocialSidebar from '../components/layout/SocialSidebar.vue';
+import SocialChatList from '../components/layout/SocialChatList.vue';
 import SettingsModal from '../components/settings/SettingsModal.vue';
-import { useConfigStore } from '../stores/config';
 import { useSettingsStore } from '../stores/settings';
-import { invoke } from '@tauri-apps/api/core';
+import { useChatStore } from '../stores/chat';
 import { AI_EVO_SVG } from '../constants/icons';
+import { invoke } from '@tauri-apps/api/core';
 
-const configStore = useConfigStore();
 const settingsStore = useSettingsStore();
+const chatStore = useChatStore();
 
-const activeModule = ref('chat');
-const isCollapsed = ref(false);
+const props = defineProps({
+  isCollapsed: { type: Boolean, default: false },
+  activeModule: { type: String, default: 'chat' }
+});
+
+const emit = defineEmits(['update:activeModule']);
+
 const selectedContact = ref(null);
 
 const handleSelect = (contact) => {
   selectedContact.value = contact;
+  // 💾 Persist selection
+  if (contact) {
+    chatStore.updateSocialContactId(contact.id);
+  }
 };
 
+const handleContactSelect = (contact) => {
+  handleSelect(contact);
+  // Jump to chat module when selecting a contact from the address book
+  emit('update:activeModule', 'chat');
+};
+
+// 🔄 Restore persisted contact on mount
 onMounted(async () => {
-  try {
-    const savedState = await invoke('get_social_setting', { key: 'sidebar_collapsed' });
-    if (savedState !== null) {
-      isCollapsed.value = savedState === 'true';
+    if (chatStore.activeSocialContactId) {
+        try {
+            // We need to fetch the contact details to populate selectedContact
+            // Option 1: Fetch all contacts and find (inefficient but safe)
+            // Option 2: Fetch specific contact (better)
+            const contacts = await invoke("get_social_contacts");
+            const found = contacts.find(c => c.id === chatStore.activeSocialContactId);
+            if (found) {
+                selectedContact.value = found;
+                console.log("📍 [RESTORE] Restored active contact:", found.name);
+            }
+        } catch (e) {
+            console.error("Failed to restore contact:", e);
+        }
     }
-  } catch (e) {
-    console.error('Failed to load sidebar state:', e);
-  }
 });
-
-const toggleCollapse = async () => {
-  isCollapsed.value = !isCollapsed.value;
-  try {
-    await invoke('set_social_setting', { 
-      key: 'sidebar_collapsed', 
-      value: isCollapsed.value.toString() 
-    });
-  } catch (e) {
-    console.error('Failed to save sidebar state:', e);
-  }
-};
-
-const handleOpenSettings = () => {
-  settingsStore.openSettings();
-};
 
 const handleCloseSettings = () => {
   settingsStore.closeSettings();
@@ -53,44 +60,43 @@ const handleCloseSettings = () => {
 
 <template>
   <div class="main-layout">
-    <AppNavBar 
-      v-model:activeModule="activeModule"
-      :is-collapsed="isCollapsed"
-      :is-in-settings="settingsStore.isModalOpen"
-      @toggleCollapse="toggleCollapse"
-      @openSettings="handleOpenSettings"
-      @backHome="handleCloseSettings"
-    />
-    
-    <div class="sidebar-wrapper">
-      <SocialSidebar 
-        :is-collapsed="isCollapsed"
-        @select="handleSelect"
+    <div class="sidebars-container" :class="{ 'is-collapsed': isCollapsed }">
+      <!-- Column: Message List (Recent Chats) - Shown in 'chat' module -->
+      <SocialChatList 
+        v-if="activeModule === 'chat'"
+        :active-contact-id="selectedContact?.id"
+        @select="handleSelect" 
       />
-      <!-- Interaction Lock Overlay -->
-      <div v-if="settingsStore.isModalOpen" class="sidebar-overlay"></div>
+      
+      <!-- Column: Contact List (Address Book) - Shown in 'address_book' module -->
+      <SocialSidebar 
+        v-if="activeModule === 'address_book'"
+        :active-contact-id="selectedContact?.id"
+        @select="handleContactSelect"
+      />
     </div>
 
     <main class="content-view">
-      <!-- Settings Mode -->
-      <SettingsModal 
-        v-if="settingsStore.isModalOpen" 
-        @close="handleCloseSettings" 
-      />
+      <Transition name="fade-scale" mode="out-in">
+        <!-- Settings Mode -->
+        <SettingsModal 
+          v-if="settingsStore.isModalOpen" 
+          @close="handleCloseSettings" 
+        />
 
-      <!-- Chat Mode -->
-      <template v-else>
-        <template v-if="activeModule === 'chat'">
-          <slot v-if="selectedContact" :active-contact="selectedContact"></slot>
-          <div v-else class="social-placeholder">
-             <div class="placeholder-icon" v-html="AI_EVO_SVG"></div>
-             <p>选择一个联系人开始对话</p>
-          </div>
-        </template>
-        <div v-else class="placeholder-module">
-          <p>{{ activeModule }} 模块正在开发中...</p>
+        <!-- Chat Mode -->
+        <div v-else class="chat-view-container">
+          <Transition name="fade-up" mode="out-in">
+            <div v-if="selectedContact" :key="selectedContact.id" class="chat-wrapper">
+               <slot :active-contact="selectedContact"></slot>
+            </div>
+            <div v-else class="social-placeholder">
+               <div class="placeholder-icon" v-html="AI_EVO_SVG"></div>
+               <p>选择一个联系人开始对话</p>
+            </div>
+          </Transition>
         </div>
-      </template>
+      </Transition>
     </main>
   </div>
 </template>
@@ -104,27 +110,19 @@ const handleCloseSettings = () => {
   background: var(--bg-main);
 }
 
-.sidebar-wrapper {
-  position: relative;
+.sidebars-container {
   display: flex;
   height: 100%;
+  width: 250px; /* One sidebar width */
+  transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-glass);
+  overflow: hidden; /* Important for width: 0 animation */
 }
 
-.sidebar-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.05); /* Slight tint */
-  z-index: 10;
-  cursor: not-allowed;
-  pointer-events: auto; /* Capture clicks */
-}
-
-/* Ensure SocialSidebar doesn't shrink */
-.sidebar-wrapper :deep(.social-sidebar) {
-  height: 100%;
+.sidebars-container.is-collapsed {
+  width: 0;
+  border-right: none;
 }
 
 .content-view {
@@ -136,15 +134,6 @@ const handleCloseSettings = () => {
   flex-direction: column;
 }
 
-.placeholder-module {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-color);
-  opacity: 0.4;
-}
-
 .social-placeholder {
   flex: 1;
   display: flex;
@@ -152,7 +141,7 @@ const handleCloseSettings = () => {
   align-items: center;
   justify-content: center;
   color: var(--text-color);
-  opacity: 0.2;
+  opacity: 0.1;
   gap: 16px;
 }
 
@@ -164,5 +153,45 @@ const handleCloseSettings = () => {
 .social-placeholder p {
   font-size: 1.1rem;
   letter-spacing: 1px;
+}
+
+.chat-view-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* Transitions */
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-scale-enter-from,
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-up-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

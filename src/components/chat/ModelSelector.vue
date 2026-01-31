@@ -183,6 +183,32 @@ const isReasoningModel = (model) => {
     return modelId.toLowerCase().includes('reasoner') || modelId.toLowerCase().includes('reason');
 };
 
+const getPanelStyle = computed(() => {
+    if (!selectorRef.value) return {};
+    const rect = selectorRef.value.getBoundingClientRect();
+    
+    if (props.fullWidth && props.direction === 'up') {
+        const inputWrapper = selectorRef.value.closest('.input-wrapper');
+        if (inputWrapper) {
+            const wrapRect = inputWrapper.getBoundingClientRect();
+            return {
+                position: 'fixed',
+                bottom: (window.innerHeight - wrapRect.top) + 'px',
+                left: wrapRect.left + 'px',
+                width: wrapRect.width + 'px',
+                borderRadius: '20px 20px 0 0'
+            };
+        }
+    }
+
+    return {
+        position: 'fixed',
+        top: props.direction === 'down' ? (rect.bottom + 12) + 'px' : 'auto',
+        bottom: props.direction === 'up' ? (window.innerHeight - rect.top + 1) + 'px' : 'auto',
+        left: rect.left + 'px'
+    };
+});
+
 </script>
 
 <template>
@@ -208,89 +234,91 @@ const isReasoningModel = (model) => {
     </button>
 
     <!-- 下拉面板 -->
-    <Transition name="fade-slide">
-      <div v-if="isOpen" class="dropdown-panel" :class="[direction === 'up' ? 'pop-up' : 'pop-down']" @mousedown.stop>
-        <!-- 搜索栏 -->
-        <div class="search-header">
-          <div class="search-box">
-            <span class="search-icon" v-html="SEARCH_SVG"></span>
-            <input 
-              v-model="searchQuery" 
-              type="text" 
-              placeholder="搜索模型..." 
-              autoFocus
-              @click.stop
-            />
-          </div>
-        </div>
-
-        <!-- 过滤器列表 -->
-        <div class="filters-container">
-          <span class="filter-label">标签</span>
-          <div class="filters-bar">
-            <button 
-              class="filter-chip" 
-              :class="{ active: activeFilter === 'all' }"
-              @click="activeFilter = 'all'"
-            >全部</button>
-            <button 
-              class="filter-chip" 
-              :class="{ active: activeFilter === 'vision' }"
-              @click="activeFilter = 'vision'"
-            >
-              <span v-html="VISION_SVG"></span>
-            </button>
-            <button 
-              class="filter-chip" 
-              :class="{ active: activeFilter === 'reasoning' }"
-              @click="activeFilter = 'reasoning'"
-            >
-              <span v-html="BRAIN_SVG"></span>
-            </button>
-            <button 
-              class="filter-chip" 
-              :class="{ active: activeFilter === 'free' }"
-              @click="activeFilter = 'free'"
-            >免费</button>
-          </div>
-        </div>
-
-        <!-- 模型列表 -->
-        <div class="models-list custom-scrollbar">
-          <div v-for="provider in filteredProviders" :key="provider.id" class="provider-group">
-            <div class="provider-label">{{ provider.name }}</div>
-            
-            <div 
-              v-for="model in provider.matchedModels" 
-              :key="typeof model === 'string' ? model : model.id"
-              class="model-item"
-              :class="{ 'selected': configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id }"
-              @click="selectModel(provider.id, model)"
-            >
-              <div class="model-info">
-                <span v-html="getProviderIcon(provider.icon)" class="model-icon"></span>
-                <span class="model-text">{{ typeof model === 'string' ? model : (model.name || model.id) }}</span>
-              </div>
-              <div class="model-badges">
-                <span v-if="isVisionModel(model)" class="badge vision" v-html="VISION_SVG" title="支持视觉"></span>
-                <span v-if="isReasoningModel(model)" class="badge reasoning" v-html="BRAIN_SVG" title="支持推理"></span>
-                <span v-if="configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id" class="badge check" v-html="CHECK_SVG"></span>
-              </div>
+    <Teleport to="body">
+      <Transition name="fade-slide">
+        <div v-if="isOpen" class="dropdown-panel-global" :class="[direction === 'up' ? 'pop-up' : 'pop-down']" :style="getPanelStyle" @mousedown.stop>
+          <!-- 搜索栏 -->
+          <div class="search-header">
+            <div class="search-box">
+              <span class="search-icon" v-html="SEARCH_SVG"></span>
+              <input 
+                v-model="searchQuery" 
+                type="text" 
+                placeholder="搜索模型..." 
+                autoFocus
+                @click.stop
+              />
             </div>
           </div>
-          
-          <div v-if="filteredProviders.length === 0" class="no-results">
-            没有找到匹配的模型
+
+          <!-- 过滤器列表 -->
+          <div class="filters-container">
+            <span class="filter-label">标签</span>
+            <div class="filters-bar">
+              <button 
+                class="filter-chip" 
+                :class="{ active: activeFilter === 'all' }"
+                @click="activeFilter = 'all'"
+              >全部</button>
+              <button 
+                class="filter-chip" 
+                :class="{ active: activeFilter === 'vision' }"
+                @click="activeFilter = 'vision'"
+              >
+                <span v-html="VISION_SVG"></span>
+              </button>
+              <button 
+                class="filter-chip" 
+                :class="{ active: activeFilter === 'reasoning' }"
+                @click="activeFilter = 'reasoning'"
+              >
+                <span v-html="BRAIN_SVG"></span>
+              </button>
+              <button 
+                class="filter-chip" 
+                :class="{ active: activeFilter === 'free' }"
+                @click="activeFilter = 'free'"
+              >免费</button>
+            </div>
+          </div>
+
+          <!-- 模型列表 -->
+          <div class="models-list custom-scrollbar">
+            <div v-for="provider in filteredProviders" :key="provider.id" class="provider-group">
+              <div class="provider-label">{{ provider.name }}</div>
+              
+              <div 
+                v-for="model in provider.matchedModels" 
+                :key="typeof model === 'string' ? model : model.id"
+                class="model-item"
+                :class="{ 'selected': configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id }"
+                @click="selectModel(provider.id, model)"
+              >
+                <div class="model-info">
+                  <span v-html="getProviderIcon(provider.icon)" class="model-icon"></span>
+                  <span class="model-text">{{ typeof model === 'string' ? model : (model.name || model.id) }}</span>
+                </div>
+                <div class="model-badges">
+                  <span v-if="isVisionModel(model)" class="badge vision" v-html="VISION_SVG" title="支持视觉"></span>
+                  <span v-if="isReasoningModel(model)" class="badge reasoning" v-html="BRAIN_SVG" title="支持推理"></span>
+                  <span v-if="configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id" class="badge check" v-html="CHECK_SVG"></span>
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="filteredProviders.length === 0" class="no-results">
+              没有找到匹配的模型
+            </div>
+          </div>
+
+          <!-- 底部提示 -->
+          <div class="menu-hint">
+            <span>ESC 关闭</span>
+            <span>↵ 确认</span>
           </div>
         </div>
-
-        <!-- 底部提示 -->
-        <div class="menu-hint">
-          <span>ESC 关闭</span>
-          <span>↵ 确认</span>
-        </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -412,9 +440,8 @@ const isReasoningModel = (model) => {
 }
 
 /* 下拉面板 */
-.dropdown-panel {
-  position: absolute;
-  left: 0;
+.dropdown-panel-global {
+  position: fixed;
   width: 320px;
   background: var(--bg-dropdown);
   backdrop-filter: blur(20px) saturate(180%);
@@ -424,7 +451,7 @@ const isReasoningModel = (model) => {
   box-shadow: 
     0 10px 30px -5px rgba(0, 0, 0, 0.3),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  z-index: 1000;
+  z-index: 100000;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -432,19 +459,8 @@ const isReasoningModel = (model) => {
   background-clip: padding-box;
 }
 
-.dropdown-panel.pop-down {
-  top: calc(100% + 12px);
-}
-
-.dropdown-panel.pop-up {
-  bottom: calc(100% - 1px);
-  left: 0 !important;
-  right: 0 !important;
-  margin: 0 auto !important;
-  width: 92% !important;
+.dropdown-panel-global.pop-up {
   border-bottom: none;
-  border-radius: 20px 20px 0 0;
-  top: auto;
   box-shadow: 
     0 -10px 30px -5px rgba(0, 0, 0, 0.3),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);

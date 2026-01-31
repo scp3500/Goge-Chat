@@ -57,9 +57,14 @@ const openSettings = () => {
 </script>
 
 <template>
-  <header class="titlebar" :class="{ 'maximized': isMaximized }" @mousedown="handleGlobalDrag">
+  <header class="titlebar" 
+          :class="{ 
+            'maximized': isMaximized, 
+            'is-chat-mode': configStore.settings.chatMode.enabled 
+          }" 
+          @mousedown="handleGlobalDrag">
     <!-- Left Segment: Logo/Brand -->
-    <div class="titlebar-left">
+    <div class="titlebar-left" v-if="!configStore.settings.chatMode.enabled">
       <span class="app-name">Goge Chat</span>
     </div>
     
@@ -68,7 +73,7 @@ const openSettings = () => {
     
     <!-- Right Segment: Selectors + Theme + Window Controls -->
     <div class="titlebar-right">
-      <div class="selectors-group" v-if="!isSettings">
+      <div class="selectors-group" v-if="!isSettings && !configStore.settings.chatMode.enabled">
         <ModelSelector class="titlebar-model-selector" menuId="titlebar-model" />
         <div class="v-divider"></div>
         <PresetSelector class="titlebar-preset-selector" menuId="titlebar-preset" />
@@ -132,6 +137,26 @@ const openSettings = () => {
   margin-left: 2px; 
   letter-spacing: 0.5px; 
   opacity: 0.8; 
+}
+
+/* Chat Mode (Immersive) Overrides */
+.titlebar.is-chat-mode {
+  background: transparent;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: none; /* Let clicks pass through to content header */
+  border-bottom: none;
+}
+
+.titlebar.is-chat-mode .window-controls {
+  pointer-events: auto; /* Re-enable clicking on buttons */
+  color: var(--text-color);
+}
+
+.titlebar.is-chat-mode .control-btn {
+  color: var(--text-color);
 }
 
 .selectors-group {

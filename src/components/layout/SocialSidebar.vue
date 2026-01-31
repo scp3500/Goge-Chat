@@ -1,9 +1,15 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { SEARCH_SVG, PLUS_SVG } from '../../constants/icons';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/config';
 import AIContactModal from '../modals/AIContactModal.vue';
+
+const resolveAvatarSrc = (path) => {
+  if (!path) return '';
+  if (path.startsWith('data:') || path.startsWith('http')) return path;
+  return convertFileSrc(path);
+};
 
 const props = defineProps({
   isCollapsed: { type: Boolean, default: false }
@@ -41,12 +47,26 @@ const contacts = ref([]);
 const groups = ref([]);
 
 const loadData = async () => {
+  // Load Profile
   try {
     profile.value = await invoke('get_social_profile');
+  } catch (e) {
+    console.error('⚠️ Failed to load profile (using default):', e);
+    // Keep default placeholder
+  }
+
+  // Load Groups
+  try {
     groups.value = await invoke('get_social_groups');
+  } catch (e) {
+    console.error('❌ Failed to load groups:', e);
+  }
+
+  // Load Contacts
+  try {
     contacts.value = await invoke('get_social_contacts');
   } catch (e) {
-    console.error('Failed to load social data:', e);
+    console.error('❌ Failed to load contacts:', e);
   }
 };
 
@@ -108,23 +128,38 @@ const handleDelete = async () => {
   closeMenu();
 };
 
-const handleConfirmModal = async (data) => {
+  const handleConfirmModal = async (data) => {
   try {
+    console.log('📝 Submitting contact data:', data);
+    
+    // Ensure we have a valid group ID
+    let targetGroupId = null;
+    if (groups.value.length > 0) {
+      targetGroupId = groups.value[0].id;
+    } else {
+      console.warn('⚠️ No groups found! Contact will have NULL group_id.');
+    }
+
     if (editingContact.value) {
       await invoke('update_social_contact', { 
         id: editingContact.value.id,
         ...data
       });
     } else {
+      // Use snake_case 'group_id' to match Rust argument strictly if auto-mapping fails
+      // Tauri usually maps camelCase -> snake_case, but explicit snake_case is safer here if inconsistent
       await invoke('add_social_contact', { 
         ...data,
-        groupId: groups.value[0]?.id // Default to first group
+        group_id: targetGroupId 
       });
     }
-    await loadData();
+    
+    await loadData(); // Refresh list
+    console.log('✅ Data reloaded. Contacts:', contacts.value.length);
     showModal.value = false;
   } catch (e) {
-    alert('操作失败: ' + e);
+    console.error('❌ Failed to save contact:', e);
+    alert('保存失败: ' + e);
   }
 };
 </script>
@@ -148,20 +183,13 @@ const handleConfirmModal = async (data) => {
         {{ clock }}
       </div>
 
-      <!-- Profile Card -->
-      <div class="profile-card">
-        <div class="avatar-container">
-          <img v-if="profile.avatar" :src="profile.avatar" class="avatar" />
-          <div v-else class="avatar-placeholder">{{ profile.nickname[0] }}</div>
-        </div>
-        <div class="profile-info">
-          <h3 class="nickname">{{ profile.nickname }}</h3>
-          <p class="bio">{{ profile.bio }}</p>
-        </div>
-      </div>
-
       <!-- Contact List -->
       <div class="contact-list modern-scroll">
+        <!-- Loading / Empty State -->
+        <div v-if="groups.length === 0 && contacts.length === 0" class="empty-state">
+             <p>暂无联系人</p>
+        </div>
+
         <div v-for="group in groups" :key="group.id" class="contact-group">
           <div class="group-header">
             <span class="group-name">{{ group.name }}</span>
@@ -176,12 +204,33 @@ const handleConfirmModal = async (data) => {
               @contextmenu.prevent="openContextMenu(contact, $event)"
             >
               <div class="avatar-sm">
-                 <img v-if="contact.avatar" :src="contact.avatar" />
+                     <img v-if="contact.avatar" :src="resolveAvatarSrc(contact.avatar)" />
                  <div v-else class="avatar-placeholder-sm">{{ contact.name[0] }}</div>
               </div>
               <div class="contact-name">{{ contact.name }}</div>
             </div>
           </div>
+        </div>
+
+        <!-- Fallback for Ungrouped Contacts -->
+        <div v-if="filteredContacts.some(c => !c.group_id || !groups.find(g => g.id === c.group_id))" class="contact-group">
+            <div class="group-header">未分组 / 其他</div>
+            <div class="group-items">
+                <div 
+                  v-for="contact in filteredContacts.filter(c => !c.group_id || !groups.find(g => g.id === c.group_id))" 
+                  :key="contact.id"
+                  class="contact-item"
+                  :class="{ 'active': activeContactId === contact.id }"
+                  @click="selectContact(contact)"
+                  @contextmenu.prevent="openContextMenu(contact, $event)"
+                >
+                  <div class="avatar-sm">
+                        <img v-if="contact.avatar" :src="resolveAvatarSrc(contact.avatar)" />
+                     <div v-else class="avatar-placeholder-sm">{{ contact.name[0] }}</div>
+                  </div>
+                  <div class="contact-name">{{ contact.name }}</div>
+                </div>
+            </div>
         </div>
       </div>
     </div>
@@ -206,15 +255,22 @@ const handleConfirmModal = async (data) => {
 </template>
 
 <style scoped>
+.empty-state {
+    padding: 20px;
+    text-align: center;
+    opacity: 0.5;
+    font-size: 14px;
+}
+
 .social-sidebar {
-  width: 280px;
+  width: 250px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-glass);
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+  transition: width 0.3s;
   flex-shrink: 0;
 }
 
@@ -228,8 +284,8 @@ const handleConfirmModal = async (data) => {
 }
 
 .sidebar-content {
-  width: 280px; /* Maintain fixed width inside for content stability during animation */
-  padding: 16px 12px;
+  width: 100%;
+  padding: 10px 12px 16px 12px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -318,7 +374,7 @@ const handleConfirmModal = async (data) => {
 .avatar-container {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--bg-active);
   flex-shrink: 0;
@@ -368,11 +424,11 @@ const handleConfirmModal = async (data) => {
 }
 
 .contact-item:hover {
-  background: var(--bg-hover);
+  background: var(--bg-social-item-hover);
 }
 
 .contact-item.active {
-  background: var(--bg-active);
+  background: var(--bg-social-item-active);
 }
 
 .contact-item.active .contact-name {
@@ -383,13 +439,15 @@ const handleConfirmModal = async (data) => {
 .avatar-sm {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--bg-active);
   flex-shrink: 0;
 }
 
-.avatar-placeholder-sm { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; background: var(--bg-active); }
+.avatar-sm img { width: 100%; height: 100%; object-fit: cover; }
+
+.avatar-placeholder-sm { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; background: var(--color-primary); color: white; font-weight: 600; }
 .contact-name { font-size: 0.9rem; color: var(--text-color); }
 
 /* Context Menu */

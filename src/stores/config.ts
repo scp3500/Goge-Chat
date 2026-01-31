@@ -51,8 +51,10 @@ export const useConfigStore = defineStore('config', () => {
         // 同时切换类名以便排查
         if (val.theme === 'light') {
             root.classList.add('light-mode');
+            root.classList.remove('app-dark'); // Ensure app-dark is removed
         } else {
             root.classList.remove('light-mode');
+            root.classList.add('app-dark'); // ✅ Add app-dark for SocialChatContainer overrides
         }
     };
 

@@ -11,6 +11,7 @@ import SystemPromptConfig from './SystemPromptConfig.vue';
 import AppearanceConfig from './AppearanceConfig.vue';
 import GeneralConfig from './GeneralConfig.vue';
 import ChatModeConfig from './ChatModeConfig.vue';
+import ProfileConfig from './ProfileConfig.vue';
 
 
 // 使用 composables
@@ -207,6 +208,7 @@ const handleClose = () => {
         <header class="detail-header">
           <div class="header-info">
             <h2>{{ 
+                settingsStore.activeCategory === 'profile' ? '个人资料设置' :
                 settingsStore.activeCategory === 'models' ? activeProviderName : 
                 settingsStore.activeCategory === 'presets' ? activePresetName : 
                 settingsStore.activeCategory === 'prompts' ? '系统提示词管理' :
@@ -219,9 +221,14 @@ const handleClose = () => {
 
         </header>
 
+        <!-- 个人资料配置 -->
+        <ProfileConfig
+          v-if="settingsStore.activeCategory === 'profile'"
+        />
+
         <!-- 模型配置 -->
         <ModelConfig 
-          v-if="settingsStore.activeCategory === 'models'"
+          v-else-if="settingsStore.activeCategory === 'models'"
           :providerId="settingsStore.activeProviderId"
         />
 

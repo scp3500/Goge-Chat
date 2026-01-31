@@ -225,6 +225,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             let app_handle = app.handle();
 
@@ -328,8 +329,13 @@ pub fn run() {
             social_db::add_social_contact,
             social_db::update_social_contact,
             social_db::delete_social_contact,
+            social_db::delete_social_message,
+            social_db::delete_social_messages_after,
+            social_db::update_social_message,
             social_db::get_social_messages,
             social_db::save_social_message,
+            social_db::get_recent_social_chats,
+            social_db::update_social_profile,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

@@ -54,14 +54,17 @@ const formatUserText = (text) => {
 
 <style scoped>
 .message-bubble { 
-  padding: 12px 16px; 
-  border-radius: 18px; 
+  padding: 8px 14px; 
+  border-radius: 8px; 
   background: var(--bg-user-bubble); 
   color: var(--color-user-bubble-text); 
-  max-width: 100%; 
+  width: fit-content;
+  max-width: 90%; 
   word-wrap: break-word; 
   white-space: pre-wrap; 
   border: 1px solid var(--border-glass);
+  line-height: 1.4;
+  font-size: 15px;
 }
 
 .message-bubble.is-editing { 

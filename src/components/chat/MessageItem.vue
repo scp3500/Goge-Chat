@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted, watch, computed } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useChatStore } from "../../stores/chat"; 
 import { renderMarkdown } from '../../services/markdown';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
@@ -20,7 +20,9 @@ const props = defineProps({
   index: Number,
   sessionId: String,
   isEditing: Boolean,
-  themeOverride: { type: String, default: null }
+  themeOverride: { type: String, default: null },
+  assistantAvatar: { type: String, default: null },
+  assistantName: { type: String, default: null }
 });
 
 const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'regenerate', 'update-edit-content']);
@@ -74,8 +76,17 @@ const findProviderByModelId = (modelId) => {
 };
 
 // 💡 获取模型图标
-// 💡 获取模型图标
 const modelIcon = computed(() => {
+    // 0. 优先使用传入的助理头像 (Social Mode)
+    if (props.assistantAvatar) {
+        // 如果是本地路径且不是 data:uri 或 http 链接，则转换
+        const url = props.assistantAvatar;
+        if (url.startsWith('http') || url.startsWith('https') || url.startsWith('data:')) {
+            return url;
+        }
+        return convertFileSrc(url);
+    }
+
     // 1. Try explicit providerId stored in message
     if (props.m.providerId) {
         const provider = configStore.settings.providers.find(p => p.id === props.m.providerId);
@@ -97,11 +108,13 @@ const modelIcon = computed(() => {
 
 // 💡 获取显示的模型名称
 const displayModelName = computed(() => {
+    if (props.assistantName) return props.assistantName;
     if (props.m.model) return props.m.model;
     return "Gemini";
 });
 
 const displayProviderName = computed(() => {
+    if (props.assistantName) return ""; // Hide provider in social mode
     // 1. Prefer explicit providerId stored in message (for new messages)
     if (props.m.providerId) {
         const provider = configStore.settings.providers.find(p => p.id === props.m.providerId);
@@ -320,6 +333,49 @@ const handleRetryError = async () => {
         await chatStore.sendMessage("");
     }
 };
+const resolveAvatarSrc = (path) => {
+    if (!path) return '';
+    if (path.startsWith('data:') || path.startsWith('http')) return path;
+    return convertFileSrc(path);
+};
+
+// --- Context Menu Logic ---
+const showContextMenu = ref(false);
+const contextMenuPos = ref({ x: 0, y: 0 });
+
+const handleContextMenu = (e) => {
+    if (!isChatMode.value) return;
+    contextMenuPos.value = { x: e.clientX, y: e.clientY };
+    showContextMenu.value = true;
+};
+
+const closeContextMenu = () => {
+    showContextMenu.value = false;
+};
+
+const handleMenuEdit = () => {
+    emit('start-edit');
+    closeContextMenu();
+};
+
+const handleMenuDelete = (event) => {
+    emit('delete', props.m.id, event);
+    closeContextMenu();
+};
+
+const handleMenuRegenerate = (event) => {
+    emit('regenerate', props.m.id, event);
+    closeContextMenu();
+};
+
+onMounted(() => {
+    window.addEventListener('click', closeContextMenu);
+    injectCodeButtons();
+});
+
+onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just add listener/remover correctly
+    window.removeEventListener('click', closeContextMenu);
+});
 </script>
 
 <template>
@@ -340,9 +396,10 @@ const handleRetryError = async () => {
               v-if="hasVisibleContent || isEditing"
               :content="m.content"
               :is-editing="isEditing"
+              @contextmenu.prevent="handleContextMenu($event)"
               @update-edit-content="$emit('update-edit-content', $event)"
               @cancel-edit="$emit('cancel-edit')"
-              @save-edit="$emit('save-edit', $event)"
+              @save-edit="$emit('save-edit', props.m.id, $event)"
             />
 
             <FileAttachment 
@@ -353,16 +410,16 @@ const handleRetryError = async () => {
           
           <MessageActions 
             role="user"
-            :show="!isEditing && showActionButtons"
-            @edit="$emit('start-edit')"
-            @delete="$emit('delete', $event)"
+        :show="!isEditing && showActionButtons && !isChatMode"
+            @edit="$emit('start-edit', props.m.id, $event)"
+            @delete="$emit('delete', props.m.id, $event)"
           />
         </div>
 
         <!-- User Avatar -->
         <div v-if="configStore.settings.showUserAvatar" class="user-avatar-container">
              <div class="avatar-img"
-                  :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${convertFileSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
+                  :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${resolveAvatarSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
                   <span v-if="!configStore.settings.userAvatarPath">👤</span>
              </div>
         </div>
@@ -385,6 +442,8 @@ const handleRetryError = async () => {
           :message="m"
           :rendered-content="renderedContent"
           :is-reasoning-expanded="isReasoningExpanded"
+          :is-chat-mode="isChatMode"
+          @contextmenu.prevent="handleContextMenu($event)"
           @toggle-reasoning="toggleReasoning"
           @link-click="handleLinkClick"
         />
@@ -392,10 +451,10 @@ const handleRetryError = async () => {
       
       <MessageActions 
         role="assistant"
-        :show="m.content !== '__LOADING__' && !m.error && showActionButtons"
-        @regenerate="chatStore.regenerateAction(index)"
+        :show="m.content !== '__LOADING__' && !m.error && showActionButtons && !isChatMode"
+        @regenerate="$emit('regenerate', props.m.id, $event)"
         @copy="e => doCopy(m.content, e.currentTarget)"
-        @delete="$emit('delete', $event)"
+        @delete="$emit('delete', props.m.id, $event)"
       />
 
       <!-- 🔴 Error Rendering -->
@@ -406,6 +465,18 @@ const handleRetryError = async () => {
         @retry="handleRetryError"
       />
     </div>
+    <!-- Context Menu for Social Mode -->
+    <Teleport to="body">
+      <div v-if="showContextMenu" 
+           class="msg-context-menu" 
+           :style="{ top: contextMenuPos.y + 'px', left: contextMenuPos.x + 'px' }"
+           @click.stop>
+        <div class="menu-item" @click="handleMenuEdit">编辑</div>
+        <div v-if="m.role === 'assistant'" class="menu-item" @click="handleMenuRegenerate($event)">重新生成</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item delete" @click="handleMenuDelete($event)">删除</div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -524,9 +595,9 @@ const handleRetryError = async () => {
 .user-layout-container {
   display: flex;
   flex-direction: row;
-  align-items: flex-end; /* Avatar at bottom */
+  align-items: flex-start; /* Avatar at top */
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
 }
 
@@ -540,15 +611,15 @@ const handleRetryError = async () => {
 
 .user-avatar-container {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  margin-bottom: 24px; /* Align with text bubble roughly */
+  width: 40px;
+  height: 40px;
+  margin-top: 0px; /* Align with top of bubble */
 }
 
 .avatar-img {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
+  border-radius: 8px; /* Rounded square */
   background-color: var(--bg-input-dim);
   background-size: cover;
   background-position: center;
@@ -560,26 +631,45 @@ const handleRetryError = async () => {
 }
 
 /* Bubble Mode Styles */
-.bubble-mode :deep(.user-bubble) {
-  background-color: var(--color-primary-alpha-10); /* Light primary bg */
-  border: 1px solid var(--color-primary-alpha-20);
+.bubble-mode :deep(.message-bubble) {
+  background-color: var(--bg-user-bubble); 
+  border: 1px solid var(--border-glass);
   border-radius: 18px 18px 4px 18px; /* Classic bubble shape */
-  padding: 12px 16px;
-  color: var(--text-color);
+  padding: 8px 14px; /* Slightly larger padding */
+  width: fit-content;
+  max-width: 90%;
+  color: var(--color-user-bubble-text);
+  line-height: 1.5;
+  font-size: 15px;
 }
 /* Adjust layout for bubble mode */
 .bubble-mode .user-turn-content {
   align-items: flex-end;
-  /* Reset max-width if necessary, but inherited is fine */
 }
 
 /* Assistant Bubble Mode */
-.bubble-mode .assistant-bubble-container :deep(.markdown-body) {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: 4px 18px 18px 18px;
-  padding: 16px 20px;
+.bubble-mode .assistant-bubble-container :deep(.assistant-bubble-content) {
+  background-color: var(--bg-assistant-bubble);
+  border: 1px solid var(--border-assistant-bubble);
+  border-radius: 4px 18px 18px 18px; /* Original asymmetric shape */
+  padding: 8px 14px; /* Larger padding */
   margin-top: 4px;
+}
+
+.bubble-mode .assistant-bubble-container :deep(.markdown-body) {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+.assistant-bubble-container {
+  width: fit-content;
+  max-width: 90%;
+}
+
+.message-row.assistant:not(.chat-mode-active) .assistant-bubble-container {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Adjust header in bubble mode */
@@ -592,18 +682,17 @@ const handleRetryError = async () => {
    ========================================= */
 
 /* WECHAT THEME (Day) */
-.theme-wechat .message-bubble-wrapper :deep(.user-bubble) {
-  background-color: #95ec69;
-  color: #000;
-  border: 1px solid #7dca5c;
+.theme-wechat .message-bubble-wrapper :deep(.message-bubble) {
+  background-color: var(--bg-user-bubble);
+  color: var(--color-user-bubble-text);
+  border: 1px solid var(--border-user-bubble);
 }
 
 .theme-wechat .assistant-bubble-container :deep(.assistant-bubble-content) {
-  background-color: #ffffff;
-  border: 1px solid #e5e5e5;
-  color: #1a1a1a;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  padding: 10px 14px;
+  background-color: var(--bg-assistant-bubble);
+  border: 1px solid var(--border-assistant-bubble);
+  color: var(--color-assistant-bubble-text);
+  box-shadow: none;
 }
 
 .theme-wechat .assistant-bubble-container :deep(.markdown-body) {
@@ -613,8 +702,22 @@ const handleRetryError = async () => {
   box-shadow: none;
 }
 
+/* WECHAT THEME (Night) */
+:global(.app-dark) .theme-wechat .message-bubble-wrapper :deep(.message-bubble) {
+  background-color: var(--bg-user-bubble);
+  color: var(--color-user-bubble-text);
+  border-color: var(--border-user-bubble);
+}
+
+:global(.app-dark) .theme-wechat .assistant-bubble-container :deep(.assistant-bubble-content) {
+  background-color: var(--bg-assistant-bubble);
+  color: var(--color-assistant-bubble-text);
+  border-color: var(--border-assistant-bubble);
+}
+
+
 /* DARK++ THEME (Night) */
-.theme-darkplus .message-bubble-wrapper :deep(.user-bubble) {
+.theme-darkplus .message-bubble-wrapper :deep(.message-bubble) {
   background-color: #2b2d31; 
   color: #e0e0e0;
   border: 1px solid #3f4148;
@@ -631,11 +734,62 @@ const handleRetryError = async () => {
   background-color: transparent;
   border: none;
   color: inherit;
+  width: fit-content;
+  max-width: 90%;
 }
 
 /* Hide Loading State */
 .loading-hidden {
   display: none;
+}
+
+/* Context Menu Styles */
+.msg-context-menu {
+  position: fixed;
+  z-index: 99999;
+  background: var(--bg-menu);
+  border: 1px solid var(--border-menu);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 100px;
+  box-shadow: var(--shadow-main);
+  backdrop-filter: blur(12px);
+  animation: menuFadeIn 0.1s ease-out;
+}
+
+@keyframes menuFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.msg-context-menu .menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-color);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.msg-context-menu .menu-item:hover {
+  background: var(--bg-menu-hover);
+  color: var(--text-color-white);
+}
+
+.msg-context-menu .menu-item.delete {
+  color: #ff6b6b;
+}
+
+.msg-context-menu .menu-item.delete:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.msg-context-menu .menu-divider {
+  height: 1px;
+  background: var(--border-menu);
+  margin: 4px 0;
 }
 </style>
 

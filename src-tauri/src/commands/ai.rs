@@ -15,6 +15,7 @@ pub async fn ask_ai(
     window: Window,
     temperature: Option<f32>,
     max_tokens: Option<u32>,
+    stream: Option<bool>,
     // 🟢 新增：允许前端显式传入当前绘画的 provider 和 model
     explicit_provider_id: Option<String>,
     explicit_model_id: Option<String>,
@@ -142,14 +143,23 @@ pub async fn ask_ai(
 
     // --- ⬇️ Google Gemini Native 支持 ⬇️ ---
     if selected_provider_id == "gemini" {
-        return handle_gemini_native(api_key, base_url, model, clean_msgs, state, on_event).await;
+        return handle_gemini_native(
+            api_key,
+            base_url,
+            model,
+            clean_msgs,
+            state,
+            on_event,
+            stream.unwrap_or(true),
+        )
+        .await;
     }
     // --- ⬆️ Google Gemini Native 支持 ⬆️ ---
 
     let payload = ChatRequest {
         model: model.to_string(),
         messages: clean_msgs,
-        stream: true,
+        stream: stream.unwrap_or(true),
         temperature,
         max_tokens,
     };
@@ -183,6 +193,28 @@ pub async fn ask_ai(
         .await
         .map_err(|e| e.to_string())?;
 
+    if !stream.unwrap_or(true) {
+        // --- 🛑 非流式响应处理 ---
+        let json: Value = response.json().await.map_err(|e| e.to_string())?;
+        let choice = &json["choices"][0];
+        let message = &choice["message"];
+
+        if let Some(content) = message["content"].as_str() {
+            on_event
+                .send(format!("c:{}", content))
+                .map_err(|e| e.to_string())?;
+        }
+
+        if let Some(reasoning) = message["reasoning_content"].as_str() {
+            on_event
+                .send(format!("r:{}", reasoning))
+                .map_err(|e| e.to_string())?;
+        }
+
+        return Ok(());
+    }
+
+    // --- 🌊 流式响应处理 ---
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
 
@@ -253,6 +285,7 @@ async fn handle_gemini_native(
     messages: Vec<Message>,
     state: State<'_, crate::GoleState>,
     on_event: Channel<String>,
+    stream: bool,
 ) -> Result<(), String> {
     let client = reqwest::Client::new();
 
@@ -272,15 +305,22 @@ async fn handle_gemini_native(
 
     let payload = GeminiRequest { contents };
 
-    // 2. 构造 URL (native 走 streamGenerateContent)
+    // 2. 构造 URL
+    let mode = if stream {
+        "streamGenerateContent"
+    } else {
+        "generateContent"
+    };
+
     let url = format!(
-        "{}/v1beta/models/{}:streamGenerateContent?key={}",
+        "{}/v1beta/models/{}:{}?key={}",
         base_url.trim_end_matches('/'),
         model,
+        mode,
         api_key
     );
 
-    println!("🚀 [Native Gemini] 请求地址: {}", url);
+    println!("🚀 [Native Gemini] 请求地址 (stream: {}): {}", stream, url);
 
     let response = client
         .post(&url)
@@ -296,6 +336,26 @@ async fn handle_gemini_native(
         return Err(format!("Gemini API 错误 (状态码 {}): {}", status, err_text));
     }
 
+    if !stream {
+        // --- 🛑 非流式处理 ---
+        let json: Value = response.json().await.map_err(|e| e.to_string())?;
+        if let Some(candidates) = json["candidates"].as_array() {
+            if let Some(candidate) = candidates.first() {
+                if let Some(parts) = candidate["content"]["parts"].as_array() {
+                    for part in parts {
+                        if let Some(text) = part["text"].as_str() {
+                            on_event
+                                .send(format!("c:{}", text))
+                                .map_err(|e| e.to_string())?;
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    // --- 🌊 流式处理 ---
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
 

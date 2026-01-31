@@ -52,15 +52,27 @@ watch(inputMsg, () => {
   });
 });
 
+const props = defineProps({
+  isGenerating: Boolean,
+  overrideSend: { type: Boolean, default: false } // 💡 Allow parent to handle send
+});
+
+const emit = defineEmits(['send', 'stop', 'pick-file']);
+
 const handleAction = async () => {
   if (isGenerating.value) {
-    await chatStore.stopGeneration();
+    if (props.overrideSend) {
+        emit('stop');
+    } else {
+        await chatStore.stopGeneration();
+    }
   } else {
+    // Basic validation
     if (!inputMsg.value.trim() && selectedFiles.value.length === 0) return;
     
     let msgToProcess = inputMsg.value;
     
-    // 如果有文件，读取内容并追加到 prompt (对于 DeepSeek-V3 这种不支持附件的情况)
+    // Process files if any (basic concatenation for now)
     if (selectedFiles.value.length > 0) {
       let filesPrompt = "\n\n--- 附件内容 ---\n";
       for (const file of selectedFiles.value) {
@@ -77,20 +89,25 @@ const handleAction = async () => {
 
     inputMsg.value = "";
     
-    // 清除已选文件
+    // Clear files
     const filesMetadata = selectedFiles.value.length > 0 ? JSON.stringify(selectedFiles.value) : null;
     selectedFiles.value = [];
     
-    // 发送后重置高度
+    // Reset height
     nextTick(() => {
         if(textareaRef.value) {
             textareaRef.value.style.height = 'auto'; 
             textareaRef.value.style.height = '24px'; 
         }
     });
-    
-    // 这里 sendMessage 需要稍作调整以接受 metadata，或者通过 store 处理
-    await chatStore.sendMessage(msgToProcess, filesMetadata, searchProvider.value);
+
+    // 💡 Decoupled Send Logic
+    if (props.overrideSend) {
+        emit('send', msgToProcess, filesMetadata);
+    } else {
+        // Standard chat store usage
+        await chatStore.sendMessage(msgToProcess, filesMetadata, searchProvider.value);
+    }
   }
 };
 
@@ -281,35 +298,37 @@ onMounted(() => {
       </div>
 
       <!-- 全局搜索源选择菜单 (移出到外层以支持全宽/居中) -->
-      <Transition name="fade-slide">
-        <div v-if="showSearchMenu" class="search-menu-popup modern-scroll" @click.stop>
-          <div class="menu-list">
-            <div 
-              v-for="provider in searchProviders" 
-              :key="provider.id"
-              class="menu-item"
-              :class="{ active: searchProvider === provider.id }"
-              @click="selectSearchProvider(provider.id)"
-            >
-              <div class="menu-item-left">
-                <span class="provider-icon" v-html="provider.icon"></span>
-                <span class="provider-name">{{ provider.name }}</span>
+      <Teleport to="body">
+        <Transition name="fade-slide">
+          <div v-if="showSearchMenu" class="search-menu-popup-global modern-scroll" @click.stop>
+            <div class="menu-list">
+              <div 
+                v-for="provider in searchProviders" 
+                :key="provider.id"
+                class="menu-item"
+                :class="{ active: searchProvider === provider.id }"
+                @click="selectSearchProvider(provider.id)"
+              >
+                <div class="menu-item-left">
+                  <span class="provider-icon" v-html="provider.icon"></span>
+                  <span class="provider-name">{{ provider.name }}</span>
+                </div>
+                <span class="free-badge">免费</span>
               </div>
-              <span class="free-badge">免费</span>
+            </div>
+            
+            <div class="menu-footer">
+              <div class="footer-left">网络搜索</div>
+              <div class="menu-shortcuts">
+                <span>ESC 关闭</span>
+                <span>▲▼ 选择</span>
+                <span><span class="key">Ctrl</span> + ▲▼ 翻页</span>
+                <span>↵ 确认</span>
+              </div>
             </div>
           </div>
-          
-          <div class="menu-footer">
-            <div class="footer-left">网络搜索</div>
-            <div class="menu-shortcuts">
-              <span>ESC 关闭</span>
-              <span>▲▼ 选择</span>
-              <span><span class="key">Ctrl</span> + ▲▼ 翻页</span>
-              <span>↵ 确认</span>
-            </div>
-          </div>
-        </div>
-      </Transition>
+        </Transition>
+      </Teleport>
 
     </div>
 
@@ -323,7 +342,7 @@ onMounted(() => {
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 10px 0 20px 0;
+  padding: 0 0 16px 0; /* Reduced padding to avoid overlap */
   background: transparent;
 }
 
@@ -387,7 +406,9 @@ onMounted(() => {
 .icon-btn {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px; /* 🔲 Box shape instead of circle */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -524,7 +545,7 @@ onMounted(() => {
 /* 1. 默认状态 (Send) - 幽灵模式 */
 .action-btn {
   background-color: transparent; /* 平时透明 */
-  color: white;
+  color: var(--color-input-icon);
   opacity: 1;
   transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
 }
@@ -560,28 +581,24 @@ onMounted(() => {
 
 /* 搜索菜单样式 */
 /* 搜索菜单样式 - 极致毛玻璃 */
-.search-menu-popup {
-  position: absolute;
-  bottom: calc(100% - 1px);
-  left: 0;      /* 设为 0 */
-  right: 0;     /* 设为 0 */
-  margin: 0 auto; /* 配合 width: 92% 实现完美居中 */
-  width: 92%;
-  width: 92%;
+.search-menu-popup-global {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
   background: var(--bg-menu);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-menu);
-  border-bottom: none;
-  border-radius: 28px 28px 0 0;
+  border-radius: 20px;
   box-shadow: 
-    0 -10px 30px rgba(0, 0, 0, 0.25),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  z-index: 1000;
+    0 10px 40px rgba(0, 0, 0, 0.3);
+  z-index: 99999;
   overflow-y: auto;
   max-height: 50vh;
   padding: 8px;
-  background-clip: padding-box;
 }
 
 .menu-list {

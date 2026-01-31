@@ -2,8 +2,50 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useConfigStore } from '../../stores/config';
 import { BRAIN_SVG, BOX_SVG, SPARKLES_SVG, CHEVRON_DOWN_SVG } from '../../constants/icons';
+import ImageCropperModal from '../modals/ImageCropperModal.vue';
+import { open } from '@tauri-apps/plugin-dialog';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { readFile } from '@tauri-apps/plugin-fs';
 
 const configStore = useConfigStore();
+
+// Avatar Cropper
+const showCropper = ref(false);
+const cropImgSrc = ref('');
+const handleAvatarUpload = async () => {
+    try {
+        const selected = await open({
+            multiple: false,
+            filters: [{
+                name: 'Images',
+                extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif']
+            }]
+        });
+        
+        if (selected) {
+            // Read file as binary
+            const content = await readFile(selected);
+            // Convert to base64
+            const base64 = btoa(
+                new Uint8Array(content)
+                  .reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            const mimeType = selected.toLowerCase().endsWith('.png') ? 'image/png' : 
+                             selected.toLowerCase().endsWith('.gif') ? 'image/gif' : 
+                             'image/jpeg';
+            
+            cropImgSrc.value = `data:${mimeType};base64,${base64}`;
+            showCropper.value = true;
+        }
+    } catch (e) {
+        console.error('Failed to open file dialog:', e);
+    }
+};
+
+const handleCropConfirm = (data) => {
+    configStore.updateConfig({ userAvatarPath: data });
+    showCropper.value = false;
+};
 
 const presets = computed(() => configStore.settings.presets || []);
 const allModels = computed(() => {
@@ -100,6 +142,12 @@ onMounted(() => {
 onUnmounted(() => {
     window.removeEventListener('click', handleClickOutside);
 });
+
+const resolveAvatarSrc = (path) => {
+    if (!path) return '';
+    if (path.startsWith('data:') || path.startsWith('http')) return path;
+    return convertFileSrc(path);
+};
 </script>
 
 <template>
@@ -137,6 +185,21 @@ onUnmounted(() => {
                 </div>
               </div>
             </Transition>
+          </div>
+        </div>
+      </section>
+
+      <!-- 用户头像 -->
+      <section class="config-card">
+        <div class="card-header">
+          <div class="icon-wrap">👤</div>
+          <div class="title-wrap">
+            <label>用户头像</label>
+            <span class="hint">显示在聊天的用户气泡旁</span>
+          </div>
+          <div class="avatar-preview-wrap" @click="handleAvatarUpload">
+             <img v-if="configStore.settings.userAvatarPath" :src="resolveAvatarSrc(configStore.settings.userAvatarPath)" class="avatar-small" />
+             <div v-else class="avatar-placeholder">+</div>
           </div>
         </div>
       </section>
@@ -247,6 +310,15 @@ onUnmounted(() => {
         </div>
       </section>
     </div>
+
+    <!-- Image Cropper -->
+    <ImageCropperModal 
+      :show="showCropper"
+      :imgSrc="cropImgSrc"
+      :fixedBox="false"
+      @close="showCropper = false"
+      @confirm="handleCropConfirm"
+    />
   </div>
 </template>
 
@@ -520,4 +592,20 @@ input:checked + .slider:before {
   opacity: 0;
   transform: translateY(-10px);
 }
+
+.avatar-preview-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-input);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-glass);
+  margin-left: auto;
+}
+.avatar-small { width: 100%; height: 100%; object-fit: cover; }
+.avatar-placeholder { color: var(--text-tertiary); font-size: 20px; }
 </style>

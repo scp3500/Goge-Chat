@@ -45,6 +45,14 @@ pub struct ChatMessage {
 // --- 数据库初始化与迁移 ---
 
 pub fn init_db(conn: &Connection) -> Result<()> {
+    // 🚀 性能优化：启用 WAL 模式和优化同步设置
+    conn.execute_batch(
+        "PRAGMA journal_mode = WAL;
+         PRAGMA synchronous = NORMAL;
+         PRAGMA cache_size = -2000;
+         PRAGMA foreign_keys = ON;",
+    )?;
+
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS folders (
@@ -74,6 +82,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
         );
+        CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages (session_id);
     ",
     )?;
 

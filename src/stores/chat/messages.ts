@@ -117,7 +117,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
     };
 
     const loadMessages = async (sessionId: string) => {
-        // 🔧 修复：只在真正需要时清空，避免在加载过程中显示空白
+        // 🔧 修复：立即清空当前消息，确保淡入淡出动画有一个干净的起点
+        currentMessages.value = [];
         isLoading.value = true;
         try {
             const history = await invoke<any[]>("get_messages", { sessionId });
@@ -283,6 +284,10 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         pausedChunks.value = { content: [], reasoning: [] };
         streamQueue.value = []; // Clear queue at start
 
+        const isStreamEnabled = configStore.settings.chatMode?.enabled
+            ? configStore.settings.chatMode.enableStream
+            : configStore.settings.enableStream;
+
         try {
             await invoke("reset_ai_generation");
 
@@ -351,10 +356,6 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     aiFullContent += content;
 
                     // 🌊 Streaming Control
-                    const isStreamEnabled = configStore.settings.chatMode?.enabled
-                        ? configStore.settings.chatMode.enableStream
-                        : configStore.settings.enableStream;
-
                     if (isStreamEnabled) {
                         for (const char of content) {
                             streamQueue.value.push(char);
@@ -477,17 +478,14 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                         // 🟢 Fix: Explicitly pass the resolved provider and model to the backend
                         // This prevents the backend from falling back to the potentially stale global config
                         explicitProviderId: configStore.settings.defaultProviderId,
-                        explicitModelId: configStore.settings.selectedModelId
+                        explicitModelId: configStore.settings.selectedModelId,
+                        stream: isStreamEnabled
                     }),
                     timeoutPromise
                 ]);
 
                 // 🛑 Non-Streaming Mode: Final Update
                 // If streaming is disabled, we need to manually update the UI with the full content once generation completes.
-                const isStreamEnabled = configStore.settings.chatMode?.enabled
-                    ? configStore.settings.chatMode.enableStream
-                    : configStore.settings.enableStream;
-
                 if (!isStreamEnabled) {
                     const lastMsg = currentMessages.value[currentMessages.value.length - 1];
                     if (lastMsg && lastMsg.role === 'assistant') {

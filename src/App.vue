@@ -12,6 +12,7 @@ import ChatContainer from "./components/chat/ChatContainer.vue";
 import StandardLayout from "./layouts/StandardLayout.vue";
 import MainLayout from "./layouts/MainLayout.vue";
 import SocialChatContainer from "./components/chat/SocialChatContainer.vue";
+import AppNavBar from "./components/layout/AppNavBar.vue";
 
 const appWindow = getCurrentWindow();
 const configStore = useConfigStore();
@@ -19,6 +20,10 @@ const chatStore = useChatStore();
 
 const isMaximized = ref(false); 
 const settingsStore = useSettingsStore();
+
+// UI States lifted from MainLayout
+const activeModule = ref('chat');
+const isCollapsed = ref(false);
 
 // 处理打开设置
 const handleOpenSettings = () => {
@@ -68,41 +73,63 @@ onUnmounted(() => {
 <template>
   <div 
     class="app-layout" 
-    :class="{ 'is-maximized': isMaximized }"
+    :class="{ 
+      'is-maximized': isMaximized,
+      'is-chat-mode': configStore.settings.chatMode.enabled 
+    }"
     @dragover.prevent
     @drop.prevent
   >
-    <TitleBar 
-      :is-settings="settingsStore.isModalOpen" 
-      @open-settings="handleOpenSettings" 
-      @back-home="handleBackToChat" 
-    />
-    
-    <div class="content-area">
-      <transition name="view-fade" mode="out-in">
-        <!-- Standard Layout (Normal Mode) -->
-        <StandardLayout v-if="!configStore.settings.chatMode.enabled && !settingsStore.isModalOpen" />
-        
-        <!-- Main Layout (Immersive Mode) - Always stays mounted even if settings are open -->
-        <MainLayout 
-          v-else-if="configStore.settings.chatMode.enabled"
-          v-slot="{ activeContact }"
-        >
-          <SocialChatContainer 
-            v-if="activeContact"
-            :active-contact="activeContact"
-          />
-        </MainLayout>
-      </transition>
+    <!-- Social Mode: Sidebar-first layout -->
+    <template v-if="configStore.settings.chatMode.enabled">
+      <AppNavBar 
+        v-model:activeModule="activeModule"
+        :is-collapsed="isCollapsed"
+        :is-in-settings="settingsStore.isModalOpen"
+        @toggleCollapse="isCollapsed = !isCollapsed"
+        @openSettings="handleOpenSettings"
+        @backHome="handleBackToChat" 
+      />
+      <div class="main-container">
+        <TitleBar 
+          :is-settings="settingsStore.isModalOpen" 
+          @open-settings="handleOpenSettings" 
+          @back-home="handleBackToChat" 
+        />
+        <div class="content-area">
+          <MainLayout 
+            :is-collapsed="isCollapsed"
+            :active-module="activeModule"
+            v-slot="{ activeContact }"
+          >
+            <SocialChatContainer 
+              v-if="activeContact"
+              :active-contact="activeContact"
+            />
+          </MainLayout>
+        </div>
+      </div>
+    </template>
 
-      <!-- Settings Modal: Only show at root level if NOT in chatMode (for Standard Layout compatibility) -->
-      <transition name="view-fade">
+    <!-- Normal Mode: Original Header-first layout -->
+    <template v-else>
+      <TitleBar 
+        :is-settings="settingsStore.isModalOpen" 
+        @open-settings="handleOpenSettings" 
+        @back-home="handleBackToChat" 
+      />
+      
+      <div class="content-area">
+        <div v-show="!settingsStore.isModalOpen" class="layout-wrapper">
+          <StandardLayout />
+        </div>
         <SettingsModal 
-          v-show="settingsStore.isModalOpen && !configStore.settings.chatMode.enabled" 
+          v-if="settingsStore.isModalOpen"
+          class="settings-overlay"
           @close="handleBackToChat" 
         />
-      </transition>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -143,6 +170,17 @@ html, body, #app {
   -webkit-backdrop-filter: blur(20px);
 }
 
+.app-layout.is-chat-mode {
+  flex-direction: row;
+}
+
+.main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .app-layout.is-maximized { 
   border-radius: 0; 
   border: none;
@@ -152,6 +190,26 @@ html, body, #app {
   flex: 1; 
   position: relative; 
   overflow: hidden; 
+}
+
+.layout-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.settings-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 

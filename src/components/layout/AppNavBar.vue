@@ -1,15 +1,23 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { 
   NAV_PROMPTS_SVG, 
   NAV_MODELS_SVG, 
-  NAV_GENERAL_SVG, 
+  NAV_ADDRESS_BOOK_SVG,
+  NAV_GENERAL_SVG,
   CHEVRON_DOWN_SVG,
   SUN_SVG,
-  MOON_SVG
+  MOON_SVG,
+  HOME_SVG
 } from '../../constants/icons';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/config';
-import { computed } from 'vue';
+
+const resolveAvatarSrc = (path) => {
+  if (!path) return '';
+  if (path.startsWith('data:') || path.startsWith('http')) return path;
+  return convertFileSrc(path);
+};
 
 const props = defineProps({
   activeModule: { type: String, default: 'chat' },
@@ -17,7 +25,22 @@ const props = defineProps({
   isInSettings: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome']);
+const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome', 'openProfile']);
+
+const profile = ref({
+  nickname: 'Guest',
+  avatar: null
+});
+
+const loadProfile = async () => {
+  try {
+    profile.value = await invoke('get_social_profile');
+  } catch (e) {
+    console.warn('Failed to load profile in Nav:', e);
+  }
+};
+
+onMounted(loadProfile);
 
 const handleModuleClick = (moduleId) => {
   emit('update:activeModule', moduleId);
@@ -36,17 +59,24 @@ const toggleTheme = () => {
 
 const modules = [
   { id: 'chat', icon: NAV_PROMPTS_SVG, label: '聊天' },
-  { id: 'contacts', icon: NAV_MODELS_SVG, label: '联系人' },
+  { id: 'address_book', icon: NAV_ADDRESS_BOOK_SVG, label: '通讯录' },
 ];
 
 </script>
 
 <template>
   <nav class="app-nav-bar" :class="{ 'immersive': configStore.settings.chatMode.enabled && isLight }">
-    <div class="nav-top">
-      <div class="logo-container" @click="emit('backHome')">
-        <!-- Placeholder for G logo -->
-        <div class="g-logo">G</div>
+    <div class="nav-top" data-tauri-drag-region>
+      <div 
+        class="user-avatar-container" 
+        @click="emit('openProfile')" 
+        title="个人资料"
+        data-tauri-drag-region
+      >
+        <img v-if="profile.avatar || configStore.settings.userAvatarPath" 
+             :src="resolveAvatarSrc(profile.avatar || configStore.settings.userAvatarPath)" 
+             class="user-avatar" />
+        <div v-else class="avatar-placeholder">{{ profile.nickname[0] }}</div>
       </div>
       
       <div class="nav-items">
@@ -72,8 +102,12 @@ const modules = [
         <div class="icon-wrapper" v-html="isLight ? SUN_SVG : MOON_SVG"></div>
       </button>
 
-      <button class="nav-item" @click="emit('openSettings')" title="设置">
-        <div class="icon-wrapper" v-html="NAV_GENERAL_SVG"></div>
+      <button 
+        class="nav-item" 
+        @click="isInSettings ? emit('backHome') : emit('openSettings')" 
+        :title="isInSettings ? '返回首页' : '设置'"
+      >
+        <div class="icon-wrapper" v-html="isInSettings ? HOME_SVG : NAV_GENERAL_SVG"></div>
       </button>
 
       <button 
@@ -116,28 +150,41 @@ const modules = [
   opacity: 1;
 }
 
-.app-nav-bar.immersive .nav-item.active {
-  color: #07c160; /* WeChat Green */
+.app-nav-bar.immersive .nav-item:hover {
+  background: var(--bg-social-icon-hover); /* Visible box on hover */
+  color: #fff;
 }
 
-.logo-container {
+.app-nav-bar.immersive .nav-item.active {
+  color: #07c160; /* WeChat Green */
+  background: var(--bg-social-icon-active); /* Visible box on active */
+}
+
+.user-avatar-container {
   margin-bottom: 24px;
   display: flex;
   justify-content: center;
   cursor: pointer;
 }
 
-.g-logo {
-  width: 32px;
-  height: 32px;
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 36px;
+  height: 36px;
   background: var(--theme-color);
   color: white;
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-size: 1.2rem;
+  font-weight: 600;
+  font-size: 1.1rem;
 }
 
 .nav-items {

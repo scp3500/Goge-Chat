@@ -117,6 +117,19 @@ onUnmounted(() => window.removeEventListener('click', handleClickOutside));
 
 const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 
+const getMenuStyle = computed(() => {
+    const inputWrapper = document.querySelector('.input-wrapper');
+    if (!inputWrapper) return {};
+    const wrapRect = inputWrapper.getBoundingClientRect();
+    return {
+        position: 'fixed',
+        bottom: (window.innerHeight - wrapRect.top) + 'px',
+        left: wrapRect.left + 'px',
+        width: wrapRect.width + 'px',
+        borderRadius: '28px 28px 0 0'
+    };
+});
+
 </script>
 
 <template>
@@ -130,78 +143,80 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
       <span v-html="NAV_PROMPTS_SVG"></span>
     </button>
 
-    <Transition name="fade-slide">
-      <div v-if="isOpen" class="prompt-menu-popup modern-scroll" @click.stop>
-        <div v-if="!isEditing" class="menu-content">
-          <div class="menu-list">
-              <!-- Header label inside list -->
-              <div class="section-label-item">
-                  <span>角色库</span>
-                  <span class="count">{{ configStore.settings.promptLibrary.length }} 个角色</span>
-              </div>
-              
-              <div class="prompt-items-container custom-scrollbar">
-                  <div 
-                      v-for="p in configStore.settings.promptLibrary" 
-                      :key="`widget-lib-${p.id}`"
-                      class="menu-item-nested"
-                      :class="{ active: currentSession?.system_prompt === p.content }"
-                      @click="applyLibrary(p)"
-                  >
-                      <div class="item-left">
-                          <span class="p-icon">{{ p.icon }}</span>
-                          <div class="p-info">
-                              <span class="p-name">{{ p.name }}</span>
-                              <span class="p-desc" v-if="p.description">{{ p.description }}</span>
-                          </div>
-                      </div>
-                      <div class="p-check" v-if="currentSession?.system_prompt === p.content" v-html="CHECK_SVG"></div>
-                  </div>
-              </div>
-          </div>
+    <Teleport to="body">
+      <Transition name="fade-slide">
+        <div v-if="isOpen" class="prompt-menu-popup-global modern-scroll" :style="getMenuStyle" @click.stop>
+          <div v-if="!isEditing" class="menu-content">
+            <div class="menu-list">
+                <!-- Header label inside list -->
+                <div class="section-label-item">
+                    <span>角色库</span>
+                    <span class="count">{{ configStore.settings.promptLibrary.length }} 个角色</span>
+                </div>
+                
+                <div class="prompt-items-container custom-scrollbar">
+                    <div 
+                        v-for="p in configStore.settings.promptLibrary" 
+                        :key="`widget-lib-${p.id}`"
+                        class="menu-item-nested"
+                        :class="{ active: currentSession?.system_prompt === p.content }"
+                        @click="applyLibrary(p)"
+                    >
+                        <div class="item-left">
+                            <span class="p-icon">{{ p.icon }}</span>
+                            <div class="p-info">
+                                <span class="p-name">{{ p.name }}</span>
+                                <span class="p-desc" v-if="p.description">{{ p.description }}</span>
+                            </div>
+                        </div>
+                        <div class="p-check" v-if="currentSession?.system_prompt === p.content" v-html="CHECK_SVG"></div>
+                    </div>
+                </div>
+            </div>
 
-          <div class="menu-footer">
-            <div class="footer-left">会话设置</div>
-            <div class="footer-actions">
-                <button class="footer-btn" @click="isEditing = true">
-                    <span v-html="EDIT_SVG"></span>
-                    <span>手动编辑</span>
-                </button>
-                <button class="footer-btn" @click="handleNewPrompt">
-                    <span v-html="PLUS_SVG"></span>
-                    <span>新建角色</span>
-                </button>
-                <button class="footer-btn danger" @click="clearPrompt" v-if="isUsingCustom">
-                    <span v-html="CLOSE_SVG"></span>
-                    <span>清除自定义</span>
-                </button>
-                <div class="v-divider"></div>
-                <button class="footer-btn" @click="settingsStore.openSettings('prompts'); isOpen = false">
-                    <span v-html="SETTINGS_SVG"></span>
-                    <span>管理库</span>
-                </button>
+            <div class="menu-footer">
+              <div class="footer-left">会话设置</div>
+              <div class="footer-actions">
+                  <button class="footer-btn" @click="isEditing = true">
+                      <span v-html="EDIT_SVG"></span>
+                      <span>手动编辑</span>
+                  </button>
+                  <button class="footer-btn" @click="handleNewPrompt">
+                      <span v-html="PLUS_SVG"></span>
+                      <span>新建角色</span>
+                  </button>
+                  <button class="footer-btn danger" @click="clearPrompt" v-if="isUsingCustom">
+                      <span v-html="CLOSE_SVG"></span>
+                      <span>清除自定义</span>
+                  </button>
+                  <div class="v-divider"></div>
+                  <button class="footer-btn" @click="settingsStore.openSettings('prompts'); isOpen = false">
+                      <span v-html="SETTINGS_SVG"></span>
+                      <span>管理库</span>
+                  </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div v-else class="wide-edit-box">
-             <div class="edit-header">
-                <span>手动编辑系统提示词</span>
-                <button class="close-btn-mini" @click="isEditing = false" v-html="CLOSE_SVG"></button>
-             </div>
-             <textarea 
-                ref="textareaRef"
-                v-model="localPrompt" 
-                placeholder="在此输入特定的系统指令，这些指令将优先于全局设置..." 
-                class="wide-textarea modern-scroll"
-             ></textarea>
-             <div class="edit-footer-btns">
-                <button class="btn-cancel" @click="isEditing = false">取消</button>
-                <button class="btn-save" @click="saveCurrentEdit">保存更改</button>
-             </div>
+          <div v-else class="wide-edit-box">
+               <div class="edit-header">
+                  <span>手动编辑系统提示词</span>
+                  <button class="close-btn-mini" @click="isEditing = false" v-html="CLOSE_SVG"></button>
+               </div>
+               <textarea 
+                  ref="textareaRef"
+                  v-model="localPrompt" 
+                  placeholder="在此输入特定的系统指令，这些指令将优先于全局设置..." 
+                  class="wide-textarea modern-scroll"
+               ></textarea>
+               <div class="edit-footer-btns">
+                  <button class="btn-cancel" @click="isEditing = false">取消</button>
+                  <button class="btn-save" @click="saveCurrentEdit">保存更改</button>
+               </div>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
 
     <NamePresetModal 
       :show="showNameModal" 
@@ -266,23 +281,17 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 }
 
 /* Full-width Popup Styles (Perfect Mirror of Search Menu) */
-.prompt-menu-popup {
-  position: absolute;
-  bottom: calc(100% - 1px);
-  left: 0;
-  right: 0;
-  margin: 0 auto;
-  width: 92%;
+.prompt-menu-popup-global {
+  position: fixed;
   background: var(--bg-menu);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-menu);
   border-bottom: none;
-  border-radius: 28px 28px 0 0;
   box-shadow: 
     0 -10px 30px rgba(0, 0, 0, 0.25),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  z-index: 1000;
+  z-index: 100000;
   overflow: hidden;
   padding: 8px;
   display: flex;

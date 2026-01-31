@@ -109,8 +109,8 @@
     --bg-button-active: rgba(129, 140, 248, 0.2);
 
     /* 12. Extracted Component Variables */
-    --bg-assistant-bubble: transparent;
-    --border-assistant-bubble: transparent;
+    --bg-assistant-bubble: #2c2c2c;
+    --border-assistant-bubble: rgba(255, 255, 255, 0.05);
 
     --bg-dropdown: rgba(15, 15, 17, 0.88);
     --border-dropdown: rgba(255, 255, 255, 0.1);
@@ -127,4 +127,10 @@
     --theme-preset-2: #1b1b1f;
     --theme-preset-3: #0f0f10;
     --theme-preset-4: #2c2c32;
+
+    /* 13. Social Mode Interactions */
+    --bg-social-item-hover: #2e2e2e;
+    --bg-social-item-active: #3a3a3a;
+    --bg-social-icon-hover: rgba(255, 255, 255, 0.1);
+    --bg-social-icon-active: rgba(255, 255, 255, 0.15);
 }

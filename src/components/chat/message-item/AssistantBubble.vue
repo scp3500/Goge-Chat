@@ -6,7 +6,8 @@ import ReasoningBlock from './ReasoningBlock.vue';
 const props = defineProps({
   message: Object,
   renderedContent: String,
-  isReasoningExpanded: Boolean
+  isReasoningExpanded: Boolean,
+  isChatMode: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['toggle-reasoning', 'link-click']);
@@ -22,7 +23,7 @@ const searchResults = computed(() => {
 </script>
 
 <template>
-  <div class="assistant-bubble-content">
+  <div class="assistant-bubble-content" :class="{ 'standard-mode': !isChatMode }">
     <template v-if="message.content === '__LOADING__' && !message.reasoningContent">
       <div class="typing-indicator"><span></span><span></span><span></span></div>
     </template>
@@ -54,11 +55,44 @@ const searchResults = computed(() => {
 .assistant-bubble-content {
   background: var(--bg-assistant-bubble);
   border: 1px solid var(--border-assistant-bubble);
-  border-radius: 12px;
-  padding: 0 12px; /* Add some padding if a background is set */
+  padding: 6px 12px;
+  width: fit-content;
+  max-width: 90%;
 }
 
-.markdown-body { font-size: 16px; line-height: 1.7; color: var(--text-color-white); }
+.assistant-bubble-content.standard-mode {
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.markdown-body { 
+  font-size: 15px; 
+  line-height: 1.6; 
+  color: var(--text-color-white); 
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.standard-mode .markdown-body {
+  display: block;
+  width: 100%;
+}
+
+.markdown-body :deep(p) { 
+  margin: 0 !important; 
+  display: inline; /* Prevent p from stretching bubble */
+}
+
+.standard-mode .markdown-body :deep(p) {
+  display: block;
+  margin-bottom: 1.2em !important;
+}
+.markdown-body :deep(*:last-child) { margin-bottom: 0 !important; }
+.markdown-body :deep(*:first-child) { margin-top: 0 !important; }
 
 /* Modern Typing Indicator - Minimal & Clean */
 .typing-indicator {

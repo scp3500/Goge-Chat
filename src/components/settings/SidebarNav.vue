@@ -5,7 +5,8 @@ import {
   NAV_PROMPTS_SVG, 
   NAV_APPEARANCE_SVG, 
   NAV_GENERAL_SVG, 
-  NAV_DATA_SVG 
+  NAV_DATA_SVG,
+  NAV_PROFILE_SVG
 } from '../../constants/icons';
 
 defineProps({
@@ -17,6 +18,10 @@ defineEmits(['update:activeCategory']);
 <template>
   <aside class="nav-sidebar">
     <div class="nav-group">
+      <div class="nav-item" :class="{ active: activeCategory === 'profile' }" @click="$emit('update:activeCategory', 'profile')">
+        <span class="icon" v-html="NAV_PROFILE_SVG"></span>
+        <span class="label">个人资料</span>
+      </div>
       <div class="nav-item" :class="{ active: activeCategory === 'models' }" @click="$emit('update:activeCategory', 'models')">
         <span class="icon" v-html="NAV_MODELS_SVG"></span>
         <span class="label">模型服务</span>

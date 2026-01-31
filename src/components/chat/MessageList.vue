@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted, onBeforeUnmount, nextTick } from 'vue';
 import { debounce } from '../../utils/format';
 import { useChatStore } from "../../stores/chat"; 
 import { useScrollRestore } from '../../composables/useScrollRestore';
@@ -7,14 +7,31 @@ import MessageItem from './MessageItem.vue';
 import ModernConfirm from './ModernConfirm.vue';
 import SystemPromptBanner from './SystemPromptBanner.vue';
 
-const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride']);
-const emit = defineEmits(['update-pos']);
+const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride', 'showSystemPrompt', 'assistantAvatar', 'assistantName']);
+const emit = defineEmits(['update-pos', 'delete', 'regenerate', 'save-edit']);
 
 const chatStore = useChatStore();
 const scrollRef = ref(null);
 const isRestoring = ref(false); 
 const isUserScrolledUp = ref(false); // 💡 追踪用户是否手动向上滚动
-const { performRestore } = useScrollRestore();
+// 💡 Simplified Scroll Logic: Always to Bottom
+const scrollToBottomDefault = async () => {
+   await nextTick();
+   setTimeout(() => {
+     if (scrollRef.value) {
+       scrollRef.value.scrollTo({
+         top: scrollRef.value.scrollHeight,
+         behavior: 'auto' // Instant jump
+       });
+     }
+   }, 50); // Small delay to allow layout stability
+};
+
+const saveScrollPosition = () => {
+   if (!scrollRef.value || !props.sessionId) return;
+   const { scrollTop } = scrollRef.value;
+   chatStore.updateSessionScroll(props.sessionId, Math.floor(scrollTop));
+};
 
 // 💡 编辑状态
 const editingIndex = ref(-1);
@@ -63,15 +80,40 @@ const executeConfirm = async () => {
 
 const handleSaveEdit = async (event, index, m) => {
   triggerConfirm(event, index, m, '修改并重新生成', async () => {
-    await chatStore.editMessageAction(m.id, index, editingContent.value);
+    if (props.themeOverride) {
+      emit('save-edit', m.id, index, editingContent.value);
+    } else {
+      await chatStore.editMessageAction(m.id, index, editingContent.value);
+    }
     cancelEdit();
   });
 };
 
-const handleDelete = async (event, index, m) => {
+const handleDelete = async (messageId, event) => {
+  // Find the message and index from props.messages
+  const index = props.messages.findIndex(msg => msg.id === messageId);
+  const m = props.messages[index];
+  
+  if (!m) return;
+
   triggerConfirm(event, index, m, '删除消息', async () => {
-    await chatStore.deleteMessageAction(m.id, index);
+    if (props.themeOverride) {
+      emit('delete', messageId, index);
+    } else {
+      await chatStore.deleteMessageAction(messageId, index);
+    }
   });
+};
+
+const handleRegenerate = (messageId, event) => {
+  const index = props.messages.findIndex(msg => msg.id === messageId);
+  if (index === -1) return;
+
+  if (props.themeOverride) {
+    emit('regenerate', messageId, index);
+  } else {
+    chatStore.regenerateAction(index);
+  }
 };
 
 // 💡 暴露给父组件的滚动方法
@@ -100,18 +142,11 @@ const handleScroll = debounce((e) => {
 }, 150);
 
 // 监听消息变化，实现智能自动滚动
+// 监听消息变化，实现智能自动滚动
 watch(() => props.messages, async (newVal, oldVal) => {
-  // 如果是由于切换会话导致的消息变化，不要滚动 (由 restore 处理)
-  // 通过检查长度变化来简单判定是否是流式更新
-  // 如果没有手动向上滚动，则自动滚动到底部
-  if (!isUserScrolledUp.value && !isRestoring.value) {
-     await nextTick();
-     if (scrollRef.value) {
-       scrollRef.value.scrollTo({
-         top: scrollRef.value.scrollHeight + 100, // 添加额外偏移确保滚到最底部
-         behavior: 'smooth' // 丝滑滚动
-       });
-     }
+  // If we have new messages or it's a fresh load, scroll to bottom
+  if ((newVal.length > 0 && !isUserScrolledUp.value) || newVal.length !== oldVal?.length) {
+      scrollToBottomDefault();
   }
 }, { deep: true });
 
@@ -134,31 +169,34 @@ watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
 });
 
 // 核心监听:切换会话触发坐标恢复
+// 核心监听:切换会话触发坐标恢复
+// 核心监听:切换会话触发坐标恢复
 watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
   if (!newId || loading) return;
-  isRestoring.value = true;
-  // 重置滚动状态
+  
   isUserScrolledUp.value = false;
   
+  // Always scroll to bottom on session switch
   if (props.messages?.length > 0) {
-    await performRestore(scrollRef.value, props.initialScrollPos || 0);
+    scrollToBottomDefault();
   }
-  
-  setTimeout(() => { isRestoring.value = false; }, 500);
 }, { immediate: true });
 
 onMounted(() => {
   scrollRef.value?.addEventListener('scroll', handleScroll);
 });
 
-onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
+onBeforeUnmount(() => {
+  saveScrollPosition(); // 💾 Save BEFORE unmounting (when DOM is still valid)
+  scrollRef.value?.removeEventListener('scroll', handleScroll);
+});
 </script>
 
 <template>
   <div class="message-display modern-scroll" ref="scrollRef">
     <Transition name="list-fade">
       <div v-if="!chatStore.isLoading" :key="sessionId" class="scroll-content-wrapper">
-        <SystemPromptBanner />
+        <SystemPromptBanner v-if="showSystemPrompt !== false" />
         
         <MessageItem 
           v-for="(m, i) in messages.filter(msg => msg.role !== 'system')" 
@@ -168,15 +206,17 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
           :sessionId="sessionId"
           :isEditing="editingIndex === i"
           :themeOverride="themeOverride"
+          :assistantAvatar="assistantAvatar"
+          :assistantName="assistantName"
           @start-edit="startEdit(i, m.content)"
           @cancel-edit="cancelEdit"
           @update-edit-content="val => editingContent = val"
           @save-edit="e => handleSaveEdit(e, i, m)"
-          @delete="e => handleDelete(e, i, m)"
+          @delete="(id, event) => handleDelete(id, event)"
+          @regenerate="(id, event) => handleRegenerate(id, event)"
         />
       </div>
     </Transition>
-
     <ModernConfirm 
       :show="confirmState.show"
       :x="confirmState.x"
@@ -189,14 +229,16 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
 </template>
 
 <style scoped>
-.message-display { flex: 1; padding: 40px 6% 60px 6%; display: flex; flex-direction: column; overflow-y: auto; position: relative; overflow-anchor: none !important; }
+.message-display { flex: 1; padding: 40px 6% 80px 6%; display: flex; flex-direction: column; overflow-y: auto; position: relative; overflow-anchor: none !important; }
 .scroll-content-wrapper { display: flex; flex-direction: column; gap: 48px; width: 100%; margin: 0 auto; backface-visibility: hidden; }
 
+/* 🕊️ 优雅淡入淡出 */
 .list-fade-enter-active { transition: all 0.3s ease-out; }
 .list-fade-leave-active { position: absolute; width: 100%; opacity: 0; }
 .list-fade-enter-from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+.list-fade-leave-to { opacity: 0; }
 
 .modern-scroll::-webkit-scrollbar { width: 6px; }
-.modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
+.modern-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); border-radius: 10px; }
 .modern-scroll::-webkit-scrollbar-track { background: transparent; }
 </style>
