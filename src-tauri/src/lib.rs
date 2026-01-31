@@ -2,7 +2,8 @@
 
 mod commands;
 mod db;
-mod models; // I'll rename the file to avoid conflict or just use it as a module
+mod models;
+mod social_db;
 
 use crate::db::DbState;
 use rusqlite::Connection;
@@ -270,6 +271,13 @@ pub fn run() {
             // ✨ 【状态管理】：注入数据库连接
             app.manage(DbState(Mutex::new(conn)));
 
+            // --- 3. 初始化社交数据库 (gole_social.db) ---
+            let social_db_path = data_dir.join("gole_social.db");
+            println!("💾 [Setup] 使用社交数据库路径: {:?}", social_db_path);
+            let social_conn = Connection::open(&social_db_path).expect("无法初始化社交数据库连接");
+            social_db::init_social_db(&social_conn).expect("社交数据库初始化失败");
+            app.manage(social_db::SocialDbState(Mutex::new(social_conn)));
+
             // ✨ 【核心新增】：注入物理中断状态锁
             app.manage(GoleState {
                 stop_flag: Arc::new(AtomicBool::new(false)),
@@ -311,6 +319,12 @@ pub fn run() {
             commands::file_cmd::open_file,
             commands::file_cmd::read_file_text_content,
             commands::file_cmd::upload_user_avatar,
+            // 社交数据库指令
+            social_db::get_social_profile,
+            social_db::get_social_contacts,
+            social_db::get_social_groups,
+            social_db::get_social_setting,
+            social_db::set_social_setting,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

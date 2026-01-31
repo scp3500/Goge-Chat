@@ -8,8 +8,9 @@ import { useSettingsStore } from './stores/settings';
 // 导入组件
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
 import TitleBar from "./components/TitleBar.vue";
-import SideBar from "./components/sidebar/layout/SideBar.vue";
 import ChatContainer from "./components/chat/ChatContainer.vue";
+import StandardLayout from "./layouts/StandardLayout.vue";
+import MainLayout from "./layouts/MainLayout.vue";
 
 const appWindow = getCurrentWindow();
 const configStore = useConfigStore();
@@ -77,29 +78,18 @@ onUnmounted(() => {
     />
     
     <div class="content-area">
-      <!-- 使用 v-show 替代 v-if，保持 ChatContainer 不被卸载 -->
-      <transition name="view-fade">
-        <div v-show="!settingsStore.isModalOpen" class="main-view">
-          <SideBar 
-            :active="chatStore.activeId" 
-            :list="chatStore.historyList" 
-            @create="chatStore.createSession" 
-            @select="id => chatStore.switchSession(id)"
-            @delete="id => chatStore.deleteSession(id)"
-            @rename="chatStore.renameSession"
-            @reorder="newList => chatStore.reorderSessions(newList)"
-            @reorder-folders="newList => chatStore.reorderFolders(newList)"
-            @new-folder="chatStore.createFolder('新建文件夹')"
-          />
+      <transition name="view-fade" mode="out-in">
+        <StandardLayout v-if="!configStore.settings.chatMode.enabled && !settingsStore.isModalOpen" />
+        
+        <MainLayout v-else-if="configStore.settings.chatMode.enabled && !settingsStore.isModalOpen">
           <ChatContainer 
             v-if="chatStore.activeId !== null"
             :key="chatStore.activeId"
           />
-          
           <div v-else class="empty-chat">
             <p>选择或创建一个对话开始</p>
           </div>
-        </div>
+        </MainLayout>
       </transition>
 
       <transition name="view-fade">
