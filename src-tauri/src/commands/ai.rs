@@ -15,13 +15,17 @@ pub async fn ask_ai(
     window: Window,
     temperature: Option<f32>,
     max_tokens: Option<u32>,
+    // 🟢 新增：允许前端显式传入当前绘画的 provider 和 model
+    explicit_provider_id: Option<String>,
+    explicit_model_id: Option<String>,
 ) -> Result<(), String> {
     // 1. 加载配置
     let config = config_cmd::load_config(app).await?;
 
     // 2. 确定当前使用的模型和提供商
-    let selected_model = config.selected_model_id.clone();
-    let selected_provider_id = config.default_provider_id.clone();
+    // 优先使用显式传入的参数，如果没有（旧版前端），则回退到全局配置
+    let selected_model = explicit_model_id.unwrap_or(config.selected_model_id.clone());
+    let selected_provider_id = explicit_provider_id.unwrap_or(config.default_provider_id.clone());
 
     // 从 providers 数组中找到当前选中的提供商配置
     let providers = config
@@ -156,10 +160,17 @@ pub async fn ask_ai(
 
     let url = if disable_url_suffix {
         base_url.clone()
-    } else if base_url.ends_with("/chat/completions") {
-        base_url.clone()
     } else {
-        format!("{}/chat/completions", base_url.trim_end_matches('/'))
+        let base = base_url.trim_end_matches('/');
+        if base.ends_with("/chat/completions") {
+            base.to_string()
+        } else if base.ends_with("/v1") {
+            format!("{}/chat/completions", base)
+        } else {
+            // 🛡️ 修复：如果不包含 v1，自动补全 /v1/chat/completions，与前端测试保持一致
+            // 这解决了类似 https://api.ohmygpt.com 这种 BaseURL 导致的测试通过但对话失败的问题
+            format!("{}/v1/chat/completions", base)
+        }
     };
 
     println!("🔗 最终对话请求地址: {}", url);

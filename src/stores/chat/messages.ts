@@ -135,7 +135,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             if (activeId.value === sessionId) {
                 let newMessages = history && history.length > 0
                     ? history.map(m => ({
-                        ...m
+                        ...m,
+                        providerId: m.provider // 🟢 Fix: Map DB provider field to frontend providerId
                     }))
                     : [];
 
@@ -145,6 +146,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     newMessages.push({
                         role: "assistant", // 确保是 assistant
                         model: configStore.settings.selectedModelId,
+                        providerId: configStore.settings.defaultProviderId, // 🟢 Fix
                         content: tempGeneratedMessage.value.content || "",
                         reasoningContent: tempGeneratedMessage.value.reasoning || "",
                         // id 为空表示未保存
@@ -160,9 +162,31 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     isInternalSync = true;
                     // 如果会话有特定配置，则使用；否则回滚到全局默认值
                     configStore.settings.defaultPresetId = session.preset_id || configStore.settings.globalPresetId;
-                    configStore.settings.selectedModelId = session.model_id || configStore.settings.globalModelId;
-                    // 同步会话系统提示词（如果有）
-                    configStore.settings.defaultSystemPrompt = session.system_prompt || configStore.settings.defaultSystemPrompt;
+
+                    const targetModelId = session.model_id || configStore.settings.globalModelId;
+                    configStore.settings.selectedModelId = targetModelId;
+
+                    // 🟢 Fix: auto-detect provider based on model ID
+                    // Many users (and the code) forget to save/sync the provider ID, leading to "DeepSeek" default.
+                    // We reverse-lookup the provider that owns this model.
+                    if (targetModelId) {
+                        const allProviders = configStore.settings.providers || [];
+                        const ownerProvider = allProviders.find(p =>
+                            p.models?.some((m: any) => {
+                                const mId = typeof m === 'string' ? m : m.id;
+                                return mId === targetModelId;
+                            })
+                        );
+
+                        if (ownerProvider) {
+                            console.log(`[loadMessages] Auto-detected provider for model ${targetModelId}:`, ownerProvider.id);
+                            configStore.settings.defaultProviderId = ownerProvider.id;
+                        }
+                    }
+
+                    // 🟢 Fix: Do NOT overwrite global defaultSystemPrompt with session specific prompt.
+                    // The global setting should only be changed by the user in Settings.
+                    // configStore.settings.defaultSystemPrompt = session.system_prompt || configStore.settings.defaultSystemPrompt;
                     setTimeout(() => { isInternalSync = false; }, 0);
                 }
             }
@@ -184,6 +208,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             sessionId,
             role: "assistant",
             model: configStore.settings.selectedModelId,
+            provider: configStore.settings.defaultProviderId, // 🟢 Fix: Pass provider to backend
             content,
             reasoningContent,
             fileMetadata,
@@ -287,6 +312,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             currentMessages.value.push({
                 role: "assistant",
                 model: configStore.settings.selectedModelId,
+                providerId: configStore.settings.defaultProviderId, // 🟢 Fix: Store provider ID explicitly
                 content: '__LOADING__',
                 reasoningContent: '',
                 fileMetadata: null,
@@ -324,13 +350,18 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     const content = data.substring(2);
                     aiFullContent += content;
 
-                    // 🌊 Push to smooth queue instead of direct rendering
-                    for (const char of content) {
-                        streamQueue.value.push(char);
-                    }
+                    // 🌊 Streaming Control
+                    const isStreamEnabled = configStore.settings.chatMode?.enabled
+                        ? configStore.settings.chatMode.enableStream
+                        : configStore.settings.enableStream;
 
-                    // Kickstart the processor if idle
-                    processStreamQueue();
+                    if (isStreamEnabled) {
+                        for (const char of content) {
+                            streamQueue.value.push(char);
+                        }
+                        // Kickstart the processor if idle
+                        processStreamQueue();
+                    }
                 }
                 // 处理推理流
                 else if (data.startsWith("r:")) {
@@ -366,7 +397,17 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
 
             // 注入系统提示词
             // 策略：如果第一条不是系统提示词，则插入；如果是，则按需更新内容
-            const finalSystemPrompt = activePreset?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+            let presetPrompt = activePreset?.systemPrompt;
+
+            // 🟢 Fix: 如果使用的是“默认预设”（default_preset），则强制忽略预设内部可能保存的旧提示词，
+            // 直接使用用户在全局设置中配置的“默认系统提示词”。
+            // 这响应了用户的需求：“不要让别的（旧预设值）影响它，直接用设置里的那个”。
+            if (activePreset?.id === 'default_preset') {
+                presetPrompt = "";
+            }
+
+            const finalSystemPrompt = presetPrompt || configStore.settings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
 
             if (msgsToSend.length > 0 && msgsToSend[0].role !== 'system') {
                 msgsToSend.unshift({
@@ -384,6 +425,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             const sessionSpecificPrompt = activeSession.value?.system_prompt;
             if (sessionSpecificPrompt) {
                 if (msgsToSend.length === 0 || msgsToSend[0].role !== 'system') {
+                    console.log('🧠 [DEBUG] Injecting session specific system prompt:', sessionSpecificPrompt);
                     msgsToSend.unshift({
                         role: 'system',
                         content: sessionSpecificPrompt,
@@ -392,6 +434,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                         searchMetadata: null
                     });
                 } else {
+                    console.log('🧠 [DEBUG] Updating existing system prompt with session specific:', sessionSpecificPrompt);
                     msgsToSend[0].content = sessionSpecificPrompt;
                 }
             }
@@ -419,12 +462,40 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
 
             // 调用 AI
             try {
-                await invoke("ask_ai", {
-                    msg: msgsToSend,
-                    onEvent,
-                    temperature: activePreset?.temperature,
-                    max_tokens: activePreset?.maxTokens
+                // 🛡️ 修复：增加 60 秒超时保护，防止后端无响应导致一直转圈
+                // Create a timeout promise
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error("Request timed out")), 60000);
                 });
+
+                await Promise.race([
+                    invoke("ask_ai", {
+                        msg: msgsToSend,
+                        onEvent,
+                        temperature: activePreset?.temperature,
+                        max_tokens: activePreset?.maxTokens,
+                        // 🟢 Fix: Explicitly pass the resolved provider and model to the backend
+                        // This prevents the backend from falling back to the potentially stale global config
+                        explicitProviderId: configStore.settings.defaultProviderId,
+                        explicitModelId: configStore.settings.selectedModelId
+                    }),
+                    timeoutPromise
+                ]);
+
+                // 🛑 Non-Streaming Mode: Final Update
+                // If streaming is disabled, we need to manually update the UI with the full content once generation completes.
+                const isStreamEnabled = configStore.settings.chatMode?.enabled
+                    ? configStore.settings.chatMode.enableStream
+                    : configStore.settings.enableStream;
+
+                if (!isStreamEnabled) {
+                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        // Replace __LOADING__ with actual content
+                        if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                        lastMsg.content = aiFullContent;
+                    }
+                }
             } finally {
 
                 unlistenSearch();
@@ -447,8 +518,36 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 autoSummaryTitle(sessionId);
             }
             console.log("💾 [SAVE] === END SAVING ===");
-        } catch (error) {
+        } catch (error: any) {
             console.error("对话失败:", error);
+
+            // 🚨 Error Handling UI
+            const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+            if (lastMsg.role === 'assistant' && lastMsg.content === '__LOADING__') {
+                // Determine error type based on message
+                let errorType = 'unknown';
+                let errorMsg = error.message || String(error);
+                let details = '';
+
+                if (errorMsg.includes('timed out')) {
+                    errorType = 'timeout';
+                    errorMsg = '请求超时 (60s)，请检查网络或稍后重试。';
+                } else if (errorMsg.includes('quota') || errorMsg.includes('429')) {
+                    errorType = 'quota';
+                    errorMsg = '请求速率超过限制或配额不足。';
+                    details = 'https://ai.google.dev/gemini-api/docs/rate-limits';
+                }
+
+                // Replace loading message with error state
+                lastMsg.content = '';
+                lastMsg.error = {
+                    message: errorMsg,
+                    type: errorType,
+                    details: details,
+                    originalError: String(error)
+                };
+            }
+
         } finally {
             isGenerating.value = false;
             // 清空生成会话状态和缓存

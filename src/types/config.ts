@@ -1,3 +1,31 @@
+// 模型功能特性
+export interface ModelFeatures {
+    vision?: boolean;     // 视觉识别
+    web?: boolean;        // 联网搜索
+    reasoning?: boolean;  // 深度思考/推理
+    tools?: boolean;      // 工具调用/函数调用
+    image?: boolean;      // 图像生成
+}
+
+// 具体模型配置
+export interface ModelConfig {
+    id: string;           // 模型标识（API 使用的 ID）
+    name: string;         // 显示名称
+    group?: string;       // 分组名称（如 "Gemini 2.5", "Gemini 3"）
+    features?: ModelFeatures;
+}
+
+// 模型详细信息
+export interface ModelInfo {
+    id: string;      // 对应供应商的原始 id，如 'gemini-1.5-pro'
+    name: string;    // 显示名称，如 'Gemini 1.5 Pro'
+    group?: string;  // 分组名称，如 'Gemini 1.5'
+    features?: ModelFeature[]; // 模型特性
+}
+
+// 模型特性类型
+export type ModelFeature = 'vision' | 'search' | 'reasoning' | 'tools' | 'web';
+
 // 模型提供商配置
 export interface ModelProviderConfig {
     id: string;
@@ -6,13 +34,14 @@ export interface ModelProviderConfig {
     enabled: boolean;
     apiKey: string;
     baseUrl?: string;
-    models: string[];
+    models: (string | ModelInfo)[]; // 兼容旧版本的字符串数组
     defaultModel?: string;
     temperature?: number;
     maxTokens?: number;
     customParams?: Record<string, any>;
     disableUrlSuffix?: boolean;
     isCustom?: boolean;
+    lastTestModelId?: string;
 }
 
 // 提示词库项
@@ -68,6 +97,14 @@ export interface AppSettings {
     promptLibrary: PromptLibraryItem[];
     defaultSystemPrompt: string;
 
+    // 聊天体验设置
+    enableStream: boolean;      // 是否开启流式传输
+    enableBubble: boolean;      // 是否开启气泡模式
+
+    // 用户头像设置
+    showUserAvatar: boolean;    // 是否显示用户头像
+    userAvatarPath: string;     // 用户头像本地路径
+
     // 搜索设置
     searchInstanceUrl: string;
 
@@ -75,6 +112,17 @@ export interface AppSettings {
 
     // 兼容旧版本的 apiKey（将逐步废弃）
     apiKey?: string;
+
+    // Chat Mode Configuration
+    chatMode: ChatModeConfig;
+}
+
+export interface ChatModeConfig {
+    enabled: boolean;
+    dayThemeId: string;
+    nightThemeId: string;
+    enableStream: boolean;      // Override global stream setting
+    enableLoadingBar: boolean; // Show/Hide "Thinking..." or progress bar
 }
 
 // 默认的模型提供商配置
@@ -189,12 +237,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
     globalPresetId: 'default_preset',
     promptLibrary: [], // 将在 store init 时根据内置常量初始化
     defaultSystemPrompt: "你是一个简洁专业的 AI 助手。请提供准确、客观、且有见地的回答。",
-    apiKey: '' // 兼容旧版本
+
+    enableStream: true,
+    enableBubble: false,
+    showUserAvatar: false,
+    userAvatarPath: "",
+
+    apiKey: '', // 兼容旧版本
+    chatMode: {
+        enabled: false,
+        dayThemeId: 'wechat',
+        nightThemeId: 'dark_plus',
+        enableStream: false,
+        enableLoadingBar: false
+    }
 };
 
 
 // 设置分类
-export type SettingsCategory = 'models' | 'presets' | 'prompts' | 'appearance' | 'advanced' | 'about';
+export type SettingsCategory = 'models' | 'presets' | 'prompts' | 'appearance' | 'chatmode' | 'advanced' | 'about';
 
 // 配置类别（向后兼容别名）
 export type ConfigCategory = SettingsCategory;
@@ -225,4 +286,12 @@ export interface FieldError {
     field: string;
     message: string;
     type: 'error' | 'warning' | 'info';
+}
+
+// 消息错误元数据
+export interface ErrorMetadata {
+    message: string;
+    type: 'timeout' | 'quota' | 'server' | 'network' | 'unknown';
+    code?: string;
+    details?: string;
 }

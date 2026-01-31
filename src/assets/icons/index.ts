@@ -19,6 +19,7 @@ export const PROVIDER_ICONS = {
     qwen: qwenIconRaw,
     ollama: ollamaIconRaw,
     gemini: geminiIconRaw,
+    ohmygpt: openaiIconRaw, // 🟢 Fix: Map OhMyGpt to OpenAI icon
     default: DEFAULT_ICON, // 默认图标
 } as const;
 

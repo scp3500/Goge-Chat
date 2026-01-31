@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useConfigStore } from '../../stores/config';
 
 defineProps({
@@ -67,10 +67,62 @@ const applyThemePreset = (styleId) => {
 };
 
 const filteredStyles = computed(() => {
-  // 确保 configStore.settings 存在
   if (!configStore.settings) return [];
   return designStyles.filter(s => s.mode === configStore.settings.theme);
 });
+
+// 头像上传逻辑
+const fileInput = ref(null);
+
+const triggerUpload = () => {
+  fileInput.value?.click();
+};
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // 简单的文件验证
+  if (!file.type.startsWith('image/')) {
+    alert('请上传图片文件');
+    return;
+  }
+
+  // 由于浏览器安全限制，我们不能直接获取全路径传给后端上传
+  // 但我们是 Tauri 环境，input type=file 拿到的是 File 对象
+  // 我们需要一个方法把 File 对象传给 Rust，或者读取 ArrayBuffer 传给 Rust
+  // 我之前实现的 `upload_user_avatar` 是接受 file_path string。
+  // Tauri 的 fs API 或 invoke 怎么传文件？
+  // 如果是 drag drop 或 dialog open，我们可以拿到 path。
+  // 但是 web input file 拿不到 path。
+  // 变更计划：使用 Tauri Dialog 打开文件，而不是 HTML input。
+  
+  // 修正：使用 open Dialog
+};
+
+// 使用 Tauri API 选择文件
+import { open } from '@tauri-apps/plugin-dialog';
+import { convertFileSrc } from '@tauri-apps/api/core';
+
+const selectAndUploadAvatar = async () => {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{
+        name: 'Images',
+        extensions: ['png', 'jpg', 'jpeg', 'webp']
+      }]
+    });
+    
+    if (selected && typeof selected === 'string') { // string (path)
+       const savedPath = await configStore.uploadAvatar(selected);
+       handleUpdate(); // Save config just in case, though uploadAvatar updates store
+    }
+  } catch (err) {
+    console.error('选择头像失败:', err);
+  }
+};
+
 
 </script>
 
@@ -165,6 +217,39 @@ const filteredStyles = computed(() => {
               :class="{ active: configStore.settings.themeColor === t }"
               @click="configStore.settings.themeColor = t; handleUpdate()"
             ></div>
+          </div>
+          </div>
+
+
+        <div class="control-item">
+          <label>气泡模式</label>
+          <div class="toggle-row">
+             <label class="toggle-switch">
+               <input type="checkbox" v-model="configStore.settings.enableBubble" @change="handleUpdate" />
+               <span class="slider"></span>
+             </label>
+             <span class="sub-label">为消息添加气泡背景和圆角</span>
+          </div>
+        </div>
+
+        <div class="control-item">
+          <label>用户头像</label>
+          <div class="avatar-settings">
+             <div class="toggle-row">
+                <label class="toggle-switch">
+                  <input type="checkbox" v-model="configStore.settings.showUserAvatar" @change="handleUpdate" />
+                  <span class="slider"></span>
+                </label>
+                <span class="sub-label">显示用户头像</span>
+             </div>
+             
+             <div v-if="configStore.settings.showUserAvatar" class="upload-row">
+                <div class="avatar-preview" 
+                     :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${convertFileSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
+                     <span v-if="!configStore.settings.userAvatarPath">?</span>
+                </div>
+                <button class="upload-btn" @click="selectAndUploadAvatar">更换头像</button>
+             </div>
           </div>
         </div>
       </div>
@@ -286,5 +371,79 @@ input[type="range"]::-webkit-slider-thumb {
     appearance: none; width: 18px; height: 18px; background: var(--text-color-white); border-radius: 50%; cursor: pointer; 
     box-shadow: var(--shadow-main);
     border: 1px solid var(--border-glass);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--bg-input-dim);
+  transition: .4s;
+  border-radius: 22px;
+  border: 1px solid var(--border-glass);
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px; width: 16px;
+  left: 2px; bottom: 2px;
+  background-color: var(--text-tertiary);
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--color-primary-bg); border-color: var(--color-primary); }
+input:checked + .slider:before { transform: translateX(18px); background-color: var(--color-primary); }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Avatar Upload */
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-left: 4px;
+}
+.avatar-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--bg-input-dim);
+  border: 1px solid var(--border-glass);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 20px;
+}
+.upload-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-glass-active);
+  border: 1px solid var(--border-glass);
+  color: var(--text-color);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.upload-btn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--color-primary);
+  color: var(--text-color-white);
 }
 </style>

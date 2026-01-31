@@ -60,16 +60,7 @@ const openSettings = () => {
   <header class="titlebar" :class="{ 'maximized': isMaximized }" @mousedown="handleGlobalDrag">
     <!-- Left Segment: Logo/Brand -->
     <div class="titlebar-left">
-      <template v-if="!isSettings">
-        <span class="app-name">Goge Chat</span>
-      </template>
-      <button
-        v-else
-        class="back-btn"
-        @click="$emit('back-home')"
-        title="返回首页"
-        v-html="HOME_SVG"
-      ></button>
+      <span class="app-name">Goge Chat</span>
     </div>
     
     <!-- Center Segment: Flexible space for dragging -->
@@ -85,11 +76,18 @@ const openSettings = () => {
 
       <div class="window-controls">
         <button
-          v-if="!isSettings"
           @click.stop="toggleTheme"
           class="control-btn theme-toggle"
           :title="isLight ? '切换深色模式' : '切换浅色模式'"
           v-html="isLight ? SUN_SVG : MOON_SVG"
+        ></button>
+
+        <button
+          v-if="isSettings"
+          @click.stop="$emit('back-home')"
+          class="control-btn settings-btn"
+          title="返回首页"
+          v-html="HOME_SVG"
         ></button>
 
         <button
@@ -194,7 +192,8 @@ const openSettings = () => {
 .control-btn:hover { background: var(--bg-window-controls-hover); color: var(--color-title-text-bright); }
 .settings-btn:hover { color: var(--text-color-white); }
 .theme-toggle:hover { color: var(--color-primary); }
-.theme-toggle :deep(svg) { width: 14px; height: 14px; }
+.theme-toggle :deep(svg),
+.settings-btn :deep(svg) { width: 14px; height: 14px; }
 .close-btn:hover { background: #c42b1c !important; }
 
 

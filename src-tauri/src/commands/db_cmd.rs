@@ -66,9 +66,22 @@ pub fn update_session_config(
 }
 
 #[tauri::command]
-pub fn create_session(title: String, state: State<DbState>) -> Result<String, String> {
+pub fn create_session(
+    title: String,
+    preset_id: Option<String>,
+    model_id: Option<String>,
+    system_prompt: Option<String>,
+    state: State<DbState>,
+) -> Result<String, String> {
     let conn = state.0.lock().unwrap();
-    let id = db_create_session(&conn, &title).map_err(|e| e.to_string())?;
+    let id = db_create_session(
+        &conn,
+        &title,
+        preset_id.as_deref(),
+        model_id.as_deref(),
+        system_prompt.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(id.to_string())
 }
 
@@ -150,6 +163,7 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
                 reasoning_content: cm.reasoning_content,
                 file_metadata: cm.file_metadata,
                 search_metadata: cm.search_metadata,
+                provider: cm.provider, // 🟢 Fix: Add missing provider field
             }
         })
         .collect();
@@ -166,6 +180,7 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
 pub fn save_message(
     session_id: String,
     model: Option<String>,
+    provider: Option<String>, // 🟢 Added parameter
     role: String,
     content: String,
     reasoning_content: Option<String>,
@@ -179,6 +194,7 @@ pub fn save_message(
     println!("💾 [DB CMD] === RECEIVED SAVE_MESSAGE COMMAND ===");
     println!("💾 [DB CMD] Session ID: {}", session_id);
     println!("💾 [DB CMD] Role: {}", role);
+    println!("💾 [DB CMD] Provider: {:?}", provider); // Log provider
     println!("💾 [DB CMD] Content length: {}", content.len());
     println!(
         "💾 [DB CMD] Reasoning content: {:?}",
@@ -200,6 +216,7 @@ pub fn save_message(
         &conn,
         numeric_id,
         model.as_deref(),
+        provider.as_deref(), // 🟢 Pass provider
         &role,
         &content,
         reasoning_content.as_deref(),

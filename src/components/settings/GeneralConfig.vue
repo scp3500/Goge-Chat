@@ -1,52 +1,105 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useConfigStore } from '../../stores/config';
-import { BRAIN_SVG, BOX_SVG, SPARKLES_SVG } from '../../constants/icons';
+import { BRAIN_SVG, BOX_SVG, SPARKLES_SVG, CHEVRON_DOWN_SVG } from '../../constants/icons';
 
 const configStore = useConfigStore();
 
+const presets = computed(() => configStore.settings.presets || []);
 const allModels = computed(() => {
   const models = [];
-  configStore.settings.providers.forEach(p => {
-    if (p.enabled) {
-      p.models.forEach(modelId => {
-        models.push({
-          id: modelId,
-          providerName: p.name,
-          displayName: `${p.name} - ${modelId}`
+  try {
+    const providers = configStore.settings.providers || [];
+    providers.forEach(p => {
+      if (p.enabled && p.models) {
+        p.models.forEach(m => {
+          const modelId = typeof m === 'string' ? m : m.id;
+          const modelName = typeof m === 'string' ? m : (m.name || m.id);
+          models.push({
+            id: modelId,
+            providerName: p.name,
+            displayName: `${p.name} - ${modelName}`
+          });
         });
-      });
-    }
-  });
+      }
+    });
+  } catch (e) {
+    console.error('[GeneralConfig] Failed to compute allModels:', e);
+  }
   return models;
 });
 
-const presets = computed(() => configStore.settings.presets || []);
-
-const updateDefaultModel = (e) => {
-  configStore.updateConfig({ globalModelId: e.target.value });
-};
-
-const updateDefaultPreset = (e) => {
-  configStore.updateConfig({ globalPresetId: e.target.value });
-};
-
-const updateDefaultPrompt = (val) => {
-  configStore.updateConfig({ defaultSystemPrompt: val });
-};
-
 const isPromptTemplateMatch = computed(() => {
-  return configStore.settings.promptLibrary.some(p => p.content === configStore.settings.defaultSystemPrompt);
+  const lib = configStore.settings.promptLibrary || [];
+  return lib.some(p => p.content === configStore.settings.defaultSystemPrompt);
 });
 
-const onSelectPromptTemplate = (e) => {
-  const val = e.target.value;
-  if (!val) return;
-  const item = configStore.settings.promptLibrary.find(p => p.id === val);
+const activeDropdown = ref(null);
+const promptSearchQuery = ref('');
+
+const currentModelName = computed(() => {
+    const list = allModels.value || [];
+    const model = list.find(m => m.id === configStore.settings.globalModelId);
+    return model ? model.displayName : '选择模型';
+});
+
+const currentPresetName = computed(() => {
+    const list = presets.value || [];
+    const preset = list.find(p => p.id === configStore.settings.globalPresetId);
+    return preset ? preset.name : '选择配置预设';
+});
+
+const currentPromptItem = computed(() => {
+    const lib = configStore.settings.promptLibrary || [];
+    return lib.find(p => p.content === configStore.settings.defaultSystemPrompt);
+});
+
+const filteredPrompts = computed(() => {
+    const query = (promptSearchQuery.value || '').toLowerCase();
+    const lib = configStore.settings.promptLibrary || [];
+    return lib.filter(p => 
+        (p.name || '').toLowerCase().includes(query) || 
+        (p.description || '').toLowerCase().includes(query)
+    );
+});
+
+const updateDefaultModel = (id) => {
+  configStore.updateConfig({ globalModelId: id });
+  activeDropdown.value = null;
+};
+
+const updateDefaultPreset = (id) => {
+  configStore.updateConfig({ globalPresetId: id });
+  activeDropdown.value = null;
+};
+
+const onSelectPromptTemplate = (promptId) => {
+  if (!promptId) {
+      activeDropdown.value = null;
+      return;
+  }
+  const lib = configStore.settings.promptLibrary || [];
+  const item = lib.find(p => p.id === promptId);
   if (item) {
     configStore.updateConfig({ defaultSystemPrompt: item.content });
   }
+  activeDropdown.value = null;
 };
+
+// Click outside logic
+const handleClickOutside = (e) => {
+    if (activeDropdown.value && !e.target.closest('.modern-dropdown')) {
+        activeDropdown.value = null;
+    }
+};
+
+onMounted(() => {
+    window.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('click', handleClickOutside);
+});
 </script>
 
 <template>
@@ -62,9 +115,29 @@ const onSelectPromptTemplate = (e) => {
           </div>
         </div>
         <div class="input-wrap">
-          <select :value="configStore.settings.globalModelId" @change="updateDefaultModel">
-            <option v-for="m in allModels" :key="m.id" :value="m.id">{{ m.displayName }}</option>
-          </select>
+          <div class="modern-dropdown" 
+               :class="{ 'is-open': activeDropdown === 'model' }"
+               @click.stop="activeDropdown = activeDropdown === 'model' ? null : 'model'">
+            <div class="dropdown-trigger">
+              <span class="item-name">{{ currentModelName }}</span>
+              <span class="chev-icon" v-html="CHEVRON_DOWN_SVG"></span>
+            </div>
+            
+            <Transition name="pop-up">
+              <div v-if="activeDropdown === 'model'" class="dropdown-portal modern-scroll" @click.stop>
+                <div 
+                  v-for="m in allModels" 
+                  :key="m.id" 
+                  class="portal-item"
+                  :class="{ 'active': configStore.settings.globalModelId === m.id }"
+                  @click="updateDefaultModel(m.id)">
+                  <div class="item-info">
+                    <span class="item-name">{{ m.displayName }}</span>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
         </div>
       </section>
 
@@ -78,9 +151,29 @@ const onSelectPromptTemplate = (e) => {
           </div>
         </div>
         <div class="input-wrap">
-          <select :value="configStore.settings.globalPresetId" @change="updateDefaultPreset">
-            <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
+          <div class="modern-dropdown" 
+               :class="{ 'is-open': activeDropdown === 'preset' }"
+               @click.stop="activeDropdown = activeDropdown === 'preset' ? null : 'preset'">
+            <div class="dropdown-trigger">
+              <span class="item-name">{{ currentPresetName }}</span>
+              <span class="chev-icon" v-html="CHEVRON_DOWN_SVG"></span>
+            </div>
+            
+            <Transition name="pop-up">
+              <div v-if="activeDropdown === 'preset'" class="dropdown-portal modern-scroll" @click.stop>
+                <div 
+                  v-for="p in presets" 
+                  :key="p.id" 
+                  class="portal-item"
+                  :class="{ 'active': configStore.settings.globalPresetId === p.id }"
+                  @click="updateDefaultPreset(p.id)">
+                  <div class="item-info">
+                    <span class="item-name">{{ p.name }}</span>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
         </div>
       </section>
 
@@ -90,29 +183,67 @@ const onSelectPromptTemplate = (e) => {
           <div class="icon-wrap" v-html="BRAIN_SVG"></div>
           <div class="title-wrap">
             <label>默认系统提示词</label>
-            <span class="hint">当新对话未自定义提示词时，将自动使用此内容作为系统指令</span>
+            <span class="hint">新对话未配置提示词时，将自动激活此角色范式</span>
           </div>
         </div>
+          
         <div class="input-wrap">
-          <select @change="onSelectPromptTemplate">
-            <option value="" :selected="!isPromptTemplateMatch">-- 手动编辑 / 自定义内容 --</option>
-            <option 
-              v-for="p in configStore.settings.promptLibrary" 
-              :key="p.id" 
-              :value="p.id"
-              :selected="configStore.settings.defaultSystemPrompt === p.content"
-            >
-              {{ p.icon }} {{ p.name }}
-            </option>
-          </select>
+          <div class="modern-dropdown" 
+               :class="{ 'is-open': activeDropdown === 'prompt' }"
+               @click.stop="activeDropdown = activeDropdown === 'prompt' ? null : 'prompt'">
+            <div class="dropdown-trigger">
+              <span class="item-icon">{{ currentPromptItem?.icon || '✍️' }}</span>
+              <span class="item-name">{{ currentPromptItem?.name || '手动编辑内容' }}</span>
+              <span class="chev-icon" v-html="CHEVRON_DOWN_SVG"></span>
+            </div>
+            
+            <Transition name="pop-up">
+              <div v-if="activeDropdown === 'prompt'" class="dropdown-portal modern-scroll" @click.stop>
+                <div class="dropdown-search">
+                  <input v-model="promptSearchQuery" placeholder="搜索提示词范式..." />
+                </div>
+                <div 
+                  class="portal-item" 
+                  :class="{ 'active': !isPromptTemplateMatch }"
+                  @click="onSelectPromptTemplate('')">
+                  <span class="item-icon">✍️</span>
+                  <span class="item-name">手动编辑 / 自定义内容</span>
+                </div>
+                <div class="divider-small"></div>
+                <div 
+                  v-for="p in filteredPrompts" 
+                  :key="p.id" 
+                  class="portal-item"
+                  :class="{ 'active': configStore.settings.defaultSystemPrompt === p.content }"
+                  @click="onSelectPromptTemplate(p.id)">
+                  <span class="item-icon">{{ p.icon }}</span>
+                  <div class="item-info">
+                    <span class="item-name">{{ p.name }}</span>
+                    <span class="item-desc">{{ p.description }}</span>
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
         </div>
-        <div class="input-wrap mt-2">
-          <textarea 
-            v-model="configStore.settings.defaultSystemPrompt" 
-            @change="updateDefaultPrompt($event.target.value)"
-            rows="4"
-            placeholder="例如：你是一个简洁专业的 AI 助手..."
-          ></textarea>
+      </section>
+
+
+
+      <!-- 流式传输 -->
+      <section class="config-card">
+        <div class="card-header">
+           <div class="icon-wrap" v-html="SPARKLES_SVG"></div>
+           <div class="title-wrap">
+             <label>流式响应模式</label>
+             <span class="hint">开启后 AI 将像打字机一样逐字输出</span>
+           </div>
+        </div>
+        <div class="input-wrap">
+           <label class="toggle-switch">
+             <input type="checkbox" v-model="configStore.settings.enableStream" @change="configStore.updateConfig({ enableStream: configStore.settings.enableStream })" />
+             <span class="slider"></span>
+           </label>
         </div>
       </section>
     </div>
@@ -130,19 +261,6 @@ const onSelectPromptTemplate = (e) => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-.header-section h2 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-color-white);
-  margin: 0 0 4px 0;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: var(--text-color);
-  opacity: 0.4;
 }
 
 .config-list {
@@ -167,7 +285,6 @@ const onSelectPromptTemplate = (e) => {
   border-color: var(--border-glass-bright);
 }
 
-
 .card-header {
   display: flex;
   gap: 12px;
@@ -191,66 +308,131 @@ const onSelectPromptTemplate = (e) => {
   height: 18px;
 }
 
-.library-select-container {
-  position: relative;
-  margin-left: auto;
+.input-wrap {
+  width: 100%;
 }
 
-.mini-tool-btn {
+.modern-dropdown {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-glass-active);
+    border: 1px solid var(--border-glass-bright);
+    border-radius: 12px;
+    padding: 10px 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-dropdown:hover .dropdown-trigger {
+    background: var(--bg-glass-hover);
+    border-color: var(--color-primary-border);
+}
+
+.modern-dropdown.is-open .dropdown-trigger {
+    background: var(--bg-input-focus);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-alpha-10);
+}
+
+.dropdown-trigger .item-name { 
+    font-size: 14px; 
+    font-weight: 500; 
+    color: var(--text-color-white); 
+    flex: 1;
+}
+.dropdown-trigger .chev-icon { 
+    color: var(--text-tertiary); 
+    display: flex;
+    transition: transform 0.3s;
+}
+.is-open .chev-icon { transform: rotate(180deg); }
+
+.dropdown-portal {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    max-height: 320px;
+    background: var(--bg-menu);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-glass-bright);
+    border-radius: 16px;
+    box-shadow: var(--shadow-main);
+    z-index: 1000;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dropdown-search {
+    padding: 4px 8px 8px;
+}
+.dropdown-search input {
+    width: 100%;
+    background: var(--bg-input-dim);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-color-white);
+    font-size: 13px;
+    outline: none;
+}
+
+.portal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.portal-item:hover {
+    background: var(--bg-glass-hover);
+}
+
+.portal-item.active {
+    background: var(--color-primary-bg);
+    border-left: 3px solid var(--color-primary);
+}
+
+.portal-item .item-icon { font-size: 18px; padding-top: 2px; }
+.item-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.item-info .item-name { font-size: 14px; font-weight: 600; color: var(--text-color-white); }
+.item-info .item-desc { font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
+
+.divider-small {
+    height: 1px;
+    background: var(--border-glass);
+    margin: 4px 8px;
+}
+
+.title-wrap {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--color-primary-bg);
-  border: 1px solid var(--color-primary-border);
-  border-radius: 8px;
-  padding: 4px 10px;
-  color: var(--color-primary-light);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
 }
 
-.mini-tool-btn:hover {
-  background: var(--color-primary-border);
+.title-wrap label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-color-white);
 }
 
-.mini-tool-btn .icon :deep(svg) {
-  width: 12px;
-  height: 12px;
+.hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
 }
-
-.library-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 180px;
-  max-height: 200px;
-  background: var(--bg-main);
-  border: 1px solid var(--border-glass-bright);
-  border-radius: 12px;
-  box-shadow: var(--shadow-main);
-  z-index: 100;
-  overflow-y: auto;
-  padding: 6px;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.dropdown-item:hover {
-  background: var(--bg-glass-hover);
-}
-
-.item-icon { font-size: 16px; }
-.item-name { font-size: 13px; color: var(--text-color-white); }
 
 .pop-up-enter-active, .pop-up-leave-active {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -260,49 +442,82 @@ const onSelectPromptTemplate = (e) => {
   transform: translateY(10px) scale(0.95);
 }
 
-.title-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
 }
 
-.title-wrap label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-color-white);
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-.hint {
-  font-size: 12px;
-  color: var(--text-color);
-  opacity: 0.35;
-  line-height: 1.4;
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-input-dim);
+  transition: .4s;
+  border-radius: 24px;
+  border: 1px solid var(--border-glass);
 }
 
-.input-wrap select, .input-wrap textarea {
-  width: 100%;
-  background: var(--bg-input-dim);
-  border: 1px solid var(--border-card);
-  border-radius: 10px;
-  color: var(--text-color-white);
-  padding: 10px 12px;
-  font-family: inherit;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s;
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-tertiary);
+  transition: .4s;
+  border-radius: 50%;
 }
 
-.input-wrap select:focus, .input-wrap textarea:focus {
+input:checked + .slider {
+  background-color: var(--color-primary-bg);
   border-color: var(--color-primary);
-  background: var(--bg-input-focus);
 }
 
-.input-wrap textarea {
-  resize: none;
-  line-height: 1.6;
+input:checked + .slider:before {
+  transform: translateX(20px);
+  background-color: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary);
 }
 
-.mt-2 {
-  margin-top: 12px;
+
+
+/* Small Toggle Switch */
+.toggle-switch.small {
+  width: 36px;
+  height: 20px;
+}
+.toggle-switch.small .slider:before {
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+}
+.toggle-switch.small input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.expand-section-enter-active, .expand-section-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+}
+.expand-section-enter-from, .expand-section-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

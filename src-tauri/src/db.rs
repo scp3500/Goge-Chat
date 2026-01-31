@@ -33,6 +33,7 @@ pub struct ChatMessage {
     pub id: Option<i64>,
     pub session_id: i64,
     pub model: Option<String>,
+    pub provider: Option<String>, // 🟢 Added provider field
     pub role: String,
     pub content: String,
     pub reasoning_content: Option<String>,
@@ -169,6 +170,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         let _ = conn.execute("ALTER TABLE messages ADD COLUMN model TEXT", []);
     }
 
+    if !columns_messages.contains(&"provider".to_string()) {
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN provider TEXT", []);
+    }
+
     Ok(())
 }
 
@@ -208,10 +213,16 @@ pub(crate) fn get_sessions(conn: &Connection) -> Result<Vec<ChatSession>> {
     Ok(sessions)
 }
 
-pub(crate) fn create_session(conn: &Connection, title: &str) -> Result<i64> {
+pub(crate) fn create_session(
+    conn: &Connection,
+    title: &str,
+    preset_id: Option<&str>,
+    model_id: Option<&str>,
+    system_prompt: Option<&str>,
+) -> Result<i64> {
     conn.execute(
-        "INSERT INTO sessions (title, last_scroll_pos) VALUES (?1, 0)",
-        params![title],
+        "INSERT INTO sessions (title, last_scroll_pos, preset_id, model_id, system_prompt) VALUES (?1, 0, ?2, ?3, ?4)",
+        params![title, preset_id, model_id, system_prompt],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -325,18 +336,21 @@ pub(crate) fn update_session_config(
 pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
     println!("📥 [DB] Loading messages for session ID: {}", session_id);
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, role, content, reasoning_content, file_metadata, search_metadata, created_at, model FROM messages WHERE session_id = ?1 ORDER BY id ASC"
+        "SELECT id, session_id, role, content, reasoning_content, file_metadata, search_metadata, created_at, model, provider FROM messages WHERE session_id = ?1 ORDER BY id ASC"
     )?;
 
     let msg_iter = stmt.query_map(params![session_id], |row| {
         let reasoning_content: Option<String> = row.get(4)?;
         let file_metadata: Option<String> = row.get(5)?;
         let search_metadata: Option<String> = row.get(6)?;
-        let model: Option<String> = row.get(8).unwrap_or(None); // 使用 unwrap_or 处理可能存在的 NULL
+        let model: Option<String> = row.get(8).unwrap_or(None);
+        let provider: Option<String> = row.get(9).unwrap_or(None); // 🟢 Get provider
+
         Ok(ChatMessage {
             id: Some(row.get(0)?),
             session_id: row.get(1)?,
             model,
+            provider, // 🟢 Set provider
             role: row.get(2)?,
             content: row.get(3)?,
             reasoning_content,
@@ -358,6 +372,7 @@ pub(crate) fn save_message(
     conn: &Connection,
     session_id: i64,
     model: Option<&str>,
+    provider: Option<&str>, // 🟢 Added parameter
     role: &str,
     content: &str,
     reasoning_content: Option<&str>,
@@ -375,8 +390,8 @@ pub(crate) fn save_message(
 
     println!("💾 [DB] Executing INSERT statement...");
     let result = conn.execute(
-        "INSERT INTO messages (session_id, model, role, content, reasoning_content, file_metadata, search_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![session_id, model, role, content, reasoning_content, file_metadata, search_metadata],
+        "INSERT INTO messages (session_id, model, provider, role, content, reasoning_content, file_metadata, search_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![session_id, model, provider, role, content, reasoning_content, file_metadata, search_metadata],
     );
 
     match result {

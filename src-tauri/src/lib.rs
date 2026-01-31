@@ -310,6 +310,7 @@ pub fn run() {
             // 文件指令
             commands::file_cmd::open_file,
             commands::file_cmd::read_file_text_content,
+            commands::file_cmd::upload_user_avatar,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

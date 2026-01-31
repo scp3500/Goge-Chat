@@ -143,18 +143,25 @@ const handleRemoveFile = (index) => {
 
 const handleSearchClick = (e) => {
     e.stopPropagation();
-    if (!useSearch.value) {
-        useSearch.value = true;
-        uiStore.setActiveMenu('search-menu');
-    } else {
-        // 如果已经开启了搜索，再次点击图标则关闭搜索
+    
+    // 如果当前搜索是开启状态，点击图标直接关闭所有
+    if (useSearch.value) {
         useSearch.value = false;
         uiStore.setActiveMenu(null);
+        return;
+    }
+
+    // 如果当前搜索是关闭状态，点击图标仅打开/关闭菜单，不点亮图标
+    if (uiStore.isMenuOpen('search-menu')) {
+        uiStore.setActiveMenu(null);
+    } else {
+        uiStore.setActiveMenu('search-menu');
     }
 };
 
 const selectSearchProvider = (id) => {
     searchProvider.value = id;
+    useSearch.value = true; // 只有在选中后才真正开启
     uiStore.setActiveMenu(null);
 };
 
@@ -561,15 +568,15 @@ onMounted(() => {
   margin: 0 auto; /* 配合 width: 92% 实现完美居中 */
   width: 92%;
   width: 92%;
-  background: linear-gradient(0deg, var(--bg-menu) 0%, rgba(20, 20, 25, 0.4) 100%);
-  backdrop-filter: blur(1000px) saturate(250%) brightness(1.1); /* Extreme blur for "Frosted" feel */
-  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  background: var(--bg-menu);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-menu);
   border-bottom: none;
   border-radius: 28px 28px 0 0;
   box-shadow: 
-    0 -30px 60px -10px rgba(0, 0, 0, 0.8),
-    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    0 -10px 30px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
   z-index: 1000;
   overflow-y: auto;
   max-height: 50vh;

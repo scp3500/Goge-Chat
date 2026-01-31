@@ -2,7 +2,7 @@
 import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { useChatStore } from "../../stores/chat"; 
 import { renderMarkdown } from '../../services/markdown';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useConfigStore } from '../../stores/config';
 import { getProviderIcon } from '../../assets/icons';
@@ -13,6 +13,7 @@ import UserBubble from './message-item/UserBubble.vue';
 import AssistantBubble from './message-item/AssistantBubble.vue';
 import MessageActions from './message-item/MessageActions.vue';
 import FileAttachment from './message-item/FileAttachment.vue';
+import MessageError from './message-item/MessageError.vue';
 
 const props = defineProps({
   m: Object,
@@ -26,6 +27,31 @@ const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'r
 const chatStore = useChatStore();
 const configStore = useConfigStore();
 
+// --- 🔵 Chat Mode Logic ---
+const isChatMode = computed(() => configStore.settings.chatMode?.enabled);
+
+const chatModeTheme = computed(() => {
+    if (!isChatMode.value) return null;
+    return configStore.settings.theme === 'light' 
+        ? configStore.settings.chatMode.dayThemeId 
+        : configStore.settings.chatMode.nightThemeId;
+});
+
+const showLoadingBar = computed(() => {
+    if (!isChatMode.value) return true; // Normal mode: always show (unless globally disabled?)
+    return configStore.settings.chatMode.enableLoadingBar;
+});
+
+const chatModeClasses = computed(() => {
+    if (!isChatMode.value) return {};
+    return {
+        'chat-mode-active': true,
+        'theme-wechat': chatModeTheme.value === 'wechat',
+        'theme-darkplus': chatModeTheme.value === 'dark_plus',
+        'no-header': true // Optional: hide header in chat mode
+    };
+});
+
 // 💡 格式化时间
 const formattedDate = computed(() => {
   if (!props.m.created_at) return '';
@@ -37,15 +63,33 @@ const formattedDate = computed(() => {
   return `${month}/${day} ${hours}:${minutes}`;
 });
 
+// 💡 辅助函数：根据模型 ID 寻找提供商
+const findProviderByModelId = (modelId) => {
+    if (!modelId) return null;
+    return configStore.settings.providers?.find(p => 
+        p.models?.some(m => (typeof m === 'string' ? m : m.id) === modelId)
+    );
+};
+
+// 💡 获取模型图标
 // 💡 获取模型图标
 const modelIcon = computed(() => {
-    const modelId = props.m.model;
-    if (modelId) {
-        const provider = configStore.settings.providers.find(p => p.models.includes(modelId));
+    // 1. Try explicit providerId stored in message
+    if (props.m.providerId) {
+        const provider = configStore.settings.providers.find(p => p.id === props.m.providerId);
         if (provider) {
             return getProviderIcon(provider.icon);
         }
     }
+
+    // 2. Fallback to model ID lookup
+    const modelId = props.m.model;
+    const provider = findProviderByModelId(modelId);
+    if (provider) {
+        return getProviderIcon(provider.icon);
+    }
+    // 特殊处理：如果是 deepseek 模型但没找着（比如由于迁移没匹配上），也给个图标而非默认 Gemini
+    if (modelId?.includes('deepseek')) return getProviderIcon('deepseek');
     return getProviderIcon('gemini');
 });
 
@@ -55,15 +99,20 @@ const displayModelName = computed(() => {
     return "Gemini";
 });
 
-// 💡 获取显示的服务商名称
 const displayProviderName = computed(() => {
-    const modelId = props.m.model;
-    if (modelId) {
-        const provider = configStore.settings.providers.find(p => p.models.includes(modelId));
-        if (provider) {
-            return provider.name;
-        }
+    // 1. Prefer explicit providerId stored in message (for new messages)
+    if (props.m.providerId) {
+        const provider = configStore.settings.providers.find(p => p.id === props.m.providerId);
+        return provider ? provider.name : props.m.providerId;
     }
+
+    // 2. Fallback: Guess based on model ID (for history)
+    const modelId = props.m.model;
+    const provider = findProviderByModelId(modelId);
+    if (provider) {
+        return provider.name;
+    }
+    if (modelId?.includes('deepseek')) return "DeepSeek";
     return "Google";
 });
 
@@ -240,37 +289,85 @@ const handleLinkClick = async (event) => {
     }
   }
 };
+
+const parsedError = (errorObj) => {
+    if (typeof errorObj === 'string') {
+        try {
+            return JSON.parse(errorObj);
+        } catch {
+            return { message: errorObj };
+        }
+    }
+    return errorObj;
+};
+
+const handleCloseError = async () => {
+    // 只是简单的从UI移除，或者尝试重新加载（当前选简单的删除）
+    // 但因为是 assistant 的最后一条消息，实际上可能需要清理 currentMessages
+    if (props.m.role === 'assistant' && props.index === chatStore.currentMessages.length - 1) {
+        // Option 1: Just hide local error (maybe not enough?)
+        // Option 2: Remove the message
+        chatStore.currentMessages.splice(props.index, 1);
+    }
+};
+
+const handleRetryError = async () => {
+    // 关闭错误并重试
+    if (props.m.role === 'assistant' && props.index === chatStore.currentMessages.length - 1) {
+        chatStore.currentMessages.splice(props.index, 1);
+        await chatStore.sendMessage("");
+    }
+};
 </script>
 
 <template>
-  <div class="message-row" :class="String(m.role || 'user').toLowerCase()" ref="messageRef">
+  <div class="message-row" 
+       :class="[
+         String(m.role || 'user').toLowerCase(), 
+         chatModeClasses
+       ]" 
+       ref="messageRef">
     
-    <div v-if="m.role === 'user'" class="message-bubble-wrapper">
-      <div class="user-turn-content">
-        <UserBubble 
-          v-if="hasVisibleContent || isEditing"
-          :content="m.content"
-          :is-editing="isEditing"
-          @update-edit-content="$emit('update-edit-content', $event)"
-          @cancel-edit="$emit('cancel-edit')"
-          @save-edit="$emit('save-edit', $event)"
-        />
-
-        <FileAttachment 
-          :files="parsedFiles"
-          @open-file="handleOpenFile"
-        />
-      </div>
+    <div v-if="m.role === 'user'" class="message-bubble-wrapper" 
+         :class="{ 'bubble-mode': isChatMode }">
       
-      <MessageActions 
-        role="user"
-        :show="!isEditing && showActionButtons"
-        @edit="$emit('start-edit')"
-        @delete="$emit('delete', $event)"
-      />
+      <div class="user-layout-container">
+        <div class="user-content-group">
+          <div class="user-turn-content">
+            <UserBubble 
+              v-if="hasVisibleContent || isEditing"
+              :content="m.content"
+              :is-editing="isEditing"
+              @update-edit-content="$emit('update-edit-content', $event)"
+              @cancel-edit="$emit('cancel-edit')"
+              @save-edit="$emit('save-edit', $event)"
+            />
+
+            <FileAttachment 
+              :files="parsedFiles"
+              @open-file="handleOpenFile"
+            />
+          </div>
+          
+          <MessageActions 
+            role="user"
+            :show="!isEditing && showActionButtons"
+            @edit="$emit('start-edit')"
+            @delete="$emit('delete', $event)"
+          />
+        </div>
+
+        <!-- User Avatar -->
+        <div v-if="configStore.settings.showUserAvatar" class="user-avatar-container">
+             <div class="avatar-img"
+                  :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${convertFileSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
+                  <span v-if="!configStore.settings.userAvatarPath">👤</span>
+             </div>
+        </div>
+      </div>
     </div>
 
-    <div v-else class="assistant-content-wrapper">
+    <div v-else class="assistant-content-wrapper" :class="{ 'bubble-mode': isChatMode }">
       <MessageHeader 
         v-if="m.content !== '__LOADING__'"
         :icon="modelIcon"
@@ -279,20 +376,32 @@ const handleLinkClick = async (event) => {
         :date="formattedDate"
       />
 
-      <AssistantBubble 
-        :message="m"
-        :rendered-content="renderedContent"
-        :is-reasoning-expanded="isReasoningExpanded"
-        @toggle-reasoning="toggleReasoning"
-        @link-click="handleLinkClick"
-      />
+      <div class="assistant-bubble-container" :class="{ 'loading-hidden': m.content === '__LOADING__' && !showLoadingBar }">
+        <!-- If loading bar disabled and content is loading, show nothing or minimal spacer -->
+        <AssistantBubble 
+          v-if="!(m.content === '__LOADING__' && !showLoadingBar)"
+          :message="m"
+          :rendered-content="renderedContent"
+          :is-reasoning-expanded="isReasoningExpanded"
+          @toggle-reasoning="toggleReasoning"
+          @link-click="handleLinkClick"
+        />
+      </div>
       
       <MessageActions 
         role="assistant"
-        :show="m.content !== '__LOADING__' && showActionButtons"
+        :show="m.content !== '__LOADING__' && !m.error && showActionButtons"
         @regenerate="chatStore.regenerateAction(index)"
         @copy="e => doCopy(m.content, e.currentTarget)"
         @delete="$emit('delete', $event)"
+      />
+
+      <!-- 🔴 Error Rendering -->
+      <MessageError 
+        v-if="m.error" 
+        :error="parsedError(m.error)"
+        @close="handleCloseError"
+        @retry="handleRetryError"
       />
     </div>
   </div>
@@ -407,6 +516,124 @@ const handleLinkClick = async (event) => {
 
 :deep(.copied) { 
   color: #4ade80 !important; 
+}
+
+/* User Avatar & Layout */
+.user-layout-container {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end; /* Avatar at bottom */
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+}
+
+.user-content-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 100%;
+  flex: 1;
+}
+
+.user-avatar-container {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 24px; /* Align with text bubble roughly */
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: var(--bg-input-dim);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+/* Bubble Mode Styles */
+.bubble-mode :deep(.user-bubble) {
+  background-color: var(--color-primary-alpha-10); /* Light primary bg */
+  border: 1px solid var(--color-primary-alpha-20);
+  border-radius: 18px 18px 4px 18px; /* Classic bubble shape */
+  padding: 12px 16px;
+  color: var(--text-color);
+}
+/* Adjust layout for bubble mode */
+.bubble-mode .user-turn-content {
+  align-items: flex-end;
+  /* Reset max-width if necessary, but inherited is fine */
+}
+
+/* Assistant Bubble Mode */
+.bubble-mode .assistant-bubble-container :deep(.markdown-body) {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 4px 18px 18px 18px;
+  padding: 16px 20px;
+  margin-top: 4px;
+}
+
+/* Adjust header in bubble mode */
+.bubble-mode .assistant-content-wrapper {
+  gap: 6px;
+}
+
+/* =========================================
+   🔵 Chat Mode Themes
+   ========================================= */
+
+/* WECHAT THEME (Day) */
+.theme-wechat .message-bubble-wrapper :deep(.user-bubble) {
+  background-color: #95ec69;
+  color: #000;
+  border: 1px solid #7dca5c;
+}
+
+.theme-wechat .assistant-bubble-container :deep(.assistant-bubble-content) {
+  background-color: #ffffff;
+  border: 1px solid #e5e5e5;
+  color: #1a1a1a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  padding: 10px 14px;
+}
+
+.theme-wechat .assistant-bubble-container :deep(.markdown-body) {
+  background-color: transparent;
+  border: none;
+  color: inherit;
+  box-shadow: none;
+}
+
+/* DARK++ THEME (Night) */
+.theme-darkplus .message-bubble-wrapper :deep(.user-bubble) {
+  background-color: #2b2d31; 
+  color: #e0e0e0;
+  border: 1px solid #3f4148;
+}
+
+.theme-darkplus .assistant-bubble-container :deep(.assistant-bubble-content) {
+  background-color: #1e1e1e;
+  border: 1px solid #333333;
+  color: #cccccc;
+  padding: 10px 14px;
+}
+
+.theme-darkplus .assistant-bubble-container :deep(.markdown-body) {
+  background-color: transparent;
+  border: none;
+  color: inherit;
+}
+
+/* Hide Loading State */
+.loading-hidden {
+  display: none;
 }
 </style>
 

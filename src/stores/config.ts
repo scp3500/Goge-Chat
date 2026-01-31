@@ -1,8 +1,8 @@
 // src/stores/config.ts
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { configCommands } from '../tauri/commands';
-import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset, PromptLibraryItem } from '../types/config';
+import { configCommands, fileCommands } from '../tauri/commands';
+import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset, PromptLibraryItem, ModelInfo } from '../types/config';
 import { PREBUILT_PROMPTS } from '../constants/prompts';
 
 export const useConfigStore = defineStore('config', () => {
@@ -73,16 +73,30 @@ export const useConfigStore = defineStore('config', () => {
                 console.log('[ConfigStore INIT] Loaded from backend, raw providers order:',
                     Array.isArray(saved.providers) ? (saved.providers as any[]).map((p: any) => p.id).join(',') : 'N/A');
 
+                // 🛡️ Hotfix: 检测并修复被污染的 defaultSystemPrompt
+                // 如果用户之前受到 bug 影响，导致全局默认提示词被错设为 "提示词创作" (Prompt Singularity)，则自动重置回默认助手
+                let fixedDefaultPrompt = saved.defaultSystemPrompt;
+                if (fixedDefaultPrompt && fixedDefaultPrompt.includes("Role: Prompt Singularity")) {
+                    console.warn("[ConfigStore] Detected polluted defaultSystemPrompt, resetting to default.");
+                    fixedDefaultPrompt = DEFAULT_SETTINGS.defaultSystemPrompt;
+                }
+
                 // 合并配置，确保新增字段有默认值
                 settings.value = {
                     ...DEFAULT_SETTINGS,
                     ...saved,
+                    defaultSystemPrompt: fixedDefaultPrompt || saved.defaultSystemPrompt || DEFAULT_SETTINGS.defaultSystemPrompt,
                     // 确保 providers 数组完整（处理新增的提供商）
                     providers: mergeProviders(saved.providers || [], DEFAULT_SETTINGS.providers),
                     // 确保 presets 数组完整
                     presets: mergePresets(saved.presets || [], DEFAULT_SETTINGS.presets),
                     // 确保 promptLibrary 完整
-                    promptLibrary: mergePromptLibrary(saved.promptLibrary || [], PREBUILT_PROMPTS)
+                    promptLibrary: mergePromptLibrary(saved.promptLibrary || [], PREBUILT_PROMPTS),
+                    // 确保 chatMode 完整 (Deep Merge)
+                    chatMode: {
+                        ...DEFAULT_SETTINGS.chatMode,
+                        ...(saved.chatMode || {})
+                    }
                 };
 
                 console.log('[ConfigStore INIT] After merge, final order:',
@@ -106,31 +120,93 @@ export const useConfigStore = defineStore('config', () => {
         defaultProviders: ModelProviderConfig[]
     ): ModelProviderConfig[] => {
         // 1. 以已保存的提供商为基础，保持其顺序
-        const merged = savedProviders.map(saved => {
-            const defaultProv = defaultProviders.find(p => p.id === saved.id);
-            if (!defaultProv) return saved;
+        // 🛡️ 修复：先对 savedProviders 进行去重，防止配置文件中出现重复的 provider block
+        const uniqueSavedProviders = savedProviders.filter((provider, index, self) =>
+            index === self.findIndex((p) => p.id === provider.id)
+        );
 
-            // 合并模型列表，确保新增的默认模型能出现
-            const allModels = [...new Set([...(saved.models || []), ...(defaultProv.models || [])])];
+        const merged = uniqueSavedProviders.map(saved => {
+            const defaultProv = defaultProviders.find(p => p.id === saved.id);
+            if (!defaultProv) {
+                // 如果是用户自定义提供商也需要处理模型规格化
+                return {
+                    ...saved,
+                    models: normalizeModels(saved.models || [])
+                };
+            }
+
+            // 合并模型列表，并基于 ID 进行去重，确保新增的默认模型能出现，同时保留用户自定义配置
+            const modelMap = new Map<string, string | ModelInfo>();
+
+            // 先放进默认模型
+            if (defaultProv.models) {
+                defaultProv.models.forEach(m => {
+                    const id = typeof m === 'string' ? m : m.id;
+                    modelMap.set(id, m);
+                });
+            }
+
+            // 再用用户保存的模型覆盖（用户保存的具有更高优先级）
+            if (saved.models) {
+                saved.models.forEach(m => {
+                    const id = typeof m === 'string' ? m : m.id;
+                    modelMap.set(id, m);
+                });
+            }
+
+            const allModels = normalizeModels(Array.from(modelMap.values()));
 
             return {
                 ...defaultProv, // 使用最新的默认值（如 id, name, icon, baseUrl, models 等）
                 ...saved,       // 覆盖用户的个性化配置（enabled, apiKey, temperature, maxTokens 等）
-                name: defaultProv.name, // 强制使用最新的内置名称（如 "Gemini 3"）
+                name: defaultProv.name, // 强制使用最新的内置名称
                 icon: defaultProv.icon, // 强制使用最新的内置图标
                 baseUrl: defaultProv.baseUrl, // 强制使用最新的内置 API 地址
-                models: allModels // 使用合并后的模型列表
+                models: allModels // 使用规格化和合并后的模型列表
             };
         });
 
         // 2. 添加全新的（默认配置中有但已保存配置中没有）提供商
         for (const defaultProvider of defaultProviders) {
             if (!merged.find(p => p.id === defaultProvider.id)) {
-                merged.push({ ...defaultProvider });
+                merged.push({
+                    ...defaultProvider,
+                    models: normalizeModels(defaultProvider.models || [])
+                });
             }
         }
 
         return merged;
+    };
+
+    /**
+     * 规格化模型列表：将字符串数组转换为 ModelInfo 对象数组
+     */
+    const normalizeModels = (models: (string | ModelInfo)[]): ModelInfo[] => {
+        return models.map(m => {
+            if (typeof m === 'string') {
+                // 尝试根据名称推断特性和分组
+                const modelId = m;
+                let group = '';
+                const features: any[] = [];
+
+                if (modelId.toLowerCase().includes('vision') || modelId.toLowerCase().includes('-v')) features.push('vision');
+                if (modelId.toLowerCase().includes('reasoner') || modelId.toLowerCase().includes('reason')) features.push('reasoning');
+
+                // Gemini 分组逻辑
+                if (modelId.startsWith('gemini-1.5')) group = 'Gemini 1.5';
+                else if (modelId.startsWith('gemini-2.0')) group = 'Gemini 2.0';
+                else if (modelId.startsWith('gemini-exp')) group = 'Experimental';
+
+                return {
+                    id: modelId,
+                    name: modelId,
+                    group: group,
+                    features: features
+                };
+            }
+            return m;
+        });
     };
 
     /**
@@ -471,6 +547,20 @@ export const useConfigStore = defineStore('config', () => {
         }
     };
 
+    /**
+     * 上传用户头像
+     */
+    const uploadAvatar = async (filePath: string) => {
+        try {
+            const savedPath = await fileCommands.uploadUserAvatar(filePath);
+            await updateConfig({ userAvatarPath: savedPath });
+            return savedPath;
+        } catch (e) {
+            console.error("上传头像失败:", e);
+            throw e;
+        }
+    };
+
     // ========== 向后兼容 ==========
 
     /**
@@ -504,6 +594,7 @@ export const useConfigStore = defineStore('config', () => {
         removeProvider,
         handleReorder,
         resetToDefaults,
+        uploadAvatar,
 
         // 预设管理
         getPreset,

@@ -25,6 +25,9 @@ pub struct Message {
     #[serde(rename = "searchMetadata")]
     #[serde(alias = "search_metadata")]
     pub search_metadata: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 /// AI 请求封装

@@ -1,6 +1,7 @@
 import { type Ref } from 'vue';
 import { invoke } from "@tauri-apps/api/core";
 import { chatApi, type ChatSession } from '../../api/chat';
+import { useConfigStore } from '../config';
 
 export function useSessionActions(
     historyList: Ref<ChatSession[]>,
@@ -11,16 +12,40 @@ export function useSessionActions(
 
     const createSession = async () => {
         try {
-            const newId = await chatApi.createSession("新对话");
+            // 获取配置 Store 以读取默认设置
+            const configStore = useConfigStore();
+            const {
+                defaultSystemPrompt,
+                globalModelId,
+                globalPresetId
+            } = configStore.settings;
+
+            // 调用后端创建会话，并传入全局配置
+            const newId = await chatApi.createSession(
+                "新对话",
+                globalPresetId,
+                globalModelId,
+                defaultSystemPrompt
+            );
+
             historyList.value.unshift({
                 id: newId,
                 title: "新对话",
                 last_scroll_pos: 0,
-                sort_order: 0
+                sort_order: 0,
+                preset_id: globalPresetId,
+                model_id: globalModelId,
+                system_prompt: defaultSystemPrompt
             });
+
             // 切换到新会话
             activeId.value = newId;
-            currentMessages.value = [{ role: "system", content: "你是一个简洁专业的 AI 助手。" }];
+
+            // 初始化本地消息列表的系统提示词
+            currentMessages.value = [{
+                role: "system",
+                content: defaultSystemPrompt || "你是一个简洁专业的 AI 助手。"
+            }];
         } catch (e) {
             console.error("创建失败", e);
         }

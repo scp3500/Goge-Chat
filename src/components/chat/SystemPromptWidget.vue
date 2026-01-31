@@ -273,15 +273,15 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
   right: 0;
   margin: 0 auto;
   width: 92%;
-  background: linear-gradient(0deg, var(--bg-menu) 0%, rgba(20, 20, 25, 0.4) 100%);
-  backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
-  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  background: var(--bg-menu);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-menu);
   border-bottom: none;
   border-radius: 28px 28px 0 0;
   box-shadow: 
-    0 -30px 60px -10px rgba(0, 0, 0, 0.8),
-    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    0 -10px 30px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
   z-index: 1000;
   overflow: hidden;
   padding: 8px;
@@ -310,8 +310,8 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
   font-weight: 700;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-dim);
-  opacity: 0.7;
+  color: var(--text-secondary);
+  opacity: 1;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -391,8 +391,8 @@ const isUsingCustom = computed(() => !!currentSession.value?.system_prompt);
 
 .p-desc {
   font-size: 12px;
-  color: var(--text-dim);
-  opacity: 0.8;
+  color: var(--text-secondary);
+  opacity: 1;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;

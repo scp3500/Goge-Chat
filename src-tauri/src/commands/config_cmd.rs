@@ -57,6 +57,40 @@ pub struct AppConfig {
     pub default_preset_id: String,
     #[serde(default = "default_preset_id", rename = "globalPresetId")]
     pub global_preset_id: String,
+
+    // NEW: Chat Experience Settings
+    #[serde(default = "default_true", rename = "enableStream")]
+    pub enable_stream: bool,
+    #[serde(default = "default_false", rename = "enableBubble")]
+    pub enable_bubble: bool,
+
+    // NEW: User Avatar Settings
+    #[serde(default = "default_false", rename = "showUserAvatar")]
+    pub show_user_avatar: bool,
+    #[serde(default, rename = "userAvatarPath")]
+    pub user_avatar_path: String,
+
+    // NEW: Prompt Library (from prompts.json)
+    #[serde(default = "default_prompt_library", rename = "promptLibrary")]
+    pub prompt_library: serde_json::Value,
+
+    // NEW: Chat Mode
+    #[serde(default = "default_chat_mode", rename = "chatMode")]
+    pub chat_mode: ChatModeConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChatModeConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_weekchat_theme", rename = "dayThemeId")]
+    pub day_theme_id: String,
+    #[serde(default = "default_dark_plus_theme", rename = "nightThemeId")]
+    pub night_theme_id: String,
+    #[serde(default = "default_false", rename = "enableStream")]
+    pub enable_stream: bool,
+    #[serde(default = "default_false", rename = "enableLoadingBar")]
+    pub enable_loading_bar: bool,
 }
 
 // Partial structs for file separation
@@ -99,6 +133,22 @@ struct SettingsPart {
     default_preset_id: String, // Pointer to default preset
     #[serde(default = "default_preset_id", rename = "globalPresetId")]
     global_preset_id: String,
+
+    #[serde(default = "default_true", rename = "enableStream")]
+    enable_stream: bool,
+    #[serde(default = "default_false", rename = "enableBubble")]
+    enable_bubble: bool,
+    #[serde(default = "default_false", rename = "showUserAvatar")]
+    show_user_avatar: bool,
+    #[serde(default, rename = "userAvatarPath")]
+    user_avatar_path: String,
+
+    #[serde(default = "default_chat_mode", rename = "chatMode")]
+    chat_mode: ChatModeConfig, // Store chatMode in settings part
+
+    // Legacy support for promptLibrary in settings.json (optional)
+    #[serde(default, rename = "promptLibrary")]
+    prompt_library: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -111,6 +161,12 @@ struct ProvidersPart {
 struct PresetsPart {
     #[serde(rename = "presets")]
     presets: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PromptsPart {
+    #[serde(rename = "promptLibrary")]
+    prompt_library: serde_json::Value,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -250,6 +306,33 @@ fn default_presets() -> serde_json::Value {
 fn default_preset_id() -> String {
     "default_preset".into()
 }
+fn default_true() -> bool {
+    true
+}
+fn default_false() -> bool {
+    false
+}
+
+fn default_prompt_library() -> serde_json::Value {
+    serde_json::json!([])
+}
+
+// Chat Mode Defaults
+fn default_chat_mode() -> ChatModeConfig {
+    ChatModeConfig {
+        enabled: false,
+        day_theme_id: "wechat".into(),
+        night_theme_id: "dark_plus".into(),
+        enable_stream: false,
+        enable_loading_bar: false,
+    }
+}
+fn default_weekchat_theme() -> String {
+    "wechat".into()
+}
+fn default_dark_plus_theme() -> String {
+    "dark_plus".into()
+}
 
 impl Default for AppConfig {
     fn default() -> Self {
@@ -274,6 +357,12 @@ impl Default for AppConfig {
             presets: default_presets(),
             default_preset_id: default_preset_id(),
             global_preset_id: default_preset_id(),
+            enable_stream: true,
+            enable_bubble: false,
+            show_user_avatar: false,
+            user_avatar_path: "".into(),
+            prompt_library: default_prompt_library(),
+            chat_mode: default_chat_mode(),
         }
     }
 }
@@ -284,7 +373,7 @@ impl Default for AppConfig {
 
 /// Resolves the config directory relative to the executable.
 /// Usually: <exe_dir>/config/
-fn get_local_config_dir() -> PathBuf {
+pub fn get_local_config_dir() -> PathBuf {
     let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
     // If we are in a dev environment (e.g. target/debug/), this still places it next to the exe
     let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
@@ -313,6 +402,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
     let settings_path = config_dir.join("settings.json");
     let providers_path = config_dir.join("providers.json");
     let presets_path = config_dir.join("presets.json");
+    let prompts_path = config_dir.join("prompts.json");
     let secrets_path = config_dir.join("secrets.json");
 
     // Strategy:
@@ -329,6 +419,8 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
             fs::read_to_string(&providers_path).unwrap_or_else(|_| "{\"providers\":[]}".into());
         let presets_content =
             fs::read_to_string(&presets_path).unwrap_or_else(|_| "{\"presets\":[]}".into());
+        let prompts_content =
+            fs::read_to_string(&prompts_path).unwrap_or_else(|_| "{\"promptLibrary\":[]}".into());
         let secrets_content = fs::read_to_string(&secrets_path).unwrap_or_else(|_| "{}".into());
 
         let settings: SettingsPart = serde_json::from_str(&settings_content)
@@ -337,6 +429,8 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
             .unwrap_or_else(|_| serde_json::from_str("{\"providers\":[]}").unwrap());
         let presets_part: PresetsPart = serde_json::from_str(&presets_content)
             .unwrap_or_else(|_| serde_json::from_str("{\"presets\":[]}").unwrap());
+        let prompts_part: PromptsPart = serde_json::from_str(&prompts_content)
+            .unwrap_or_else(|_| serde_json::from_str("{\"promptLibrary\":[]}").unwrap());
         let secrets_part: SecretsPart = serde_json::from_str(&secrets_content)
             .unwrap_or_else(|_| serde_json::from_str("{}").unwrap());
 
@@ -376,9 +470,32 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
         config.search_provider = settings.search_provider;
         config.default_preset_id = settings.default_preset_id;
         config.global_preset_id = settings.global_preset_id;
+        config.enable_stream = settings.enable_stream;
+        config.enable_bubble = settings.enable_bubble;
+        config.show_user_avatar = settings.show_user_avatar;
+        config.user_avatar_path = settings.user_avatar_path;
+        config.chat_mode = settings.chat_mode;
 
         config.providers = providers_part.providers;
         config.presets = presets_part.presets;
+
+        // Prefer separate prompts.json, fallback to settings.json embedded
+        config.prompt_library = if let Some(p) = settings.prompt_library {
+            // If local prompts.json is empty but settings has it (migration scenario)
+            if prompts_part
+                .prompt_library
+                .as_array()
+                .map_or(0, |a| a.len())
+                == 0
+                && p.as_array().map_or(0, |a| a.len()) > 0
+            {
+                p
+            } else {
+                prompts_part.prompt_library
+            }
+        } else {
+            prompts_part.prompt_library
+        };
 
         return Ok(config);
     }
@@ -473,7 +590,14 @@ pub async fn save_config(_app: AppHandle, mut config: AppConfig) -> Result<(), S
     let presets_json = serde_json::to_string_pretty(&presets_part).map_err(|e| e.to_string())?;
     fs::write(config_dir.join("presets.json"), presets_json).map_err(|e| e.to_string())?;
 
-    // 5. Settings (Remainder)
+    // 5. Prompts
+    let prompts_part = PromptsPart {
+        prompt_library: config.prompt_library.clone(),
+    };
+    let prompts_json = serde_json::to_string_pretty(&prompts_part).map_err(|e| e.to_string())?;
+    fs::write(config_dir.join("prompts.json"), prompts_json).map_err(|e| e.to_string())?;
+
+    // 6. Settings (Remainder)
     let settings_part = SettingsPart {
         font_size: config.font_size,
         line_ratio: config.line_ratio,
@@ -493,6 +617,12 @@ pub async fn save_config(_app: AppHandle, mut config: AppConfig) -> Result<(), S
         search_provider: config.search_provider,
         default_preset_id: config.default_preset_id,
         global_preset_id: config.global_preset_id,
+        enable_stream: config.enable_stream,
+        enable_bubble: config.enable_bubble,
+        show_user_avatar: config.show_user_avatar,
+        user_avatar_path: config.user_avatar_path,
+        chat_mode: config.chat_mode,
+        prompt_library: None, // No longer saving here to avoid duplication
     };
     let settings_json = serde_json::to_string_pretty(&settings_part).map_err(|e| e.to_string())?;
     fs::write(config_dir.join("settings.json"), settings_json).map_err(|e| e.to_string())?;

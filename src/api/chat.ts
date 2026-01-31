@@ -10,7 +10,8 @@ export const chatApi = {
     getSessions: () => invoke<ChatSession[]>('get_sessions'),
 
     /** 创建新会话 */
-    createSession: (title: string) => invoke<string>('create_session', { title }),
+    createSession: (title: string, presetId?: string, modelId?: string, systemPrompt?: string) =>
+        invoke<string>('create_session', { title, presetId, modelId, systemPrompt }),
 
     /** 删除会话 */
     deleteSession: (id: string) => invoke('delete_session', { id }),

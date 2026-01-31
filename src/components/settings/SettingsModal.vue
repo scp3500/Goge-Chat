@@ -10,6 +10,7 @@ import PresetConfig from './PresetConfig.vue';
 import SystemPromptConfig from './SystemPromptConfig.vue';
 import AppearanceConfig from './AppearanceConfig.vue';
 import GeneralConfig from './GeneralConfig.vue';
+import ChatModeConfig from './ChatModeConfig.vue';
 
 
 // 使用 composables
@@ -210,6 +211,8 @@ const handleClose = () => {
                 settingsStore.activeCategory === 'presets' ? activePresetName : 
                 settingsStore.activeCategory === 'prompts' ? '系统提示词管理' :
                 settingsStore.activeCategory === 'appearance' ? '界面外观与显示' :
+                settingsStore.activeCategory === 'chatmode' ? '沉浸式聊天模式' :
+                settingsStore.activeCategory === 'data' ? '数据管理' :
                 '通用项设置' 
             }}</h2>
           </div>
@@ -239,6 +242,11 @@ const handleClose = () => {
         <AppearanceConfig 
           v-else-if="settingsStore.activeCategory === 'appearance'"
           :themes="themes"
+        />
+
+        <!-- 聊天模式设置 -->
+        <ChatModeConfig 
+          v-else-if="settingsStore.activeCategory === 'chatmode'"
         />
 
         <!-- 通用设置 -->

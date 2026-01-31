@@ -87,8 +87,8 @@ export const messageCommands = {
  */
 export const aiCommands = {
     /** 向 AI 提问 */
-    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>, temperature?: number, max_tokens?: number) =>
-        invoke<void>('ask_ai', { msg, onEvent, temperature, max_tokens }),
+    askAI: (msg: AskAIParams['msg'], onEvent: Channel<string>, temperature?: number, max_tokens?: number, explicit_provider_id?: string, explicit_model_id?: string) =>
+        invoke<void>('ask_ai', { msg, onEvent, temperature, max_tokens, explicitProviderId: explicit_provider_id, explicitModelId: explicit_model_id }),
 
 
     /** 停止 AI 生成 */
@@ -127,6 +127,18 @@ export const dbCommands = {
 };
 
 /**
+ * 文件相关命令
+ */
+export const fileCommands = {
+    /** 打开文件 */
+    openFile: (path: string) => invoke<void>('open_file', { path }),
+    /** 读取文件文本内容 */
+    readFileTextContent: (path: string) => invoke<string>('read_file_text_content', { path }),
+    /** 上传用户头像 */
+    uploadUserAvatar: (filePath: string) => invoke<string>('upload_user_avatar', { filePath: filePath }),
+};
+
+/**
  * 所有命令的聚合对象
  */
 export const tauriCommands = {
@@ -136,9 +148,7 @@ export const tauriCommands = {
     ...aiCommands,
     ...configCommands,
     ...dbCommands,
-    /** 文件相关 */
-    open_file: (path: string) => invoke<void>('open_file', { path }),
-    read_file_text_content: (path: string) => invoke<string>('read_file_text_content', { path }),
+    ...fileCommands,
 };
 
 /**

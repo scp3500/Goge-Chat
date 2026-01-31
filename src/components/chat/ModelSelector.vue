@@ -73,22 +73,57 @@ const currentModel = computed(() => {
   
   if (!selectedId) return null;
 
+  // 🟢 Fix: Prioritize the currently selected provider (defaultProviderId)
+  // This ensures that if multiple providers share the same model ID (e.g. 'gemini-1.5-flash'),
+  // we display the icon/info for the *active* provider, not just the first one found.
+  const activeProviderId = configStore.settings.defaultProviderId;
+  if (activeProviderId) {
+    const activeProvider = providers.find(p => p.id === activeProviderId);
+    if (activeProvider) {
+      const models = activeProvider.models || [];
+      const foundInActive = models.find(m => {
+          const id = typeof m === 'string' ? m : m.id;
+          return id === selectedId;
+      });
+      
+      if (foundInActive) {
+        return {
+          id: selectedId,
+          name: typeof foundInActive === 'string' ? foundInActive : (foundInActive.name || selectedId),
+          provider: activeProvider,
+          data: typeof foundInActive === 'string' ? null : foundInActive
+        };
+      }
+    }
+  }
+
+  // Fallback: search all providers if not found in active provider
   for (const provider of providers) {
-    if (provider.models && provider.models.includes(selectedId)) {
+    const models = provider.models || [];
+    const foundModel = models.find(m => {
+        const id = typeof m === 'string' ? m : m.id;
+        return id === selectedId;
+    });
+
+    if (foundModel) {
       return {
         id: selectedId,
-        name: selectedId,
-        provider: provider
+        name: typeof foundModel === 'string' ? foundModel : (foundModel.name || selectedId),
+        provider: provider,
+        data: typeof foundModel === 'string' ? null : foundModel
       };
     }
   }
   // 如果没找到，尝试返回默认提供商的模型
   const defaultProv = providers.find(p => p.id === configStore.settings.defaultProviderId);
   if (defaultProv && defaultProv.models && defaultProv.models.length > 0) {
+    const firstModel = defaultProv.models[0];
+    const id = typeof firstModel === 'string' ? firstModel : firstModel.id;
     return {
-      id: defaultProv.models[0],
-      name: defaultProv.models[0],
-      provider: defaultProv
+      id: id,
+      name: typeof firstModel === 'string' ? firstModel : (firstModel.name || id),
+      provider: defaultProv,
+      data: typeof firstModel === 'string' ? null : firstModel
     };
   }
   return null;
@@ -100,17 +135,19 @@ const filteredProviders = computed(() => {
   const filter = activeFilter.value;
   
   return configStore.enabledProviders.map(provider => {
-    const matchedModels = provider.models.filter(model => {
+    const matchedModels = (provider.models || []).filter(m => {
+      const modelId = typeof m === 'string' ? m : m.id;
+      const modelName = typeof m === 'string' ? m : (m.name || m.id);
+      const modelFeatures = typeof m === 'string' ? [] : (m.features || []);
+
       // 搜索匹配
-      const matchesSearch = model.toLowerCase().includes(query);
+      const matchesSearch = modelId.toLowerCase().includes(query) || modelName.toLowerCase().includes(query);
       if (!matchesSearch) return false;
       
-      // 过滤器匹配 (Mock 逻辑，因为目前没有模型元数据)
+      // 过滤器匹配
       if (filter === 'all') return true;
-      if (filter === 'vision') return model.includes('vision') || model.includes('v');
-      if (filter === 'reasoning') return model.includes('reasoner') || model.includes('reason');
-      if (filter === 'tools') return false; // 暂时没有工具模型标识
-      if (filter === 'web') return false;
+      if (filter === 'vision') return modelFeatures.includes('vision') || modelId.includes('vision') || modelId.includes('-v');
+      if (filter === 'reasoning') return modelFeatures.includes('reasoning') || modelId.includes('reasoner') || modelId.includes('reason');
       if (filter === 'free') return provider.id === 'ollama'; // Mock
       
       return true;
@@ -124,7 +161,8 @@ const filteredProviders = computed(() => {
 });
 
 // 选择模型
-const selectModel = (providerId, modelId) => {
+const selectModel = (providerId, model) => {
+  const modelId = typeof model === 'string' ? model : model.id;
   configStore.updateConfig({
     defaultProviderId: providerId,
     selectedModelId: modelId
@@ -133,9 +171,17 @@ const selectModel = (providerId, modelId) => {
 };
 
 // 判断是否为视觉模型
-const isVisionModel = (model) => model.toLowerCase().includes('vision') || model.toLowerCase().includes('-v');
+const isVisionModel = (model) => {
+    if (typeof model !== 'string' && model.features?.includes('vision')) return true;
+    const modelId = typeof model === 'string' ? model : model.id;
+    return modelId.toLowerCase().includes('vision') || modelId.toLowerCase().includes('-v');
+};
 // 判断是否为推理模型
-const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || model.toLowerCase().includes('reason');
+const isReasoningModel = (model) => {
+    if (typeof model !== 'string' && model.features?.includes('reasoning')) return true;
+    const modelId = typeof model === 'string' ? model : model.id;
+    return modelId.toLowerCase().includes('reasoner') || modelId.toLowerCase().includes('reason');
+};
 
 </script>
 
@@ -216,19 +262,19 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
             
             <div 
               v-for="model in provider.matchedModels" 
-              :key="model"
+              :key="typeof model === 'string' ? model : model.id"
               class="model-item"
-              :class="{ 'selected': configStore.settings.selectedModelId === model && configStore.settings.defaultProviderId === provider.id }"
+              :class="{ 'selected': configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id }"
               @click="selectModel(provider.id, model)"
             >
               <div class="model-info">
                 <span v-html="getProviderIcon(provider.icon)" class="model-icon"></span>
-                <span class="model-text">{{ model }}</span>
+                <span class="model-text">{{ typeof model === 'string' ? model : (model.name || model.id) }}</span>
               </div>
               <div class="model-badges">
                 <span v-if="isVisionModel(model)" class="badge vision" v-html="VISION_SVG" title="支持视觉"></span>
                 <span v-if="isReasoningModel(model)" class="badge reasoning" v-html="BRAIN_SVG" title="支持推理"></span>
-                <span v-if="configStore.settings.selectedModelId === model && configStore.settings.defaultProviderId === provider.id" class="badge check" v-html="CHECK_SVG"></span>
+                <span v-if="configStore.settings.selectedModelId === (typeof model === 'string' ? model : model.id) && configStore.settings.defaultProviderId === provider.id" class="badge check" v-html="CHECK_SVG"></span>
               </div>
             </div>
           </div>
@@ -370,15 +416,14 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   position: absolute;
   left: 0;
   width: 320px;
-  background: linear-gradient(135deg, var(--bg-dropdown) 0%, rgba(20, 20, 25, 0.4) 100%);
-  backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
-  -webkit-backdrop-filter: blur(100px) saturate(250%) brightness(1.1);
+  background: var(--bg-dropdown);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-dropdown);
   border-radius: 14px;
   box-shadow: 
-    0 40px 80px -12px rgba(0, 0, 0, 0.8),
-    0 18px 36px -18px rgba(0, 0, 0, 0.9),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2); /* Stronger Top highlight */
+    0 10px 30px -5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
   z-index: 1000;
   overflow: hidden;
   display: flex;
@@ -400,6 +445,9 @@ const isReasoningModel = (model) => model.toLowerCase().includes('reasoner') || 
   border-bottom: none;
   border-radius: 20px 20px 0 0;
   top: auto;
+  box-shadow: 
+    0 -10px 30px -5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
 .full-width .dropdown-panel.pop-up {
