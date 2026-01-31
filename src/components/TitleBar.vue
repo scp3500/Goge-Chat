@@ -75,28 +75,30 @@ const openSettings = () => {
       </div>
 
       <div class="window-controls">
-        <button
-          @click.stop="toggleTheme"
-          class="control-btn theme-toggle"
-          :title="isLight ? '切换深色模式' : '切换浅色模式'"
-          v-html="isLight ? SUN_SVG : MOON_SVG"
-        ></button>
+        <template v-if="!configStore.settings.chatMode.enabled">
+          <button
+            @click.stop="toggleTheme"
+            class="control-btn theme-toggle"
+            :title="isLight ? '切换深色模式' : '切换浅色模式'"
+            v-html="isLight ? SUN_SVG : MOON_SVG"
+          ></button>
 
-        <button
-          v-if="isSettings"
-          @click.stop="$emit('back-home')"
-          class="control-btn settings-btn"
-          title="返回首页"
-          v-html="HOME_SVG"
-        ></button>
+          <button
+            v-if="isSettings"
+            @click.stop="$emit('back-home')"
+            class="control-btn settings-btn"
+            title="返回首页"
+            v-html="HOME_SVG"
+          ></button>
 
-        <button
-          v-if="!isSettings"
-          @click.stop="openSettings"
-          class="control-btn settings-btn"
-          title="设置"
-          v-html="SETTINGS_SVG"
-        ></button>
+          <button
+            v-if="!isSettings"
+            @click.stop="openSettings"
+            class="control-btn settings-btn"
+            title="设置"
+            v-html="SETTINGS_SVG"
+          ></button>
+        </template>
 
         <button @click.stop="minimizeWin" class="control-btn" v-html="MINIMIZE_SVG"></button>
         <button @click.stop="toggleMaximizeWin" class="control-btn" v-html="MAXIMIZE_SVG"></button>

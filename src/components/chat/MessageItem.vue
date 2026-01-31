@@ -19,7 +19,8 @@ const props = defineProps({
   m: Object,
   index: Number,
   sessionId: String,
-  isEditing: Boolean
+  isEditing: Boolean,
+  themeOverride: { type: String, default: null }
 });
 
 const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'regenerate', 'update-edit-content']);
@@ -28,9 +29,10 @@ const chatStore = useChatStore();
 const configStore = useConfigStore();
 
 // --- 🔵 Chat Mode Logic ---
-const isChatMode = computed(() => configStore.settings.chatMode?.enabled);
+const isChatMode = computed(() => !!props.themeOverride || configStore.settings.chatMode?.enabled);
 
 const chatModeTheme = computed(() => {
+    if (props.themeOverride) return props.themeOverride;
     if (!isChatMode.value) return null;
     return configStore.settings.theme === 'light' 
         ? configStore.settings.chatMode.dayThemeId 

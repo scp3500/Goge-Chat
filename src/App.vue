@@ -11,6 +11,7 @@ import TitleBar from "./components/TitleBar.vue";
 import ChatContainer from "./components/chat/ChatContainer.vue";
 import StandardLayout from "./layouts/StandardLayout.vue";
 import MainLayout from "./layouts/MainLayout.vue";
+import SocialChatContainer from "./components/chat/SocialChatContainer.vue";
 
 const appWindow = getCurrentWindow();
 const configStore = useConfigStore();
@@ -79,21 +80,27 @@ onUnmounted(() => {
     
     <div class="content-area">
       <transition name="view-fade" mode="out-in">
+        <!-- Standard Layout (Normal Mode) -->
         <StandardLayout v-if="!configStore.settings.chatMode.enabled && !settingsStore.isModalOpen" />
         
-        <MainLayout v-else-if="configStore.settings.chatMode.enabled && !settingsStore.isModalOpen">
-          <ChatContainer 
-            v-if="chatStore.activeId !== null"
-            :key="chatStore.activeId"
+        <!-- Main Layout (Immersive Mode) - Always stays mounted even if settings are open -->
+        <MainLayout 
+          v-else-if="configStore.settings.chatMode.enabled"
+          v-slot="{ activeContact }"
+        >
+          <SocialChatContainer 
+            v-if="activeContact"
+            :active-contact="activeContact"
           />
-          <div v-else class="empty-chat">
-            <p>选择或创建一个对话开始</p>
-          </div>
         </MainLayout>
       </transition>
 
+      <!-- Settings Modal: Only show at root level if NOT in chatMode (for Standard Layout compatibility) -->
       <transition name="view-fade">
-        <SettingsModal v-show="settingsStore.isModalOpen" @close="handleBackToChat" />
+        <SettingsModal 
+          v-show="settingsStore.isModalOpen && !configStore.settings.chatMode.enabled" 
+          @close="handleBackToChat" 
+        />
       </transition>
     </div>
   </div>

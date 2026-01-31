@@ -7,7 +7,7 @@ import MessageItem from './MessageItem.vue';
 import ModernConfirm from './ModernConfirm.vue';
 import SystemPromptBanner from './SystemPromptBanner.vue';
 
-const props = defineProps(['messages', 'sessionId', 'initialScrollPos']);
+const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride']);
 const emit = defineEmits(['update-pos']);
 
 const chatStore = useChatStore();
@@ -167,6 +167,7 @@ onUnmounted(() => scrollRef.value?.removeEventListener('scroll', handleScroll));
           :index="i"
           :sessionId="sessionId"
           :isEditing="editingIndex === i"
+          :themeOverride="themeOverride"
           @start-edit="startEdit(i, m.content)"
           @cancel-edit="cancelEdit"
           @update-edit-content="val => editingContent = val"

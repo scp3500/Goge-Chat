@@ -325,6 +325,11 @@ pub fn run() {
             social_db::get_social_groups,
             social_db::get_social_setting,
             social_db::set_social_setting,
+            social_db::add_social_contact,
+            social_db::update_social_contact,
+            social_db::delete_social_contact,
+            social_db::get_social_messages,
+            social_db::save_social_message,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

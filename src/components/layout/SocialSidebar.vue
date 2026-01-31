@@ -1,14 +1,30 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
-import { SEARCH_SVG } from '../../constants/icons';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { SEARCH_SVG, PLUS_SVG } from '../../constants/icons';
 import { invoke } from '@tauri-apps/api/core';
+import { useConfigStore } from '../../stores/config';
+import AIContactModal from '../modals/AIContactModal.vue';
 
 const props = defineProps({
   isCollapsed: { type: Boolean, default: false }
 });
 
+const emit = defineEmits(['select']);
+
+const configStore = useConfigStore();
+const searchQuery = ref('');
+const activeContactId = ref(null);
 const clock = ref('');
 let timer = null;
+
+const showClock = computed(() => configStore.settings.chatMode.showSocialClock);
+
+const showModal = ref(false);
+const editingContact = ref(null);
+
+const showMenu = ref(false);
+const menuPos = ref({ x: 0, y: 0 });
+const targetContact = ref(null);
 
 const updateClock = () => {
   const now = new Date();
@@ -24,10 +40,7 @@ const profile = ref({
 const contacts = ref([]);
 const groups = ref([]);
 
-onMounted(async () => {
-  updateClock();
-  timer = setInterval(updateClock, 1000);
-
+const loadData = async () => {
   try {
     profile.value = await invoke('get_social_profile');
     groups.value = await invoke('get_social_groups');
@@ -35,26 +48,103 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to load social data:', e);
   }
+};
+
+onMounted(async () => {
+  updateClock();
+  timer = setInterval(updateClock, 1000);
+  await loadData();
+  window.addEventListener('click', closeMenu);
 });
 
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  window.removeEventListener('click', closeMenu);
 });
+
+// 过滤后的联系人列表
+const filteredContacts = computed(() => {
+  if (!searchQuery.value) return contacts.value;
+  return contacts.value.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+});
+
+const handleAddContact = () => {
+  editingContact.value = null;
+  showModal.value = true;
+};
+
+const selectContact = (contact) => {
+  activeContactId.value = contact.id;
+  emit('select', contact);
+};
+
+const openContextMenu = (contact, e) => {
+  targetContact.value = contact;
+  menuPos.value = { x: e.clientX, y: e.clientY };
+  showMenu.value = true;
+};
+
+const closeMenu = () => {
+  showMenu.value = false;
+};
+
+const handleEdit = () => {
+  editingContact.value = targetContact.value;
+  showModal.value = true;
+  closeMenu();
+};
+
+const handleDelete = async () => {
+  if (confirm(`确定要删除联系人 ${targetContact.value.name} 吗？`)) {
+    try {
+      await invoke('delete_social_contact', { id: targetContact.value.id });
+      await loadData();
+    } catch (e) {
+      alert('删除失败: ' + e);
+    }
+  }
+  closeMenu();
+};
+
+const handleConfirmModal = async (data) => {
+  try {
+    if (editingContact.value) {
+      await invoke('update_social_contact', { 
+        id: editingContact.value.id,
+        ...data
+      });
+    } else {
+      await invoke('add_social_contact', { 
+        ...data,
+        groupId: groups.value[0]?.id // Default to first group
+      });
+    }
+    await loadData();
+    showModal.value = false;
+  } catch (e) {
+    alert('操作失败: ' + e);
+  }
+};
 </script>
 
 <template>
   <aside class="social-sidebar" :class="{ 'is-collapsed': isCollapsed }">
     <div class="sidebar-content">
-      <!-- Search Box -->
-      <div class="search-container">
+      <!-- Search Box & Add Button -->
+      <div class="search-header">
         <div class="search-box">
           <div class="search-icon" v-html="SEARCH_SVG"></div>
-          <input type="text" placeholder="搜索内容..." />
+          <input type="text" v-model="searchQuery" placeholder="搜索联系人..." />
         </div>
+        <button class="add-btn" @click="handleAddContact" title="添加联系人">
+           <div class="icon-sm" v-html="PLUS_SVG"></div>
+        </button>
       </div>
 
       <!-- Clock -->
-      <div class="clock-display">
+      <div v-if="showClock" class="clock-display">
         {{ clock }}
       </div>
 
@@ -71,16 +161,19 @@ onUnmounted(() => {
       </div>
 
       <!-- Contact List -->
-      <div class="contact-list">
+      <div class="contact-list modern-scroll">
         <div v-for="group in groups" :key="group.id" class="contact-group">
           <div class="group-header">
             <span class="group-name">{{ group.name }}</span>
           </div>
           <div class="group-items">
             <div 
-              v-for="contact in contacts.filter(c => c.group_id === group.id)" 
+              v-for="contact in filteredContacts.filter(c => c.group_id === group.id)" 
               :key="contact.id"
               class="contact-item"
+              :class="{ 'active': activeContactId === contact.id }"
+              @click="selectContact(contact)"
+              @contextmenu.prevent="openContextMenu(contact, $event)"
             >
               <div class="avatar-sm">
                  <img v-if="contact.avatar" :src="contact.avatar" />
@@ -92,6 +185,23 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- AI Contact Modal -->
+    <AIContactModal 
+      :show="showModal" 
+      :contact="editingContact"
+      @close="showModal = false"
+      @confirm="handleConfirmModal"
+    />
+
+    <!-- Context Menu -->
+    <Teleport to="body">
+      <div v-if="showMenu" class="glass-menu" :style="{ top: menuPos.y + 'px', left: menuPos.x + 'px' }" @click.stop>
+        <div class="menu-item" @click="handleEdit">✎ 修改资料</div>
+        <div class="menu-sep"></div>
+        <div class="menu-item delete" @click="handleDelete">🗑 删除好友</div>
+      </div>
+    </Teleport>
   </aside>
 </template>
 
@@ -104,8 +214,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
   flex-shrink: 0;
+}
+
+:global(.app-light) .social-sidebar {
+    background: #ebebeb;
 }
 
 .social-sidebar.is-collapsed {
@@ -115,21 +229,55 @@ onUnmounted(() => {
 
 .sidebar-content {
   width: 280px; /* Maintain fixed width inside for content stability during animation */
-  padding: 16px;
+  padding: 16px 12px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+}
+
+.search-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
 }
 
 .search-box {
+  flex: 1;
   background: var(--bg-input);
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   gap: 8px;
   border: 1px solid var(--border-glass);
+}
+
+.add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  border: none;
+  cursor: pointer;
+  color: var(--text-color);
+  opacity: 0.8;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.add-btn:hover {
+  background: var(--bg-active);
+  opacity: 1;
+}
+
+.icon-sm :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 
 .search-icon {
@@ -223,6 +371,15 @@ onUnmounted(() => {
   background: var(--bg-hover);
 }
 
+.contact-item.active {
+  background: var(--bg-active);
+}
+
+.contact-item.active .contact-name {
+  color: var(--theme-color);
+  font-weight: 600;
+}
+
 .avatar-sm {
   width: 32px;
   height: 32px;
@@ -234,4 +391,32 @@ onUnmounted(() => {
 
 .avatar-placeholder-sm { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; background: var(--bg-active); }
 .contact-name { font-size: 0.9rem; color: var(--text-color); }
+
+/* Context Menu */
+.glass-menu { 
+  position: fixed; 
+  z-index: 10000; 
+  background: var(--bg-menu); 
+  backdrop-filter: blur(12px); 
+  border: 1px solid var(--border-menu); 
+  border-radius: 10px; 
+  padding: 6px; 
+  min-width: 150px;
+  box-shadow: var(--shadow-main);
+}
+
+.menu-item { 
+    padding: 8px 12px; 
+    font-size: 13px; 
+    color: var(--text-color); 
+    border-radius: 6px; 
+    cursor: pointer; 
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.menu-item:hover { background: var(--bg-menu-hover); color: var(--text-color-white); }
+.menu-item.delete { color: #ff6b6b; }
+.menu-sep { height: 1px; background: var(--border-menu); margin: 4px 0; }
 </style>

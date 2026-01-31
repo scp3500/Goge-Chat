@@ -4,15 +4,35 @@ import {
   NAV_PROMPTS_SVG, 
   NAV_MODELS_SVG, 
   NAV_GENERAL_SVG, 
-  CHEVRON_DOWN_SVG 
+  CHEVRON_DOWN_SVG,
+  SUN_SVG,
+  MOON_SVG
 } from '../../constants/icons';
+import { useConfigStore } from '../../stores/config';
+import { computed } from 'vue';
 
 const props = defineProps({
   activeModule: { type: String, default: 'chat' },
-  isCollapsed: { type: Boolean, default: false }
+  isCollapsed: { type: Boolean, default: false },
+  isInSettings: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings']);
+const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome']);
+
+const handleModuleClick = (moduleId) => {
+  emit('update:activeModule', moduleId);
+  if (props.isInSettings) {
+    emit('backHome');
+  }
+};
+
+const configStore = useConfigStore();
+const isLight = computed(() => configStore.settings.theme === 'light');
+
+const toggleTheme = () => {
+  const nextTheme = isLight.value ? 'dark' : 'light';
+  configStore.updateConfig({ theme: nextTheme });
+};
 
 const modules = [
   { id: 'chat', icon: NAV_PROMPTS_SVG, label: '聊天' },
@@ -22,9 +42,9 @@ const modules = [
 </script>
 
 <template>
-  <nav class="app-nav-bar">
+  <nav class="app-nav-bar" :class="{ 'immersive': configStore.settings.chatMode.enabled && isLight }">
     <div class="nav-top">
-      <div class="logo-container">
+      <div class="logo-container" @click="emit('backHome')">
         <!-- Placeholder for G logo -->
         <div class="g-logo">G</div>
       </div>
@@ -34,8 +54,8 @@ const modules = [
           v-for="mod in modules" 
           :key="mod.id"
           class="nav-item"
-          :class="{ active: activeModule === mod.id }"
-          @click="emit('update:activeModule', mod.id)"
+          :class="{ active: activeModule === mod.id && !isInSettings }"
+          @click="handleModuleClick(mod.id)"
           :title="mod.label"
         >
           <div class="icon-wrapper" v-html="mod.icon"></div>
@@ -44,6 +64,14 @@ const modules = [
     </div>
 
     <div class="nav-bottom">
+      <button 
+        class="nav-item theme-toggle" 
+        @click="toggleTheme" 
+        :title="isLight ? '切换深色模式' : '切换浅色模式'"
+      >
+        <div class="icon-wrapper" v-html="isLight ? SUN_SVG : MOON_SVG"></div>
+      </button>
+
       <button class="nav-item" @click="emit('openSettings')" title="设置">
         <div class="icon-wrapper" v-html="NAV_GENERAL_SVG"></div>
       </button>
@@ -75,12 +103,28 @@ const modules = [
   box-sizing: border-box;
   flex-shrink: 0;
   z-index: 100;
+  transition: background 0.3s;
+}
+
+.app-nav-bar.immersive {
+  background: #28292c;
+  border-right: none;
+}
+
+.app-nav-bar.immersive .nav-item {
+  color: #999;
+  opacity: 1;
+}
+
+.app-nav-bar.immersive .nav-item.active {
+  color: #07c160; /* WeChat Green */
 }
 
 .logo-container {
   margin-bottom: 24px;
   display: flex;
   justify-content: center;
+  cursor: pointer;
 }
 
 .g-logo {

@@ -123,6 +123,7 @@ export interface ChatModeConfig {
     nightThemeId: string;
     enableStream: boolean;      // Override global stream setting
     enableLoadingBar: boolean; // Show/Hide "Thinking..." or progress bar
+    showSocialClock: boolean; // Show/Hide real-time clock in social sidebar
 }
 
 // 默认的模型提供商配置
@@ -249,7 +250,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
         dayThemeId: 'wechat',
         nightThemeId: 'dark_plus',
         enableStream: false,
-        enableLoadingBar: false
+        enableLoadingBar: false,
+        showSocialClock: false
     }
 };
 
