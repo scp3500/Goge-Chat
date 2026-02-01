@@ -319,6 +319,7 @@ pub fn run() {
             // 文件指令
             commands::file_cmd::open_file,
             commands::file_cmd::read_file_text_content,
+            commands::file_cmd::read_file_base64,
             commands::file_cmd::upload_user_avatar,
             // 社交数据库指令
             social_db::get_social_profile,
@@ -333,6 +334,8 @@ pub fn run() {
             social_db::delete_social_messages_after,
             social_db::update_social_message,
             social_db::get_social_messages,
+            social_db::get_recent_social_messages,
+            social_db::get_social_messages_paginated,
             social_db::save_social_message,
             social_db::get_recent_social_chats,
             social_db::update_social_profile,

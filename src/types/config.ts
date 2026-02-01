@@ -115,6 +115,15 @@ export interface AppSettings {
 
     // Chat Mode Configuration
     chatMode: ChatModeConfig;
+
+    // UI Density / Scaling
+    globalScale: number;
+
+    // Avatar Adjustments
+    userAvatarSize: number;
+    userAvatarBorderRadius: number;
+    userAvatarOffsetX: number;
+    userAvatarOffsetY: number;
 }
 
 export interface ChatModeConfig {
@@ -252,7 +261,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
         enableStream: false,
         enableLoadingBar: false,
         showSocialClock: false
-    }
+    },
+    globalScale: 1.0,
+    userAvatarSize: 36,
+    userAvatarBorderRadius: 6,
+    userAvatarOffsetX: 0,
+    userAvatarOffsetY: 0
 };
 
 

@@ -121,12 +121,13 @@ const getMenuStyle = computed(() => {
     const inputWrapper = document.querySelector('.input-wrapper');
     if (!inputWrapper) return {};
     const wrapRect = inputWrapper.getBoundingClientRect();
+    const targetWidth = wrapRect.width * 0.92;
     return {
         position: 'fixed',
         bottom: (window.innerHeight - wrapRect.top) + 'px',
-        left: wrapRect.left + 'px',
-        width: wrapRect.width + 'px',
-        borderRadius: '28px 28px 0 0'
+        left: wrapRect.left + (wrapRect.width - targetWidth) / 2 + 'px',
+        width: targetWidth + 'px',
+        borderRadius: '20px 20px 0 0'
     };
 });
 

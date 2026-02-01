@@ -5,6 +5,7 @@ import { renderMarkdown } from '../../services/markdown';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useConfigStore } from '../../stores/config';
+import { useSettingsStore } from '../../stores/settings';
 import { getProviderIcon } from '../../assets/icons';
 
 // Import new components
@@ -29,6 +30,7 @@ const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'r
 
 const chatStore = useChatStore();
 const configStore = useConfigStore();
+const settingsStore = useSettingsStore();
 
 // --- 🔵 Chat Mode Logic ---
 const isChatMode = computed(() => !!props.themeOverride || configStore.settings.chatMode?.enabled);
@@ -59,7 +61,16 @@ const chatModeClasses = computed(() => {
 // 💡 格式化时间
 const formattedDate = computed(() => {
   if (!props.m.created_at) return '';
-  const date = new Date(props.m.created_at + 'Z');
+  // 🛡️ Fix: Handle both SQLite "YYYY-MM-DD HH:MM:SS" (needs Z) and ISO "YYYY-MM-DDTHH:MM:SSZ"
+  let timeStr = props.m.created_at;
+  if (!timeStr.includes('Z') && !timeStr.includes('+')) {
+      // If it looks like SQLite local time, append Z for UTC
+      timeStr += 'Z';
+  }
+  
+  const date = new Date(timeStr);
+  if (isNaN(date.getTime())) return props.m.created_at; // Fallback to raw string if still invalid
+
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const hours = date.getHours().toString().padStart(2, '0');
@@ -81,10 +92,8 @@ const modelIcon = computed(() => {
     if (props.assistantAvatar) {
         // 如果是本地路径且不是 data:uri 或 http 链接，则转换
         const url = props.assistantAvatar;
-        if (url.startsWith('http') || url.startsWith('https') || url.startsWith('data:')) {
-            return url;
-        }
-        return convertFileSrc(url);
+        // ⚡️ Fix: Use shared resolver to handle all path types (including local assets)
+        return resolveSocialAvatar(url);
     }
 
     // 1. Try explicit providerId stored in message
@@ -333,10 +342,10 @@ const handleRetryError = async () => {
         await chatStore.sendMessage("");
     }
 };
+import { resolveSocialAvatar } from '../../utils/social';
+
 const resolveAvatarSrc = (path) => {
-    if (!path) return '';
-    if (path.startsWith('data:') || path.startsWith('http')) return path;
-    return convertFileSrc(path);
+    return resolveSocialAvatar(path);
 };
 
 // --- Context Menu Logic ---
@@ -417,10 +426,13 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
         </div>
 
         <!-- User Avatar -->
-        <div v-if="configStore.settings.showUserAvatar" class="user-avatar-container">
+        <div v-if="configStore.settings.showUserAvatar" 
+             class="user-avatar-container click-enabled"
+             @click="settingsStore.openSettings('profile')"
+             title="个人资料设置">
              <div class="avatar-img"
-                  :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${resolveAvatarSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
-                  <span v-if="!configStore.settings.userAvatarPath">👤</span>
+                  :style="{ backgroundImage: configStore.userAvatarUrl ? `url('${configStore.userAvatarUrl}')` : 'none' }">
+                  <span v-if="!configStore.userAvatarUrl">👤</span>
              </div>
         </div>
       </div>
@@ -614,6 +626,15 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
   width: 40px;
   height: 40px;
   margin-top: 0px; /* Align with top of bubble */
+}
+
+.click-enabled {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.click-enabled:hover {
+    transform: scale(1.05);
 }
 
 .avatar-img {

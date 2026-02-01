@@ -103,6 +103,11 @@ const handleFileUpload = async (event) => {
 // 使用 Tauri API 选择文件
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { readFile } from '@tauri-apps/plugin-fs';
+import ImageCropperModal from '../modals/ImageCropperModal.vue';
+
+const showEditor = ref(false);
+const editingImg = ref('');
 
 const selectAndUploadAvatar = async () => {
   try {
@@ -115,11 +120,33 @@ const selectAndUploadAvatar = async () => {
     });
     
     if (selected && typeof selected === 'string') { // string (path)
-       const savedPath = await configStore.uploadAvatar(selected);
-       handleUpdate(); // Save config just in case, though uploadAvatar updates store
+       // 🟢 Fix: Read file as base64 for vue-cropper compatibility
+       const content = await readFile(selected);
+       const base64 = btoa(
+           new Uint8Array(content)
+             .reduce((data, byte) => data + String.fromCharCode(byte), '')
+       );
+       const mimeType = selected.toLowerCase().endsWith('.png') ? 'image/png' : 
+                        selected.toLowerCase().endsWith('.gif') ? 'image/gif' : 
+                        selected.toLowerCase().endsWith('.webp') ? 'image/webp' :
+                        'image/jpeg';
+
+       editingImg.value = `data:${mimeType};base64,${base64}`;
+       showEditor.value = true;
     }
   } catch (err) {
     console.error('选择头像失败:', err);
+  }
+};
+
+const handleAvatarSave = async (croppedData) => {
+  try {
+    // croppedData is a base64 data-URL
+    const savedPath = await configStore.uploadAvatar(croppedData);
+    showEditor.value = false;
+    handleUpdate();
+  } catch (err) {
+    console.error('保存裁剪头像失败:', err);
   }
 };
 
@@ -196,6 +223,25 @@ const selectAndUploadAvatar = async () => {
           />
         </div>
         <div class="control-item">
+          <label>UI 密度 / 缩放 ({{ (configStore.settings.globalScale * 100).toFixed(0) }}%)</label>
+          <div class="scale-control">
+            <input 
+              type="range" 
+              v-model.number="configStore.settings.globalScale" 
+              min="0.5" 
+              max="1.5" 
+              step="0.05"
+              @input="handleUpdate" 
+            />
+            <div class="scale-presets">
+               <button class="preset-tag" @click="configStore.settings.globalScale = 1.0; handleUpdate()">100% (标准)</button>
+               <button class="preset-tag" @click="configStore.settings.globalScale = 0.85; handleUpdate()">85% (高密)</button>
+               <button class="preset-tag" @click="configStore.settings.globalScale = 0.75; handleUpdate()">75% (紧凑)</button>
+            </div>
+          </div>
+          <span class="sub-label">缩放 UI 元素大小，同时保持文字清晰可读</span>
+        </div>
+        <div class="control-item">
           <label>滚动条宽度 ({{ configStore.settings.scrollbarWidth }}px)</label>
           <input 
             type="range" 
@@ -240,20 +286,51 @@ const selectAndUploadAvatar = async () => {
                   <input type="checkbox" v-model="configStore.settings.showUserAvatar" @change="handleUpdate" />
                   <span class="slider"></span>
                 </label>
-                <span class="sub-label">显示用户头像</span>
+                <span class="sub-label">显示用户头像 (将在侧边栏或标题栏展示)</span>
              </div>
              
-             <div v-if="configStore.settings.showUserAvatar" class="upload-row">
+             <div v-if="configStore.settings.showUserAvatar" class="avatar-adjustments">
+                <div v-if="configStore.settings.showUserAvatar" class="upload-row">
                 <div class="avatar-preview" 
-                     :style="{ backgroundImage: configStore.settings.userAvatarPath ? `url('${convertFileSrc(configStore.settings.userAvatarPath)}')` : 'none' }">
-                     <span v-if="!configStore.settings.userAvatarPath">?</span>
+                     :style="{ backgroundImage: configStore.userAvatarUrl ? `url('${configStore.userAvatarUrl}')` : 'none' }">
+                   <span v-if="!configStore.userAvatarUrl" class="placeholder">+</span>
                 </div>
-                <button class="upload-btn" @click="selectAndUploadAvatar">更换头像</button>
+                   <button class="upload-btn" @click="selectAndUploadAvatar">更换头像</button>
+                </div>
+
+                <!-- 头像细调 -->
+                <div class="adjustment-grid">
+                  <div class="adj-item">
+                    <label>大小: {{ configStore.settings.userAvatarSize }}px</label>
+                    <input type="range" v-model.number="configStore.settings.userAvatarSize" min="20" max="80" @input="handleUpdate" />
+                  </div>
+                  <div class="adj-item">
+                    <label>圆角: {{ configStore.settings.userAvatarBorderRadius }}px</label>
+                    <input type="range" v-model.number="configStore.settings.userAvatarBorderRadius" min="0" max="40" @input="handleUpdate" />
+                  </div>
+                  <div class="adj-item">
+                    <label>水平偏移: {{ configStore.settings.userAvatarOffsetX }}px</label>
+                    <input type="range" v-model.number="configStore.settings.userAvatarOffsetX" min="-50" max="50" @input="handleUpdate" />
+                  </div>
+                  <div class="adj-item">
+                    <label>垂直偏移: {{ configStore.settings.userAvatarOffsetY }}px</label>
+                    <input type="range" v-model.number="configStore.settings.userAvatarOffsetY" min="-50" max="50" @input="handleUpdate" />
+                  </div>
+                </div>
              </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Avatar Editor Modal (Reused) -->
+    <ImageCropperModal 
+      :show="showEditor"
+      :img-src="editingImg"
+      :border-radius="configStore.settings.userAvatarBorderRadius"
+      @confirm="handleAvatarSave"
+      @close="showEditor = false"
+    />
   </div>
 </template>
 
@@ -445,5 +522,61 @@ input:checked + .slider:before { transform: translateX(18px); background-color: 
   background: var(--bg-glass-hover);
   border-color: var(--color-primary);
   color: var(--text-color-white);
+}
+
+.avatar-adjustments {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.adjustment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-input-dim);
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+}
+
+.adj-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adj-item label {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-bottom: 0px !important;
+}
+
+.scale-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scale-presets {
+  display: flex;
+  gap: 8px;
+}
+
+.preset-tag {
+  padding: 4px 10px;
+  background: var(--bg-input-dim);
+  border: 1px solid var(--border-glass);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-tag:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--color-primary);
 }
 </style>

@@ -10,6 +10,12 @@ export const useConfigStore = defineStore('config', () => {
     const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
     const isLoading = ref(false);
     const lastError = ref<string | null>(null);
+    const userAvatarUrl = ref<string>(''); // Loaded base64 avatar for display
+    let lastLoadedPath = ''; // Prevent redundant loads
+
+    // Import lazily to avoid circular issues or just at top
+    // But we can't import inside defineStore easily if it is a module import
+    // Let's add import at top of file
 
     // ========== 计算属性 ==========
 
@@ -39,9 +45,29 @@ export const useConfigStore = defineStore('config', () => {
         // 🛡️ 强力修复：彻底移除可能存在的内联硬编码背景色，确保 CSS 变量生效
         root.style.removeProperty('--bg-main');
 
-        root.style.setProperty('--font-size-base', `${val.fontSize}px`);
+        // 应用全局缩放 (UI 密度)
+        // 注意：zoom 在现代浏览器中表现良好，但某些布局可能需要更精细的处理
+        const scale = val.globalScale || 1.0;
+        (root.style as any).zoom = scale.toString();
+
+        // 文字大小补偿计算：fontSize / scale 确保文字物理大小在不同缩放下保持一致
+        const compensatedFontSize = val.fontSize / scale;
+        root.style.setProperty('--font-size-base', `${compensatedFontSize}px`);
+
         root.style.setProperty('--font-ratio', val.lineRatio.toString());
         root.style.setProperty('--scrollbar-width', `${val.scrollbarWidth}px`);
+
+        // 头像调整
+        root.style.setProperty('--user-avatar-size', `${val.userAvatarSize || 36}px`);
+        root.style.setProperty('--user-avatar-radius', `${val.userAvatarBorderRadius || 6}px`);
+        root.style.setProperty('--user-avatar-offset-x', `${val.userAvatarOffsetX || 0}px`);
+        root.style.setProperty('--user-avatar-offset-x', `${val.userAvatarOffsetX || 0}px`);
+        root.style.setProperty('--user-avatar-offset-y', `${val.userAvatarOffsetY || 0}px`);
+
+        // Load avatar if path exists and url is empty
+        if (val.userAvatarPath && !userAvatarUrl.value) {
+            loadUserAvatar();
+        }
 
         // 应用主题属性
         // 根据当前模式（light/dark）获取用户预设的具体主题 ID
@@ -103,6 +129,12 @@ export const useConfigStore = defineStore('config', () => {
 
                 console.log('[ConfigStore INIT] After merge, final order:',
                     settings.value.providers.map(p => p.id).join(','));
+
+                // Initialize avatar
+                if (settings.value.userAvatarPath) {
+                    await loadUserAvatar();
+                }
+
                 applyToCss(settings.value);
             }
         } catch (e) {
@@ -289,6 +321,11 @@ export const useConfigStore = defineStore('config', () => {
 
             await configCommands.saveConfig(persistentSettings as AppSettings);
             lastError.value = null;
+
+            // 🔄 Reactive Avatar Loading: Reload if path changed
+            if (newPartialSettings.userAvatarPath !== undefined && newPartialSettings.userAvatarPath !== lastLoadedPath) {
+                await loadUserAvatar();
+            }
         } catch (e) {
             console.error("持久化配置失败:", e);
             lastError.value = e instanceof Error ? e.message : String(e);
@@ -549,13 +586,52 @@ export const useConfigStore = defineStore('config', () => {
         }
     };
 
+    // ========== 头像加载 ==========
+    const loadUserAvatar = async () => {
+        const path = settings.value.userAvatarPath;
+        if (!path) {
+            userAvatarUrl.value = '';
+            return;
+        }
+
+        // If it's already a data URL or http URL, just use it
+        if (path.startsWith('data:') || path.startsWith('http')) {
+            userAvatarUrl.value = path;
+            lastLoadedPath = path;
+            return;
+        }
+
+        try {
+            // Read file content using robust Rust command
+            const base64 = await fileCommands.readFileBase64(path);
+
+            // Guess mime type
+            const mimeType = path.toLowerCase().endsWith('.png') ? 'image/png' :
+                path.toLowerCase().endsWith('.gif') ? 'image/gif' :
+                    path.toLowerCase().endsWith('.webp') ? 'image/webp' :
+                        'image/jpeg';
+
+            userAvatarUrl.value = `data:${mimeType};base64,${base64}`;
+            lastLoadedPath = path;
+        } catch (e) {
+            console.error('Failed to load avatar:', e);
+            userAvatarUrl.value = '';
+        }
+    };
+
     /**
      * 上传用户头像
      */
     const uploadAvatar = async (filePath: string) => {
         try {
             const savedPath = await fileCommands.uploadUserAvatar(filePath);
+
+            // Update settings
             await updateConfig({ userAvatarPath: savedPath });
+
+            // Reload avatar for display
+            await loadUserAvatar();
+
             return savedPath;
         } catch (e) {
             console.error("上传头像失败:", e);
@@ -597,6 +673,8 @@ export const useConfigStore = defineStore('config', () => {
         handleReorder,
         resetToDefaults,
         uploadAvatar,
+        userAvatarUrl, // Export state
+        loadUserAvatar,
 
         // 预设管理
         getPreset,

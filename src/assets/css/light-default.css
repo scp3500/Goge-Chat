@@ -109,4 +109,9 @@
     /* Light box for Light Mode */
     --bg-social-icon-hover: rgba(0, 0, 0, 0.05);
     --bg-social-icon-active: rgba(0, 0, 0, 0.1);
+
+    /* Scrollbar Adaptation (Dark on Light) */
+    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+    --scrollbar-thumb-active: rgba(0, 0, 0, 0.5);
 }

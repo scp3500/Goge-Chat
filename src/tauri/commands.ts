@@ -134,6 +134,8 @@ export const fileCommands = {
     openFile: (path: string) => invoke<void>('open_file', { path }),
     /** 读取文件文本内容 */
     readFileTextContent: (path: string) => invoke<string>('read_file_text_content', { path }),
+    /** 读取二进制文件为 Base64 */
+    readFileBase64: (path: string) => invoke<string>('read_file_base64', { path }),
     /** 上传用户头像 */
     uploadUserAvatar: (filePath: string) => invoke<string>('upload_user_avatar', { filePath: filePath }),
 };

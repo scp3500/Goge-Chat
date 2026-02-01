@@ -2,12 +2,13 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 
-const resolveAvatarSrc = (path) => {
-  if (!path) return '';
-  if (path.startsWith('data:') || path.startsWith('http')) return path;
-  return convertFileSrc(path);
-};
 import { SEARCH_SVG } from '../../constants/icons';
+import { getDefaultAvatar, resolveSocialAvatar } from '../../utils/social';
+
+const resolveAvatarSrc = (path, id) => {
+  // If path exists, resolve it; otherwise use default avatar directly
+  return path ? resolveSocialAvatar(path) : getDefaultAvatar(id);
+};
 
 const props = defineProps({
   activeContactId: { type: Number, default: null }
@@ -82,8 +83,7 @@ const selectChat = (chat) => {
         @click="selectChat(chat)"
       >
         <div class="avatar-box">
-          <img v-if="chat.contact.avatar" :src="resolveAvatarSrc(chat.contact.avatar)" />
-          <div v-else class="avatar-placeholder">{{ chat.contact.name[0] }}</div>
+          <img :src="resolveAvatarSrc(chat.contact.avatar, chat.contact.id)" />
         </div>
         
         <div class="chat-info">

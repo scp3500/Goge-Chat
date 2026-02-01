@@ -5,6 +5,13 @@ import { useConfigStore } from "../../stores/config";
 import { useChatStore } from "../../stores/chat";
 import MessageList from "./MessageList.vue";
 import ChatInput from "./ChatInput.vue";
+import { getDefaultAvatar, resolveSocialAvatar } from "../../utils/social";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const resolveAvatarSrc = (path, id) => {
+  // If path exists, resolve it; otherwise use default avatar directly
+  return path ? resolveSocialAvatar(path) : getDefaultAvatar(id);
+};
 
 const props = defineProps({
   activeContact: {
@@ -18,21 +25,89 @@ const chatStore = useChatStore();
 const messages = ref([]);
 const isGenerating = ref(false);
 const messageListRef = ref(null);
+const isLoadingMore = ref(false); // ⏳ Loading state
+const allLoaded = ref(false);     // 🏁 End of history
+const PAGE_SIZE = 20;
 
+// ⚡️ Load recent messages initially
 const loadMessages = async (contactId) => {
   try {
-    const history = await invoke("get_social_messages", { contactId });
+    messages.value = []; // Clear current
+    allLoaded.value = false;
+    
+    // Fetch last N messages
+    const history = await invoke("get_recent_social_messages", { 
+      contactId, 
+      limit: PAGE_SIZE 
+    });
+    
     messages.value = history;
+    if (history.length < PAGE_SIZE) {
+      allLoaded.value = true;
+    }
+    
+    triggerScroll(); // Scroll to bottom on initial load
   } catch (e) {
     console.error("Failed to load social messages:", e);
   }
 };
 
-const triggerScroll = async () => {
+// 📜 Load more older messages (Pagination)
+const loadMoreMessages = async () => {
+  if (isLoadingMore.value || allLoaded.value || !props.activeContact?.id) return;
+  
+  const oldestMsgId = messages.value[0]?.id;
+  if (!oldestMsgId) return;
+
+  try {
+    isLoadingMore.value = true;
+    const startTime = Date.now(); // ⏱️ Start timer
+    
+    // Save scroll height BEFORE loading to restore position
+    const listEl = messageListRef.value?.$el?.querySelector('.message-list-scroll');
+    const oldScrollHeight = listEl?.scrollHeight || 0;
+    const oldScrollTop = listEl?.scrollTop || 0;
+
+    const olderMessages = await invoke("get_social_messages_paginated", { 
+      contactId: props.activeContact.id,
+      limit: PAGE_SIZE,
+      beforeId: oldestMsgId
+    });
+
+    // ⏳ Ensure minimum spinner visibility (300ms) for smoother UX
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 300) {
+      await new Promise(resolve => setTimeout(resolve, 300 - elapsed));
+    }
+
+    isLoadingMore.value = false; // 💡 Hide spinner BEFORE measuring height to avoid jump
+
+    if (olderMessages.length > 0) {
+      messages.value = [...olderMessages, ...messages.value];
+    } else {
+      allLoaded.value = true;
+    }
+
+    // 📍 Restore scroll position
+    await nextTick();
+    if (listEl) {
+      const newScrollHeight = listEl.scrollHeight;
+      const heightDiff = newScrollHeight - oldScrollHeight;
+      // If we were at top (scrollTop=0), we want to stay at the same relative position
+      listEl.scrollTop = oldScrollTop + heightDiff; 
+    }
+
+  } catch (e) {
+    console.error("Failed to load more messages:", e);
+    isLoadingMore.value = false;
+  }
+};
+
+const triggerScroll = async (behavior = 'auto') => {
   await nextTick();
   setTimeout(() => {
     if (messageListRef.value?.scrollToBottom) {
-      messageListRef.value.scrollToBottom();
+      messageListRef.value.scrollToBottom(behavior);
     }
   }, 10);
 };
@@ -40,7 +115,6 @@ const triggerScroll = async () => {
 watch(() => props.activeContact?.id, (newId) => {
   if (newId) {
     loadMessages(newId);
-    triggerScroll();
   }
 }, { immediate: true });
 
@@ -59,13 +133,16 @@ const triggerAIRequest = async (targetMessage = null) => {
       role: "assistant",
       content: "__LOADING__",
       model: props.activeContact.model,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString().replace('T', ' ').replace('Z', '')
     };
     messages.value.push(assistantMsg);
   }
   
+  const msgInArray = targetMessage ? assistantMsg : messages.value[messages.value.length - 1];
+  
   isGenerating.value = true;
-  triggerScroll();
+  chatStore.isGenerating = true; // ⚡️ Sync state for auto-scroll
+  triggerScroll('smooth'); // 🌊 Smooth scroll for AI start
 
   try {
     // 2. Prepare AI request
@@ -91,8 +168,8 @@ const triggerAIRequest = async (targetMessage = null) => {
         const content = data.substring(2);
         aiFullContent += content;
         
-        if (assistantMsg.content === "__LOADING__") assistantMsg.content = "";
-        assistantMsg.content += content;
+        if (msgInArray.content === "__LOADING__") msgInArray.content = "";
+        msgInArray.content += content;
       }
     };
 
@@ -118,23 +195,24 @@ const triggerAIRequest = async (targetMessage = null) => {
     });
 
     // 3. Save/Update assistant response in database
-    if (assistantMsg.id) {
-        await invoke("update_social_message", { id: assistantMsg.id, content: aiFullContent });
+    if (msgInArray.id) {
+        await invoke("update_social_message", { id: msgInArray.id, content: aiFullContent });
     } else {
         const savedId = await invoke("save_social_message", {
             contactId,
             role: "assistant",
             content: aiFullContent
         });
-        assistantMsg.id = savedId;
+        msgInArray.id = savedId;
     }
-    assistantMsg.content = aiFullContent;
+    msgInArray.content = aiFullContent;
 
   } catch (e) {
     console.error("Social chat AI error:", e);
-    assistantMsg.content = "发生错误: " + e;
+    msgInArray.content = "发生错误: " + e;
   } finally {
     isGenerating.value = false;
+    chatStore.isGenerating = false; // ⚡️ Sync state end
   }
 };
 
@@ -156,9 +234,9 @@ const handleSend = async (text) => {
       id: savedUserId,
       role: "user", 
       content: userText,
-      created_at: new Date().toISOString() 
+      created_at: new Date().toISOString().replace('T', ' ').replace('Z', '') 
     });
-    triggerScroll();
+    triggerScroll('smooth'); // 🌊 Smooth scroll for user action
 
     // 2. Trigger AI
     await triggerAIRequest();
@@ -170,6 +248,7 @@ const handleSend = async (text) => {
 
 const handleStop = async () => {
     isGenerating.value = false;
+    chatStore.isGenerating = false; // ⚡️ Sync state stop
     try { await invoke("stop_ai_generation"); } catch (err) { console.error(err); }
 };
 
@@ -235,7 +314,11 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   <main class="social-chat-container">
     <header class="chat-header" data-tauri-drag-region>
        <span class="contact-name">{{ activeContact.name }}</span>
-       <span class="model-badge">{{ activeContact.model }}</span>
+       <transition name="status-fade">
+           <div v-if="isGenerating" class="typing-status">
+               对方正在输入<span class="dot-anim">...</span>
+           </div>
+       </transition>
     </header>
 
     <div class="message-list-wrapper">
@@ -245,13 +328,15 @@ const handleSaveEdit = async (messageId, index, newContent) => {
           :sessionId="activeContact.id.toString()"
           :themeOverride="'wechat'"
           :showSystemPrompt="false"
-          :assistantAvatar="activeContact.avatar"
+          :assistantAvatar="resolveAvatarSrc(activeContact.avatar, activeContact.id)"
           :assistantName="activeContact.name"
           :initialScrollPos="chatStore.getSessionScroll(activeContact.id.toString())"
+          :loadingMore="isLoadingMore"
           ref="messageListRef"
           @delete="handleDelete"
           @regenerate="handleRegenerate"
           @save-edit="handleSaveEdit"
+          @load-more="loadMoreMessages"
         />
     </div>
 
@@ -300,12 +385,48 @@ const handleSaveEdit = async (messageId, index, newContent) => {
     color: #1a1a1a;
 }
 
-.model-badge {
-    font-size: 0.75rem;
-    padding: 2px 8px;
-    background: #e0e0e0;
-    border-radius: 4px;
-    color: #666;
+.typing-status {
+    font-size: 0.85rem;
+    color: #888;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+}
+
+.dot-anim {
+    display: inline-block;
+    width: 12px;
+    text-align: left;
+    animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+}
+
+/* 适配微信/QQ样式的点点点更生动的方式：使用伪类循环 */
+.dot-anim::after {
+    content: '';
+    animation: dots-pseudo 1.5s infinite;
+}
+
+@keyframes dots-pseudo {
+    0% { content: ''; }
+    33% { content: '.'; }
+    66% { content: '..'; }
+    100% { content: '...'; }
+}
+
+/* Transition for status */
+.status-fade-enter-active, .status-fade-leave-active {
+    transition: all 0.3s ease;
+}
+.status-fade-enter-from, .status-fade-leave-to {
+    opacity: 0;
+    transform: translateY(5px);
 }
 
 /* chat-input-wrapper removed to simplify layout and avoid overlap */
@@ -323,8 +444,7 @@ const handleSaveEdit = async (messageId, index, newContent) => {
     color: #fff;
 }
 
-:global(.app-dark) .model-badge {
-    background: #333;
-    color: #888;
+:global(.app-dark) .typing-status {
+    color: #777;
 }
 </style>

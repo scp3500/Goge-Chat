@@ -73,8 +73,8 @@ const modules = [
         title="个人资料"
         data-tauri-drag-region
       >
-        <img v-if="profile.avatar || configStore.settings.userAvatarPath" 
-             :src="resolveAvatarSrc(profile.avatar || configStore.settings.userAvatarPath)" 
+        <img v-if="configStore.userAvatarUrl || profile.avatar" 
+             :src="configStore.userAvatarUrl || resolveAvatarSrc(profile.avatar)" 
              class="user-avatar" />
         <div v-else class="avatar-placeholder">{{ profile.nickname[0] }}</div>
       </div>
@@ -165,26 +165,30 @@ const modules = [
   display: flex;
   justify-content: center;
   cursor: pointer;
+  /* 移除侧边栏头像的偏移转换，窄侧边栏不适合此类精调 */
+  transition: transform 0.2s ease;
 }
 
 .user-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
+  width: var(--user-avatar-size);
+  height: var(--user-avatar-size);
+  border-radius: var(--user-avatar-radius);
   object-fit: cover;
+  transition: all 0.2s ease;
 }
 
 .avatar-placeholder {
-  width: 36px;
-  height: 36px;
+  width: var(--user-avatar-size);
+  height: var(--user-avatar-size);
   background: var(--theme-color);
   color: white;
-  border-radius: 6px;
+  border-radius: var(--user-avatar-radius);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: calc(var(--user-avatar-size) * 0.45);
+  transition: all 0.2s ease;
 }
 
 .nav-items {

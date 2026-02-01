@@ -297,38 +297,36 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 全局搜索源选择菜单 (移出到外层以支持全宽/居中) -->
-      <Teleport to="body">
-        <Transition name="fade-slide">
-          <div v-if="showSearchMenu" class="search-menu-popup-global modern-scroll" @click.stop>
-            <div class="menu-list">
-              <div 
-                v-for="provider in searchProviders" 
-                :key="provider.id"
-                class="menu-item"
-                :class="{ active: searchProvider === provider.id }"
-                @click="selectSearchProvider(provider.id)"
-              >
-                <div class="menu-item-left">
-                  <span class="provider-icon" v-html="provider.icon"></span>
-                  <span class="provider-name">{{ provider.name }}</span>
-                </div>
-                <span class="free-badge">免费</span>
+      <!-- 全局搜索源选择菜单 (移到内部以相对于 input-wrapper 绝对定位) -->
+      <Transition name="fade-slide">
+        <div v-if="showSearchMenu" class="search-menu-popup-global modern-scroll" @click.stop>
+          <div class="menu-list">
+            <div 
+              v-for="provider in searchProviders" 
+              :key="provider.id"
+              class="menu-item"
+              :class="{ active: searchProvider === provider.id }"
+              @click="selectSearchProvider(provider.id)"
+            >
+              <div class="menu-item-left">
+                <span class="provider-icon" v-html="provider.icon"></span>
+                <span class="provider-name">{{ provider.name }}</span>
               </div>
-            </div>
-            
-            <div class="menu-footer">
-              <div class="footer-left">网络搜索</div>
-              <div class="menu-shortcuts">
-                <span>ESC 关闭</span>
-                <span>▲▼ 选择</span>
-                <span><span class="key">Ctrl</span> + ▲▼ 翻页</span>
-                <span>↵ 确认</span>
-              </div>
+              <span class="free-badge">免费</span>
             </div>
           </div>
-        </Transition>
-      </Teleport>
+          
+          <div class="menu-footer">
+            <div class="footer-left">网络搜索</div>
+            <div class="menu-shortcuts">
+              <span>ESC 关闭</span>
+              <span>▲▼ 选择</span>
+              <span><span class="key">Ctrl</span> + ▲▼ 翻页</span>
+              <span>↵ 确认</span>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
     </div>
 
@@ -579,20 +577,21 @@ onMounted(() => {
 .modern-scroll::-webkit-scrollbar { width: 4px; }
 .modern-scroll::-webkit-scrollbar-thumb { background: var(--bg-glass-active); border-radius: 10px; }
 
-/* 搜索菜单样式 */
-/* 搜索菜单样式 - 极致毛玻璃 */
+/* 搜索菜单样式 - 极致毛玻璃 & 绝对定位 */
 .search-menu-popup-global {
-  position: fixed;
-  bottom: 100px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: 92%;
   max-width: 600px;
   background: var(--bg-menu);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-menu);
-  border-radius: 20px;
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
   box-shadow: 
     0 10px 40px rgba(0, 0, 0, 0.3);
   z-index: 99999;

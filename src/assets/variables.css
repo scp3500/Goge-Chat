@@ -26,6 +26,9 @@
     --h1-size: 1.4em;
     --h2-size: 1.25em;
     --h3-size: 1.15em;
+    --h4-size: 1.05em;
+    --h5-size: 1em;
+    --h6-size: 0.95em;
 
     /* Theme Presets (Base Definitions) */
     --theme-preset-1: #1E1F20;

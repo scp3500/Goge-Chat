@@ -611,7 +611,7 @@ const confirmTest = () => {
     align-items: center;
     gap: 8px;
     background: var(--bg-input-dim, rgba(255,255,255,0.03));
-    border: 1px solid var(--border-glass);
+    border: 1.5px solid var(--border-glass-bright);
     border-radius: 8px;
     padding: 4px 10px;
     flex: 1;
@@ -767,7 +767,7 @@ const confirmTest = () => {
     display: flex;
     align-items: center;
     background: var(--bg-input-dim);
-    border: 1px solid var(--border-glass);
+    border: 1.5px solid var(--border-glass-bright);
     border-radius: 8px;
     transition: all 0.2s;
 }

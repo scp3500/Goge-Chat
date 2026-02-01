@@ -5,13 +5,11 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { PLUS_SVG } from '../../constants/icons';
 
-const resolveAvatarSrc = (path) => {
-  if (!path) return '';
-  if (path.startsWith('data:') || path.startsWith('http')) return path;
-  return convertFileSrc(path);
-};
+import { resolveSocialAvatar } from '../../utils/social';
 import ImageCropperModal from './ImageCropperModal.vue';
 import { readFile } from '@tauri-apps/plugin-fs';
+
+const resolveAvatarSrc = resolveSocialAvatar; // 💡 Re-use centralized logic
 
 
 const props = defineProps({
@@ -34,14 +32,12 @@ const model = ref('');
 const showCropper = ref(false);
 const cropImgSrc = ref('');
 
-// 预设头像 (使用 SVG 占位符或项目资源)
+// 🖼️ Local Avatars (Use IDs for selection)
+import { PRESET_AVATARS_MAP } from '../../utils/social';
+
 const presets = [
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Felix',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Aneka',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Milo', 
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Lela',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Bella',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=Rocky'
+  'avatar_1', 'avatar_2', 'avatar_3', 'avatar_4', 
+  'avatar_5', 'avatar_6', 'avatar_7', 'avatar_8'
 ];
 
 const resetForm = () => {
@@ -71,12 +67,13 @@ watch(() => props.show, (val) => {
 
 const handleConfirm = () => {
   if (name.value.trim()) {
-    emit('confirm', {
+    const contactData = {
       name: name.value.trim(),
       avatar: avatar.value.trim(),
       prompt: prompt.value.trim(),
       model: model.value
-    });
+    };
+    emit('confirm', contactData);
   }
 };
 
@@ -145,72 +142,89 @@ const handlePromptSelect = (content) => {
 <template>
   <Transition name="modal-fade">
     <div v-if="show" class="modal-overlay" @click.self="handleCancel">
-      <div class="modal-content">
-        <h3 class="modal-title">{{ contact ? '修改联系人资料' : '添加 AI 联系人' }}</h3>
-        
-        <div class="form-group">
-          <label>头像选择</label>
-          <div class="avatar-picker">
-              <div 
-                  v-for="(src, index) in presets" 
-                  :key="index"
-                  class="avatar-option"
-                  :class="{ active: avatar === src }"
-                  @click="avatar = src"
-              >
-                  <img :src="src" class="avatar-img" />
-              </div>
-              
-              <div 
-                  class="avatar-option upload-option" 
-                  :class="{ active: avatar && !presets.includes(avatar) }"
-                  @click="handleUploadAvatar"
-                  title="上传本地图片"
-              >
-                  <div v-if="avatar && !presets.includes(avatar)" class="custom-avatar-preview">
-                      <img :src="resolveAvatarSrc(avatar)" class="avatar-img" />
+      <div class="modal-card">
+        <!-- 🟢 Fixed Header -->
+        <div class="modal-header">
+           <h3 class="modal-title">{{ contact ? '修改联系人资料' : '添加 AI 联系人' }}</h3>
+           <button class="close-icon-btn" @click="handleCancel">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+               <path d="M18 6L6 18M6 6l12 12"></path>
+             </svg>
+           </button>
+        </div>
+
+        <!-- 🟡 Scrollable Body -->
+        <div class="modal-body modern-scroll">
+            <div class="form-section">
+              <label class="section-label">头像选择</label>
+              <div class="avatar-picker">
+                  <div 
+                      v-for="(src, index) in presets" 
+                      :key="index"
+                      class="avatar-option"
+                      :class="{ active: avatar === src }"
+                      @click="avatar = src"
+                  >
+                      <img :src="resolveAvatarSrc(src)" class="avatar-img" />
                   </div>
-                  <div v-else class="upload-icon" v-html="PLUS_SVG"></div>
+                  
+                  <div 
+                      class="avatar-option upload-option" 
+                      :class="{ active: avatar && !presets.includes(avatar) }"
+                      @click="handleUploadAvatar"
+                      title="上传本地图片"
+                  >
+                      <div v-if="avatar && !presets.includes(avatar)" class="custom-avatar-preview">
+                          <img :src="resolveAvatarSrc(avatar)" class="avatar-img" />
+                      </div>
+                      <div v-else class="upload-icon" v-html="PLUS_SVG"></div>
+                  </div>
               </div>
-          </div>
-          <!-- 备用文本框，允许直接输入 URL -->
-          <input 
-              v-model="avatar" 
-              placeholder="或输入图片 URL" 
-              style="margin-top: 8px; font-size: 12px; padding: 6px;"
-          />
-        </div>
+              <input 
+                  v-model="avatar" 
+                  class="url-input"
+                  placeholder="或粘贴图片 URL..." 
+              />
+            </div>
 
-        <div class="form-group">
-          <label>昵称</label>
-          <input v-model="name" placeholder="为 AI 起个名字" />
-        </div>
+            <div class="form-group">
+              <label>昵称</label>
+              <input v-model="name" placeholder="为 AI 起个名字..." />
+            </div>
 
-        <div class="form-group">
-          <label>模型选择</label>
-          <select v-model="model">
-            <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
-          </select>
-        </div>
+            <div class="form-group">
+              <label>模型选择</label>
+              <select v-model="model">
+                <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </div>
 
-        <div class="form-group" v-if="promptLibrary.length > 0">
-          <label>角色快捷模板</label>
-          <select @change="handlePromptSelect($event.target.value)" class="preset-select">
-            <option value="" disabled selected>从您的提示词库中快速填充...</option>
-            <option v-for="item in promptLibrary" :key="item.id" :value="item.content">
-              {{ item.icon || '💬' }} {{ item.name }}
-            </option>
-          </select>
-        </div>
+            <div class="form-group" v-if="promptLibrary.length > 0">
+              <label>角色快捷模板</label>
+              <select @change="handlePromptSelect($event.target.value)" class="preset-select">
+                <option value="" disabled selected>从您的提示词库中快速填充...</option>
+                <option v-for="item in promptLibrary" :key="item.id" :value="item.content">
+                  {{ item.icon || '💬' }} {{ item.name }}
+                </option>
+              </select>
+            </div>
 
-        <div class="form-group">
-          <label>人设提示词 (Prompt)</label>
-          <textarea v-model="prompt" rows="4" placeholder="定义这个 AI 的性格和职责..."></textarea>
+            <div class="form-group hover-grow">
+              <label>人设提示词 (Prompt)</label>
+              <textarea 
+                v-model="prompt" 
+                rows="6" 
+                placeholder="定义这个 AI 的性格和职责..."
+              ></textarea>
+            </div>
         </div>
         
-        <div class="modal-actions">
+        <!-- 🔵 Fixed Footer -->
+        <div class="modal-footer">
           <button class="cancel-btn" @click="handleCancel">取消</button>
-          <button class="confirm-btn" :disabled="!name.trim()" @click="handleConfirm">确定</button>
+          <button class="confirm-btn" :disabled="!name.trim()" @click="handleConfirm">
+             {{ contact ? '保存修改' : '创建联系人' }}
+          </button>
         </div>
       </div>
     </div>
@@ -230,95 +244,166 @@ const handlePromptSelect = (content) => {
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--bg-mask);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
 }
 
-.modal-content {
+.modal-card {
   background: var(--bg-main);
   border: 1px solid var(--border-glass);
-  border-radius: 16px;
-  width: 440px;
-  padding: 24px;
-  box-shadow: var(--shadow-main);
-  max-height: 90vh;
-  overflow-y: auto;
+  border-radius: 20px;
+  width: 480px;
+  max-width: 100%;
+  max-height: 85vh;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 🟢 Header */
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-main);
+    flex-shrink: 0;
 }
 
 .modal-title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-color);
-  margin: 0 0 20px 0;
+  margin: 0;
+}
+
+.close-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+}
+.close-icon-btn:hover {
+    background: var(--bg-glass-hover);
+    color: var(--text-color);
+}
+
+/* 🟡 Body */
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 16px;
 }
 
 .form-group {
-  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .form-group label {
-  font-size: 13px;
-  color: var(--text-color);
-  opacity: 0.7;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-left: 2px;
 }
 
 .form-group input, 
 .form-group select, 
-.form-group textarea {
+.form-group textarea,
+.url-input {
   background: var(--bg-input-dim);
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
-  padding: 10px 14px;
+  border: 1.5px solid var(--border-glass-bright);
+  border-radius: 12px;
+  padding: 12px 14px;
   color: var(--text-color);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
   font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group input:focus, 
 .form-group select:focus, 
-.form-group textarea:focus {
-  border-color: var(--theme-color);
+.form-group textarea:focus,
+.url-input:focus {
+  background: var(--bg-input);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha-10);
 }
 
-/* Avatar Picker Styles */
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+}
+
+/* Avatar Section */
+.section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    display: block;
+    margin-left: 2px;
+}
+
 .avatar-picker {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
-    margin-bottom: 4px;
+    margin-bottom: 12px;
 }
 
 .avatar-option {
     width: 48px;
     height: 48px;
-    border-radius: 50%;
+    border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.2s;
-    background: var(--bg-input);
+    border: 1.5px solid var(--border-glass-bright);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: var(--bg-input-dim);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 .avatar-option:hover {
-    transform: scale(1.05);
-    border-color: var(--bg-glass-hover);
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .avatar-option.active {
-    border-color: var(--theme-color);
-    box-shadow: 0 0 0 2px var(--bg-main), 0 0 0 4px var(--theme-color);
+    border-color: var(--color-primary);
+    border-width: 2px;
+    box-shadow: 0 0 0 3px var(--color-primary-alpha-30), 0 4px 12px rgba(0,0,0,0.1);
+    transform: scale(1.05);
 }
 
 .avatar-img {
@@ -328,59 +413,90 @@ const handlePromptSelect = (content) => {
 }
 
 .upload-option {
-    border: 2px dashed var(--border-glass);
+    border: 1.5px dashed var(--border-glass-bright);
     color: var(--text-tertiary);
+    background: var(--bg-input-dim);
 }
 
 .upload-option:hover {
-    border-color: var(--theme-color);
-    color: var(--theme-color);
+    border-style: solid;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-alpha-5);
+    transform: translateY(-2px);
 }
 
-.upload-icon :deep(svg) {
-    width: 20px;
-    height: 20px;
+.upload-option.active {
+    border-style: solid;
 }
 
-.custom-avatar-preview {
-    width: 100%;
-    height: 100%;
+.url-input {
+    font-size: 13px;
+    padding: 8px 12px;
+    opacity: 0.8;
 }
+.url-input:focus { opacity: 1; }
 
-.modal-actions {
+/* 🔵 Footer */
+.modal-footer {
+  padding: 16px 24px;
+  background: var(--bg-main);
+  border-top: 1px solid var(--border-glass);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
+  flex-shrink: 0;
 }
 
 .cancel-btn {
   background: transparent;
-  border: none;
-  color: #888;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  transition: all 0.2s;
 }
 
-.cancel-btn:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
+.cancel-btn:hover { 
+    background: var(--bg-glass-hover); 
+    color: var(--text-color); 
+}
 
 .confirm-btn {
-  background: var(--theme-color);
+  background: var(--color-primary); /* ⚡️ Fix: Replaced theme-color with color-primary */
   border: none;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  padding: 8px 24px;
-  border-radius: 6px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px var(--color-primary-alpha-30);
+  transition: all 0.2s;
 }
 
-.confirm-btn:hover:not(:disabled) { opacity: 0.9; }
-.confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.confirm-btn:hover:not(:disabled) { 
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px var(--color-primary-alpha-50);
+}
+.confirm-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
 
-.modal-fade-enter-active, .modal-fade-leave-active { transition: all 0.2s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; transform: scale(0.95); }
+.confirm-btn:disabled { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    box-shadow: none;
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 </style>

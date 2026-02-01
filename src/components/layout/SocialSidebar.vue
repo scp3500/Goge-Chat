@@ -5,11 +5,8 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/config';
 import AIContactModal from '../modals/AIContactModal.vue';
 
-const resolveAvatarSrc = (path) => {
-  if (!path) return '';
-  if (path.startsWith('data:') || path.startsWith('http')) return path;
-  return convertFileSrc(path);
-};
+import { resolveSocialAvatar } from '../../utils/social';
+const resolveAvatarSrc = resolveSocialAvatar;
 
 const props = defineProps({
   isCollapsed: { type: Boolean, default: false }
@@ -130,8 +127,6 @@ const handleDelete = async () => {
 
   const handleConfirmModal = async (data) => {
   try {
-    console.log('📝 Submitting contact data:', data);
-    
     // Ensure we have a valid group ID
     let targetGroupId = null;
     if (groups.value.length > 0) {
@@ -155,7 +150,6 @@ const handleDelete = async () => {
     }
     
     await loadData(); // Refresh list
-    console.log('✅ Data reloaded. Contacts:', contacts.value.length);
     showModal.value = false;
   } catch (e) {
     console.error('❌ Failed to save contact:', e);
@@ -313,22 +307,23 @@ const handleDelete = async () => {
 .add-btn {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-hover);
-  border: none;
+  background: var(--bg-input-dim);
+  border: 1px solid var(--border-glass-bright);
   cursor: pointer;
-  color: var(--text-color);
-  opacity: 0.8;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
 .add-btn:hover {
-  background: var(--bg-active);
-  opacity: 1;
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
 }
 
 .icon-sm :deep(svg) {

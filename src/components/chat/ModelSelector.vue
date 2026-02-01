@@ -191,11 +191,12 @@ const getPanelStyle = computed(() => {
         const inputWrapper = selectorRef.value.closest('.input-wrapper');
         if (inputWrapper) {
             const wrapRect = inputWrapper.getBoundingClientRect();
+            const targetWidth = wrapRect.width * 0.92;
             return {
                 position: 'fixed',
                 bottom: (window.innerHeight - wrapRect.top) + 'px',
-                left: wrapRect.left + 'px',
-                width: wrapRect.width + 'px',
+                left: wrapRect.left + (wrapRect.width - targetWidth) / 2 + 'px',
+                width: targetWidth + 'px',
                 borderRadius: '20px 20px 0 0'
             };
         }
@@ -204,8 +205,9 @@ const getPanelStyle = computed(() => {
     return {
         position: 'fixed',
         top: props.direction === 'down' ? (rect.bottom + 12) + 'px' : 'auto',
-        bottom: props.direction === 'up' ? (window.innerHeight - rect.top + 1) + 'px' : 'auto',
-        left: rect.left + 'px'
+        bottom: props.direction === 'up' ? (window.innerHeight - rect.top) + 'px' : 'auto',
+        left: rect.left + 'px',
+        borderRadius: props.direction === 'up' ? '20px 20px 0 0' : '0 0 20px 20px'
     };
 });
 
@@ -447,7 +449,7 @@ const getPanelStyle = computed(() => {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-dropdown);
-  border-radius: 14px;
+  border-radius: 20px 20px 0 0;
   box-shadow: 
     0 10px 30px -5px rgba(0, 0, 0, 0.3),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);

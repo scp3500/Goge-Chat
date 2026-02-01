@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { HOME_SVG, SETTINGS_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, CLOSE_SVG, SUN_SVG, MOON_SVG } from '../constants/icons.ts';
 import ModelSelector from './chat/ModelSelector.vue';
 import PresetSelector from './chat/PresetSelector.vue';
@@ -54,6 +55,12 @@ const closeWin = async () => await appWindow.destroy();
 const openSettings = () => {
   emit('open-settings');
 };
+
+const resolveAvatarSrc = (path) => {
+  if (!path) return '';
+  if (path.startsWith('data:') || path.startsWith('http')) return path;
+  return convertFileSrc(path);
+};
 </script>
 
 <template>
@@ -63,9 +70,15 @@ const openSettings = () => {
             'is-chat-mode': configStore.settings.chatMode.enabled 
           }" 
           @mousedown="handleGlobalDrag">
-    <!-- Left Segment: Logo/Brand -->
-    <div class="titlebar-left" v-if="!configStore.settings.chatMode.enabled">
-      <span class="app-name">Goge Chat</span>
+    <!-- Left Segment: Logo/Brand + Avatar -->
+    <div class="titlebar-left">
+      <div v-if="configStore.settings.showUserAvatar && !configStore.settings.chatMode.enabled" class="user-avatar-container">
+        <img v-if="configStore.userAvatarUrl" 
+             :src="configStore.userAvatarUrl" 
+             class="user-avatar" />
+        <div v-else class="avatar-placeholder">U</div>
+      </div>
+      <span class="app-name" v-if="!configStore.settings.chatMode.enabled">Goge Chat</span>
     </div>
     
     <!-- Center Segment: Flexible space for dragging -->
@@ -126,7 +139,40 @@ const openSettings = () => {
   border-bottom: none;
 }
 
-.titlebar-left { display: flex; align-items: center; flex-shrink: 0; }
+.titlebar-left { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
+
+/* 用户头像样式 (通用 CSS 变量) */
+.user-avatar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(var(--user-avatar-offset-x), var(--user-avatar-offset-y));
+  transition: transform 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.user-avatar {
+  width: var(--user-avatar-size);
+  height: var(--user-avatar-size);
+  border-radius: var(--user-avatar-radius);
+  object-fit: cover;
+  transition: all 0.2s ease;
+}
+
+.avatar-placeholder {
+  width: var(--user-avatar-size);
+  height: var(--user-avatar-size);
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--user-avatar-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: calc(var(--user-avatar-size) * 0.45);
+  transition: all 0.2s ease;
+}
+
 .titlebar-center { flex: 1; height: 100%; }
 .titlebar-right { display: flex; align-items: center; gap: 12px; }
 

@@ -6,7 +6,8 @@ import 'vue-cropper/dist/index.css';
 const props = defineProps({
   show: { type: Boolean, default: false },
   imgSrc: { type: String, default: '' },
-  fixedBox: { type: Boolean, default: false } // Fixed selection box size?
+  fixedBox: { type: Boolean, default: false }, // Fixed selection box size?
+  borderRadius: { type: Number, default: 0 } // Custom preview radius
 });
 
 const emit = defineEmits(['close', 'confirm']);
@@ -47,6 +48,16 @@ const handleZoom = (val) => {
     if(!cropperRef.value) return;
     cropperRef.value.changeScale(val);
 }
+
+import { computed } from 'vue';
+const cropStyle = computed(() => {
+  // Scale radius based on autoCropWidth (400) vs default avatar size (36)
+  // If user has 36px avatar with 6px radius, in 400px box it should appear proportionally
+  const ratio = 400 / 36; 
+  return {
+    borderRadius: `${props.borderRadius * ratio}px`
+  };
+});
 </script>
 
 <template>
@@ -57,7 +68,7 @@ const handleZoom = (val) => {
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       
-      <div class="cropper-content">
+      <div class="cropper-content" :style="{ '--crop-radius': cropStyle.borderRadius }">
         <VueCropper
           ref="cropperRef"
           :img="option.img"
@@ -182,5 +193,14 @@ const handleZoom = (val) => {
   border: none;
   color: white;
   min-width: 60px;
+}
+
+/* Dynamic border radiuc sync */
+:deep(.cropper-view-box) {
+  outline: 2px solid var(--theme-color) !important;
+  border-radius: var(--crop-radius, 0px);
+}
+:deep(.cropper-face) {
+  background-color: transparent !important;
 }
 </style>

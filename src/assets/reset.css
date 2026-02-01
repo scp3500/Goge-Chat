@@ -15,34 +15,78 @@ body,
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     user-select: text;
     -webkit-user-select: text;
+
+    /* 优化渲染质量，特别是在缩放时 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    image-rendering: -webkit-optimize-contrast;
+    /* 确保头像在缩放时依然清晰 */
 }
 
 /* ========================================================
    核心交互控制
    ======================================================== */
-.chat-main-layout,
-.message-list-wrapper,
+/* 仅文字区域显示 I-beam，并强制允许选择 */
 .markdown-body,
+.markdown-body *,
 .user-text,
-.message-row,
-pre,
-code {
+.message-content,
+.chat-input,
+.p-desc,
+input,
+textarea {
     user-select: text !important;
     -webkit-user-select: text !important;
     cursor: text;
 }
 
-.sidebar,
+/* 仅真正的功能按钮显示 Pointer (手型) */
+button,
+a,
 .icon-btn,
 .new-chat-pill,
-.sidebar-footer,
 .menu-btn,
-.search-trigger,
-.action-area,
+.footer-btn,
+.send-btn,
+.action-btn,
 .close-btn {
     user-select: none !important;
     -webkit-user-select: none !important;
     cursor: pointer;
+}
+
+/* 其余区域默认为标准箭头 (指针) */
+html,
+body,
+#app {
+    cursor: default !important;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.sidebar,
+.nav-bar,
+.app-nav-bar,
+.chat-main-layout,
+.message-list-wrapper,
+.message-row,
+.chat-item,
+.sidebar-item,
+.history-item,
+.contact-item,
+.search-box,
+.search-capsule {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: default !important;
+}
+
+/* 额外确保图片等不可选择但默认指针 */
+img {
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: none;
 }
 
 input,

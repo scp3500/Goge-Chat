@@ -70,6 +70,12 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
         ",
     )?;
 
+    // ⚡️ Add Index for fast pagination
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_social_messages_contact_id_id ON social_messages (contact_id, id)",
+        [],
+    );
+
     // Schema Migrations - contacts
     let mut stmt = conn.prepare("PRAGMA table_info(contacts)")?;
     let columns: Vec<String> = stmt
@@ -308,6 +314,74 @@ pub async fn get_social_messages(
     for msg in msg_iter {
         messages.push(msg.map_err(|e| e.to_string())?);
     }
+    Ok(messages)
+}
+
+#[tauri::command]
+pub async fn get_recent_social_messages(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    limit: i64,
+) -> Result<Vec<SocialMessage>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    // Load the LAST N messages
+    // We select top N by DESC id, then reverse them to ASC order for display
+    let mut stmt = conn
+        .prepare("SELECT id, contact_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id DESC LIMIT ?2")
+        .map_err(|e| e.to_string())?;
+
+    let msg_iter = stmt
+        .query_map(params![contact_id, limit], |row| {
+            Ok(SocialMessage {
+                id: row.get(0)?,
+                contact_id: row.get(1)?,
+                role: row.get(2)?,
+                content: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut messages = Vec::new();
+    for msg in msg_iter {
+        messages.push(msg.map_err(|e| e.to_string())?);
+    }
+    // Reverse to chronological order (Old -> New)
+    messages.reverse();
+    Ok(messages)
+}
+
+#[tauri::command]
+pub async fn get_social_messages_paginated(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    limit: i64,
+    before_id: i64,
+) -> Result<Vec<SocialMessage>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    // Load N messages BEFORE specific ID (for scrolling up)
+    let mut stmt = conn
+        .prepare("SELECT id, contact_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND id < ?2 ORDER BY id DESC LIMIT ?3")
+        .map_err(|e| e.to_string())?;
+
+    let msg_iter = stmt
+        .query_map(params![contact_id, before_id, limit], |row| {
+            Ok(SocialMessage {
+                id: row.get(0)?,
+                contact_id: row.get(1)?,
+                role: row.get(2)?,
+                content: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut messages = Vec::new();
+    for msg in msg_iter {
+        messages.push(msg.map_err(|e| e.to_string())?);
+    }
+    // Reverse to chronological order (Old -> New) because we fetched DESC
+    messages.reverse();
     Ok(messages)
 }
 

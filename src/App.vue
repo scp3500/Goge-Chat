@@ -88,6 +88,7 @@ onUnmounted(() => {
         :is-in-settings="settingsStore.isModalOpen"
         @toggleCollapse="isCollapsed = !isCollapsed"
         @openSettings="handleOpenSettings"
+        @openProfile="handleOpenSettings('profile')"
         @backHome="handleBackToChat" 
       />
       <div class="main-container">

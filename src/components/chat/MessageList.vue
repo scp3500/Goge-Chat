@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import { debounce } from '../../utils/format';
 import { useChatStore } from "../../stores/chat"; 
 import { useScrollRestore } from '../../composables/useScrollRestore';
@@ -7,13 +7,28 @@ import MessageItem from './MessageItem.vue';
 import ModernConfirm from './ModernConfirm.vue';
 import SystemPromptBanner from './SystemPromptBanner.vue';
 
-const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride', 'showSystemPrompt', 'assistantAvatar', 'assistantName']);
-const emit = defineEmits(['update-pos', 'delete', 'regenerate', 'save-edit']);
+const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride', 'showSystemPrompt', 'assistantAvatar', 'assistantName', 'loadingMore']);
+const emit = defineEmits(['update-pos', 'delete', 'regenerate', 'save-edit', 'load-more']);
 
 const chatStore = useChatStore();
 const scrollRef = ref(null);
 const isRestoring = ref(false); 
 const isUserScrolledUp = ref(false); // 💡 追踪用户是否手动向上滚动
+
+const displayMessages = computed(() => (props.messages || []).filter(m => m.role !== 'system'));
+
+// 💡 优化滚动：只监听最后一条消息内容的长度变化 (用于流式渲染时自动滚动)
+const lastMsgLen = computed(() => {
+  if (!props.messages || props.messages.length === 0) return 0;
+  return props.messages[props.messages.length - 1].content?.length || 0;
+});
+
+watch(lastMsgLen, () => {
+  if (chatStore.isGenerating && !isUserScrolledUp.value) {
+    scrollToBottomDefault();
+  }
+});
+
 // 💡 Simplified Scroll Logic: Always to Bottom
 const scrollToBottomDefault = async () => {
    await nextTick();
@@ -132,6 +147,11 @@ const handleScroll = debounce((e) => {
   if (!scrollRef.value) return;
   const { scrollTop, scrollHeight, clientHeight } = scrollRef.value;
   
+  // 1. Detect Top Reach (Load More)
+  if (scrollTop < 50) {
+    emit('load-more');
+  }
+
   // 判定是否在底部 (阈值 60px)
   const isAtBottom = scrollHeight - scrollTop - clientHeight <= 60;
   isUserScrolledUp.value = !isAtBottom;
@@ -141,14 +161,21 @@ const handleScroll = debounce((e) => {
   emit('update-pos', Math.floor(scrollTop));
 }, 150);
 
-// 监听消息变化，实现智能自动滚动
-// 监听消息变化，实现智能自动滚动
-watch(() => props.messages, async (newVal, oldVal) => {
-  // If we have new messages or it's a fresh load, scroll to bottom
-  if ((newVal.length > 0 && !isUserScrolledUp.value) || newVal.length !== oldVal?.length) {
-      scrollToBottomDefault();
+// 💡 优化性能：移除 deep watch。AI 打字更新内容时不需要触发整个列表的深度扫描。
+// 只监听数组长度变化（新消息增加）来触发滚动。
+watch(() => props.messages?.length, (newLen, oldLen) => {
+  if (newLen > (oldLen || 0) && !isUserScrolledUp.value) {
+    scrollToBottomDefault();
   }
-}, { deep: true });
+});
+
+// 💡 监听 sessionId 切换，恢复状态
+watch(() => props.sessionId, (newId) => {
+  if (newId) {
+    isUserScrolledUp.value = false;
+    scrollToBottomDefault();
+  }
+});
 
 // 💡 监听生成状态变化,确保在操作按钮渲染后滚动到底部
 watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
@@ -168,19 +195,6 @@ watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
   }
 });
 
-// 核心监听:切换会话触发坐标恢复
-// 核心监听:切换会话触发坐标恢复
-// 核心监听:切换会话触发坐标恢复
-watch([() => props.sessionId, () => chatStore.isLoading], async ([newId, loading]) => {
-  if (!newId || loading) return;
-  
-  isUserScrolledUp.value = false;
-  
-  // Always scroll to bottom on session switch
-  if (props.messages?.length > 0) {
-    scrollToBottomDefault();
-  }
-}, { immediate: true });
 
 onMounted(() => {
   scrollRef.value?.addEventListener('scroll', handleScroll);
@@ -196,10 +210,17 @@ onBeforeUnmount(() => {
   <div class="message-display modern-scroll" ref="scrollRef">
     <Transition name="list-fade">
       <div v-if="!chatStore.isLoading" :key="sessionId" class="scroll-content-wrapper">
+        <!-- 🌀 PULL TO LOAD SPINNER -->
+        <div v-if="loadingMore" class="pagination-loader">
+           <svg class="spinner" viewBox="0 0 50 50">
+             <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="4"></circle>
+           </svg>
+        </div>
+
         <SystemPromptBanner v-if="showSystemPrompt !== false" />
         
         <MessageItem 
-          v-for="(m, i) in messages.filter(msg => msg.role !== 'system')" 
+          v-for="(m, i) in displayMessages" 
           :key="i"
           :m="m"
           :index="i"
@@ -241,4 +262,39 @@ onBeforeUnmount(() => {
 .modern-scroll::-webkit-scrollbar { width: 6px; }
 .modern-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); border-radius: 10px; }
 .modern-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* 🌀 Pagination Spinner */
+.pagination-loader {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  width: 100%;
+  animation: fadeIn 0.3s ease;
+}
+
+.spinner {
+  animation: rotate 2s linear infinite;
+  width: 24px;
+  height: 24px;
+}
+
+.path {
+  stroke: var(--color-primary);
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 </style>
