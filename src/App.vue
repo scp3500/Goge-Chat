@@ -21,9 +21,9 @@ const chatStore = useChatStore();
 const isMaximized = ref(false); 
 const settingsStore = useSettingsStore();
 
-// UI States lifted from MainLayout
 const activeModule = ref('chat');
-const isCollapsed = ref(false);
+const isLeftSidebarOpen = ref(true); // Left sidebar (Contacts/Groups)
+const isHistoryOpen = ref(false);    // Right sidebar (Conversation History)
 
 // 处理打开设置
 const handleOpenSettings = () => {
@@ -84,9 +84,9 @@ onUnmounted(() => {
     <template v-if="configStore.settings.chatMode.enabled">
       <AppNavBar 
         v-model:activeModule="activeModule"
-        :is-collapsed="isCollapsed"
+        :is-collapsed="!isLeftSidebarOpen"
         :is-in-settings="settingsStore.isModalOpen"
-        @toggleCollapse="isCollapsed = !isCollapsed"
+        @toggleCollapse="isLeftSidebarOpen = !isLeftSidebarOpen"
         @openSettings="handleOpenSettings"
         @openProfile="handleOpenSettings('profile')"
         @backHome="handleBackToChat" 
@@ -96,10 +96,13 @@ onUnmounted(() => {
           :is-settings="settingsStore.isModalOpen" 
           @open-settings="handleOpenSettings" 
           @back-home="handleBackToChat" 
+          @toggle-sidebar="isLeftSidebarOpen = !isLeftSidebarOpen"
+          @toggle-history="isHistoryOpen = !isHistoryOpen"
         />
         <div class="content-area">
           <MainLayout 
-            :is-collapsed="isCollapsed"
+            :is-left-sidebar-open="isLeftSidebarOpen"
+            :is-history-open="isHistoryOpen"
             :active-module="activeModule"
             v-slot="{ activeContact }"
           >

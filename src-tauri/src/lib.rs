@@ -339,6 +339,12 @@ pub fn run() {
             social_db::save_social_message,
             social_db::get_recent_social_chats,
             social_db::update_social_profile,
+            // ✨ Session Commands
+            social_db::get_social_sessions,
+            social_db::create_social_session,
+            social_db::update_social_session_title,
+            social_db::touch_social_session,
+            social_db::delete_social_session,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

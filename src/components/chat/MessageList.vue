@@ -39,7 +39,7 @@ const scrollToBottomDefault = async () => {
          behavior: 'auto' // Instant jump
        });
      }
-   }, 50); // Small delay to allow layout stability
+   }, 20); // Reduced delay for faster response
 };
 
 const saveScrollPosition = () => {
@@ -143,6 +143,8 @@ defineExpose({
   }
 });
 
+const { performRestore } = useScrollRestore();
+
 const handleScroll = debounce((e) => {
   if (!scrollRef.value) return;
   const { scrollTop, scrollHeight, clientHeight } = scrollRef.value;
@@ -161,21 +163,34 @@ const handleScroll = debounce((e) => {
   emit('update-pos', Math.floor(scrollTop));
 }, 150);
 
-// 💡 优化性能：移除 deep watch。AI 打字更新内容时不需要触发整个列表的深度扫描。
-// 只监听数组长度变化（新消息增加）来触发滚动。
-watch(() => props.messages?.length, (newLen, oldLen) => {
-  if (newLen > (oldLen || 0) && !isUserScrolledUp.value) {
-    scrollToBottomDefault();
-  }
-});
+const restorePosition = async () => {
+    if (!scrollRef.value || isRestoring.value) return;
+    
+    // Only force to bottom in social mode (wechat theme)
+    if (props.themeOverride === 'wechat') {
+        scrollToBottomDefault();
+        return;
+    }
+
+    // Normal mode: Restore last position if it exists
+    if (props.initialScrollPos > 0) {
+        isRestoring.value = true;
+        await performRestore(scrollRef.value, props.initialScrollPos);
+        isRestoring.value = false;
+    } else {
+        // Fallback for new sessions in normal mode: scroll to bottom
+        scrollToBottomDefault();
+    }
+};
 
 // 💡 监听 sessionId 切换，恢复状态
-watch(() => props.sessionId, (newId) => {
+watch(() => props.sessionId, async (newId) => {
   if (newId) {
     isUserScrolledUp.value = false;
-    scrollToBottomDefault();
+    await nextTick();
+    restorePosition();
   }
-});
+}, { immediate: true });
 
 // 💡 监听生成状态变化,确保在操作按钮渲染后滚动到底部
 watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
@@ -198,6 +213,7 @@ watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
 
 onMounted(() => {
   scrollRef.value?.addEventListener('scroll', handleScroll);
+  restorePosition();
 });
 
 onBeforeUnmount(() => {

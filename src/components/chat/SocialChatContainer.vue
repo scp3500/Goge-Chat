@@ -37,7 +37,8 @@ const loadMessages = async (contactId) => {
     
     // Fetch last N messages
     const history = await invoke("get_recent_social_messages", { 
-      contactId, 
+      contactId,
+      sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
       limit: PAGE_SIZE 
     });
     
@@ -46,7 +47,7 @@ const loadMessages = async (contactId) => {
       allLoaded.value = true;
     }
     
-    triggerScroll(); // Scroll to bottom on initial load
+    triggerScroll('auto'); // ⚡️ Instant scroll to bottom on initial load
   } catch (e) {
     console.error("Failed to load social messages:", e);
   }
@@ -70,6 +71,7 @@ const loadMoreMessages = async () => {
 
     const olderMessages = await invoke("get_social_messages_paginated", { 
       contactId: props.activeContact.id,
+      sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
       limit: PAGE_SIZE,
       beforeId: oldestMsgId
     });
@@ -105,18 +107,75 @@ const loadMoreMessages = async () => {
 
 const triggerScroll = async (behavior = 'auto') => {
   await nextTick();
+  // Wait for blur 'out' phase (approx 125ms) + enter phase start
   setTimeout(() => {
     if (messageListRef.value?.scrollToBottom) {
       messageListRef.value.scrollToBottom(behavior);
     }
-  }, 10);
+  }, 80);
 };
 
-watch(() => props.activeContact?.id, (newId) => {
+const activeSessionTitle = ref("");
+
+// 🆕 Initialize Session Logic
+const initSessions = async (contactId) => {
+  try {
+    const sessions = await invoke("get_social_sessions", { contactId });
+    
+    if (sessions.length > 0) {
+      // 1. Prioritize currently persisted active session
+      let targetSession = null;
+      if (chatStore.activeSocialSessionId) {
+          targetSession = sessions.find(s => s.id === chatStore.activeSocialSessionId);
+      }
+      
+      // 2. Fallback to most recent if persisted one is invalid or not set
+      if (!targetSession) {
+          targetSession = sessions[0];
+          chatStore.updateSocialSessionId(targetSession.id);
+      }
+      
+      activeSessionTitle.value = targetSession.title;
+    } else {
+      // No sessions, create default
+      const newId = await invoke("create_social_session", { contactId, title: "默认会话" });
+      chatStore.updateSocialSessionId(newId);
+      activeSessionTitle.value = "默认会话";
+    }
+  } catch(e) {
+    console.error("Session init failed:", e);
+  }
+};
+
+watch(() => props.activeContact?.id, async (newId) => {
   if (newId) {
-    loadMessages(newId);
+    // 1. Init Session first
+    await initSessions(newId);
+    // 2. Then load messages
+    await loadMessages(newId);
   }
 }, { immediate: true });
+
+// Watch for session changes (clicked in sidebar)
+watch(() => chatStore.activeSocialSessionId, async (newSid) => {
+  if (newSid && props.activeContact?.id) {
+    // 🔄 Touch session to update its accessed time
+    try {
+        await invoke("touch_social_session", { id: newSid });
+    } catch (e) {
+        console.warn("Failed to touch session:", e);
+    }
+    
+    // Update title
+    try {
+        const sessions = await invoke("get_social_sessions", { contactId: props.activeContact.id });
+        const s = sessions.find(x => x.id === newSid);
+        if (s) activeSessionTitle.value = s.title;
+    } catch(e) {}
+    
+    await loadMessages(props.activeContact.id);
+  }
+});
 
 const triggerAIRequest = async (targetMessage = null) => {
   if (isGenerating.value) return;
@@ -200,12 +259,24 @@ const triggerAIRequest = async (targetMessage = null) => {
     } else {
         const savedId = await invoke("save_social_message", {
             contactId,
+            sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
             role: "assistant",
             content: aiFullContent
         });
         msgInArray.id = savedId;
     }
     msgInArray.content = aiFullContent;
+
+    // 4. 🧠 Auto Summary Check
+    const validMsgCount = messages.value.filter(m => m.content !== "__LOADING__").length;
+    // Check if title is default. Weak check using string inclusion or exact match.
+    // Better to check against "默认会话" or "新对话"
+    const isDefaultTitle = ["默认会话", "新对话"].includes(activeSessionTitle.value);
+    
+    if (validMsgCount >= 2 && isDefaultTitle && chatStore.activeSocialSessionId) {
+        console.log("🧠 Triggering Auto Summary...");
+        autoSummaryTitle(chatStore.activeSocialSessionId);
+    }
 
   } catch (e) {
     console.error("Social chat AI error:", e);
@@ -225,7 +296,8 @@ const handleSend = async (text) => {
   try {
     // 1. Save and add user message locally with ID
     const savedUserId = await invoke("save_social_message", { 
-        contactId, 
+        contactId,
+        sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
         role: "user", 
         content: userText 
     });
@@ -244,6 +316,47 @@ const handleSend = async (text) => {
   } catch (e) {
     console.error("Social chat send error:", e);
   }
+};
+
+// 🆕 Auto Summary Title Logic
+const autoSummaryTitle = async (sessionId) => {
+    try {
+        const prompt = "请总结以上对话的标题(8-10字)。直接返回标题文字，不要代码，不要标点符号。";
+        
+        // Filter out loading messages
+        const filteredMsgs = messages.value.filter(m => m.content !== "__LOADING__");
+        
+        // Take first few turns + prompt
+        const summaryMsgs = [
+            ...filteredMsgs.slice(0, 5).map(m => ({
+                role: m.role,
+                content: m.content
+            })),
+            { role: "user", content: prompt }
+        ];
+
+        console.log("=== [Social] Requesting Auto Title ===");
+        const rawTitle = await invoke("generate_title", { msg: summaryMsgs });
+        console.log("✨ Generated Title:", rawTitle);
+
+        let finalTitle = rawTitle.trim();
+        if (finalTitle.length > 10) finalTitle = finalTitle.substring(0, 10);
+
+        if (finalTitle && finalTitle.length > 0 && finalTitle !== "新对话") {
+            // Update DB
+            await invoke("update_social_session_title", { 
+                id: sessionId, 
+                title: finalTitle 
+            });
+            // Update Local State
+            activeSessionTitle.value = finalTitle;
+
+            // 🔄 Sync: Notify sidebar to reload
+            chatStore.triggerSocialSessionRefresh();
+        }
+    } catch (e) {
+        console.error("Auto summary failed:", e);
+    }
 };
 
 const handleStop = async () => {
@@ -313,31 +426,35 @@ const handleSaveEdit = async (messageId, index, newContent) => {
 <template>
   <main class="social-chat-container">
     <header class="chat-header" data-tauri-drag-region>
-       <span class="contact-name">{{ activeContact.name }}</span>
-       <transition name="status-fade">
-           <div v-if="isGenerating" class="typing-status">
-               对方正在输入<span class="dot-anim">...</span>
-           </div>
-       </transition>
+       <div class="header-info">
+           <span class="session-topic">{{ activeContact.name }}</span>
+           <transition name="status-fade">
+               <span v-if="isGenerating" class="typing-status">
+                   &nbsp;正在输入<span class="dot-anim">...</span>
+               </span>
+           </transition>
+       </div>
     </header>
 
     <div class="message-list-wrapper">
-        <MessageList
-          :key="activeContact.id"
-          :messages="messages"
-          :sessionId="activeContact.id.toString()"
-          :themeOverride="'wechat'"
-          :showSystemPrompt="false"
-          :assistantAvatar="resolveAvatarSrc(activeContact.avatar, activeContact.id)"
-          :assistantName="activeContact.name"
-          :initialScrollPos="chatStore.getSessionScroll(activeContact.id.toString())"
-          :loadingMore="isLoadingMore"
-          ref="messageListRef"
-          @delete="handleDelete"
-          @regenerate="handleRegenerate"
-          @save-edit="handleSaveEdit"
-          @load-more="loadMoreMessages"
-        />
+        <Transition name="message-blur" mode="out-in">
+          <MessageList
+            :key="activeContact.id + '-' + chatStore.activeSocialSessionId"
+            :messages="messages"
+            :sessionId="activeContact.id.toString()"
+            :themeOverride="'wechat'"
+            :showSystemPrompt="false"
+            :assistantAvatar="resolveAvatarSrc(activeContact.avatar, activeContact.id)"
+            :assistantName="activeContact.name"
+            :initialScrollPos="chatStore.getSessionScroll(activeContact.id.toString())"
+            :loadingMore="isLoadingMore"
+            ref="messageListRef"
+            @delete="handleDelete"
+            @regenerate="handleRegenerate"
+            @save-edit="handleSaveEdit"
+            @load-more="loadMoreMessages"
+          />
+        </Transition>
     </div>
 
     <ChatInput
@@ -355,7 +472,8 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: #f5f5f5; /* Classic WeChat light grey background */
+  width: 100%;
+  background: var(--bg-chat-island); /* Swapped to darker/grayer */
 }
 
 /* Force Light Background for MessageList in Social Mode */
@@ -364,32 +482,42 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: #f5f5f5;
+  min-height: 0;
+  background: var(--bg-chat-island);
   overflow: hidden;
 }
 
 .chat-header {
-    height: 60px;
+    height: 52px; /* Slightly more compact header */
     padding: 0 24px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid #e5e5e5;
-    background: #f5f5f5;
+    border-bottom: 1px solid var(--border-color); /* Use variable */
+    background: var(--bg-chat-island);
     z-index: 10;
 }
 
-.contact-name {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #1a1a1a;
+.header-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
 }
+
+.session-topic {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.2;
+}
+
+
 
 .typing-status {
     font-size: 0.85rem;
     color: #888;
-    margin-top: 2px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
 }
 
@@ -427,6 +555,24 @@ const handleSaveEdit = async (messageId, index, newContent) => {
 .status-fade-enter-from, .status-fade-leave-to {
     opacity: 0;
     transform: translateY(5px);
+}
+
+/* Message List Blur Transition */
+.message-blur-enter-active,
+.message-blur-leave-active {
+  transition: all 0.20s ease;
+}
+
+.message-blur-enter-from {
+  opacity: 0;
+  transform: scale(0.98);
+  filter: blur(4px);
+}
+
+.message-blur-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+  filter: blur(4px);
 }
 
 /* chat-input-wrapper removed to simplify layout and avoid overlap */

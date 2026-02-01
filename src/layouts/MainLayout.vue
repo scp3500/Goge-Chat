@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue';
 import SocialSidebar from '../components/layout/SocialSidebar.vue';
 import SocialChatList from '../components/layout/SocialChatList.vue';
+import SocialHistorySidebar from '../components/layout/SocialHistorySidebar.vue';
 import SettingsModal from '../components/settings/SettingsModal.vue';
 import { useSettingsStore } from '../stores/settings';
 import { useChatStore } from '../stores/chat';
@@ -12,7 +13,8 @@ const settingsStore = useSettingsStore();
 const chatStore = useChatStore();
 
 const props = defineProps({
-  isCollapsed: { type: Boolean, default: false },
+  isLeftSidebarOpen: { type: Boolean, default: true },
+  isHistoryOpen: { type: Boolean, default: false },
   activeModule: { type: String, default: 'chat' }
 });
 
@@ -60,7 +62,7 @@ const handleCloseSettings = () => {
 
 <template>
   <div class="main-layout">
-    <div class="sidebars-container" :class="{ 'is-collapsed': isCollapsed }">
+    <div class="sidebars-container" :class="{ 'is-collapsed': !isLeftSidebarOpen }">
       <!-- Column: Message List (Recent Chats) - Shown in 'chat' module -->
       <SocialChatList 
         v-if="activeModule === 'chat'"
@@ -73,6 +75,13 @@ const handleCloseSettings = () => {
         v-if="activeModule === 'address_book'"
         :active-contact-id="selectedContact?.id"
         @select="handleContactSelect"
+      />
+    </div>
+
+    <!-- New Column: History Sidebar (Secondary Sidebar) -->
+    <div class="history-sidebar-container" :class="{ 'is-open': isHistoryOpen }">
+      <SocialHistorySidebar 
+        :active-contact="selectedContact"
       />
     </div>
 
@@ -123,6 +132,20 @@ const handleCloseSettings = () => {
 .sidebars-container.is-collapsed {
   width: 0;
   border-right: none;
+}
+
+.history-sidebar-container {
+  display: flex;
+  height: 100%;
+  width: 0;
+  transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-glass);
+  overflow: hidden;
+}
+
+.history-sidebar-container.is-open {
+  width: 250px;
 }
 
 .content-view {

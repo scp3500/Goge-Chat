@@ -160,7 +160,8 @@ const selectChat = (chat) => {
   padding: 12px 16px;
   cursor: pointer;
   transition: background 0.2s;
-  border-radius: 6px; /* 🧱 Base border radius */
+  border-radius: 12px; /* Consistent with History Sidebar */
+  margin: 0 8px; /* Give it some breathing room */
 }
 
 .chat-item:hover {
@@ -168,8 +169,11 @@ const selectChat = (chat) => {
 }
 
 .chat-item.active {
+  background-color: #e1e1e1; /* Light mode specific active color */
+}
+
+:global(.app-dark) .chat-item.active {
   background-color: var(--bg-social-item-active);
-  border-radius: 6px;
 }
 
 .avatar-box {

@@ -23,6 +23,15 @@ pub struct Group {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SocialSession {
+    pub id: i64,
+    pub contact_id: i64,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Profile {
     pub id: i64,
     pub nickname: String,
@@ -59,13 +68,23 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
             key TEXT PRIMARY KEY,
             value TEXT
         );
+        CREATE TABLE IF NOT EXISTS social_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id INTEGER NOT NULL,
+            title TEXT NOT NULL DEFAULT '新对话',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS social_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             contact_id INTEGER NOT NULL,
+            session_id INTEGER,  -- Allow NULL for legacy/global messages if needed, but we should migrate
             role TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE
+            FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE,
+            FOREIGN KEY (session_id) REFERENCES social_sessions (id) ON DELETE CASCADE
         );
         ",
     )?;
@@ -73,6 +92,10 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
     // ⚡️ Add Index for fast pagination
     let _ = conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_social_messages_contact_id_id ON social_messages (contact_id, id)",
+        [],
+    );
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_social_messages_session_id ON social_messages (session_id)",
         [],
     );
 
@@ -89,25 +112,50 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN model TEXT", []);
     }
 
+    // Schema Migrations - social_messages (Adding session_id)
+    let mut stmt_msg = conn.prepare("PRAGMA table_info(social_messages)")?;
+    let msg_columns: Vec<String> = stmt_msg
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>>>()?;
+
+    if !msg_columns.contains(&"session_id".to_string()) {
+        println!("🔧 Migrating social_messages: adding session_id");
+        let _ = conn.execute(
+            "ALTER TABLE social_messages ADD COLUMN session_id INTEGER",
+            [],
+        );
+
+        // 🛠️ DATA MIGRATION: Move orphan messages to a default session
+        println!("🔧 Migrating existing messages to default sessions...");
+        conn.execute_batch(
+            "
+            INSERT INTO social_sessions (contact_id, title)
+            SELECT DISTINCT contact_id, '默认会话' FROM social_messages WHERE session_id IS NULL;
+            
+            UPDATE social_messages 
+            SET session_id = (
+                SELECT id FROM social_sessions 
+                WHERE social_sessions.contact_id = social_messages.contact_id 
+                LIMIT 1
+            )
+            WHERE session_id IS NULL;
+        ",
+        )?;
+    }
+
     // Schema Migrations - profiles
     let mut stmt_prof = conn.prepare("PRAGMA table_info(profiles)")?;
     let prof_columns: Vec<String> = stmt_prof
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>>>()?;
 
-    // If we have an old table without nickname, we might need to fix it.
-    // In SQLite, adding a NOT NULL column requires a default.
     if !prof_columns.contains(&"nickname".to_string()) {
         println!("🔧 Migrating profiles table: adding nickname");
-        // Try adding it with default
         if let Err(e) = conn.execute(
             "ALTER TABLE profiles ADD COLUMN nickname TEXT NOT NULL DEFAULT 'GoleUser'",
             [],
         ) {
-            println!(
-                "⚠️ Failed to add nickname column: {}. Recreating table recommended if dev.",
-                e
-            );
+            println!("⚠️ Failed to add nickname column: {}", e);
         }
     }
 
@@ -232,6 +280,7 @@ pub async fn get_social_groups(
 pub struct SocialMessage {
     pub id: Option<i64>,
     pub contact_id: i64,
+    pub session_id: Option<i64>, // ✨ Added session_id
     pub role: String,
     pub content: String,
     pub created_at: Option<String>,
@@ -296,16 +345,17 @@ pub async fn get_social_messages(
 ) -> Result<Vec<SocialMessage>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, contact_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id ASC")
+        .prepare("SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
     let msg_iter = stmt
         .query_map(params![contact_id], |row| {
             Ok(SocialMessage {
                 id: row.get(0)?,
                 contact_id: row.get(1)?,
-                role: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
+                session_id: row.get(2)?,
+                role: row.get(3)?,
+                content: row.get(4)?,
+                created_at: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -321,23 +371,36 @@ pub async fn get_social_messages(
 pub async fn get_recent_social_messages(
     state: tauri::State<'_, SocialDbState>,
     contact_id: i64,
+    session_id: Option<i64>, // ✨ Filter by session_id (Optional for transitions)
     limit: i64,
 ) -> Result<Vec<SocialMessage>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    // Load the LAST N messages
-    // We select top N by DESC id, then reverse them to ASC order for display
-    let mut stmt = conn
-        .prepare("SELECT id, contact_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id DESC LIMIT ?2")
-        .map_err(|e| e.to_string())?;
+    // Load the LAST N messages of a session
+    let sql = if session_id.is_some() {
+        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 ORDER BY id DESC LIMIT ?3"
+    } else {
+        // Fallback: get all messages if no session specified (or for testing)
+        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id DESC LIMIT ?3"
+    };
 
+    let params_list: Vec<&dyn rusqlite::ToSql> = if let Some(sid) = session_id.as_ref() {
+        vec![&contact_id, sid, &limit] // Borrow from session_id
+    } else {
+        vec![&contact_id, &limit]
+    };
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+
+    // Rust rusqlite params! macro is for fixed args. For dynamic, we use query_map with slice
     let msg_iter = stmt
-        .query_map(params![contact_id, limit], |row| {
+        .query_map(rusqlite::params_from_iter(params_list), |row| {
             Ok(SocialMessage {
                 id: row.get(0)?,
                 contact_id: row.get(1)?,
-                role: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
+                session_id: row.get(2)?,
+                role: row.get(3)?,
+                content: row.get(4)?,
+                created_at: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -346,7 +409,6 @@ pub async fn get_recent_social_messages(
     for msg in msg_iter {
         messages.push(msg.map_err(|e| e.to_string())?);
     }
-    // Reverse to chronological order (Old -> New)
     messages.reverse();
     Ok(messages)
 }
@@ -355,23 +417,35 @@ pub async fn get_recent_social_messages(
 pub async fn get_social_messages_paginated(
     state: tauri::State<'_, SocialDbState>,
     contact_id: i64,
+    session_id: Option<i64>, // ✨ Filter by session_id
     limit: i64,
     before_id: i64,
 ) -> Result<Vec<SocialMessage>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    // Load N messages BEFORE specific ID (for scrolling up)
-    let mut stmt = conn
-        .prepare("SELECT id, contact_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND id < ?2 ORDER BY id DESC LIMIT ?3")
-        .map_err(|e| e.to_string())?;
+
+    let sql = if session_id.is_some() {
+        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 AND id < ?3 ORDER BY id DESC LIMIT ?4"
+    } else {
+        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND id < ?3 ORDER BY id DESC LIMIT ?4"
+    };
+
+    let params_vec: Vec<&dyn rusqlite::ToSql> = if let Some(sid) = session_id.as_ref() {
+        vec![&contact_id, sid, &before_id, &limit]
+    } else {
+        vec![&contact_id, &before_id, &limit]
+    };
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
     let msg_iter = stmt
-        .query_map(params![contact_id, before_id, limit], |row| {
+        .query_map(rusqlite::params_from_iter(params_vec), |row| {
             Ok(SocialMessage {
                 id: row.get(0)?,
                 contact_id: row.get(1)?,
-                role: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
+                session_id: row.get(2)?,
+                role: row.get(3)?,
+                content: row.get(4)?,
+                created_at: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -380,7 +454,6 @@ pub async fn get_social_messages_paginated(
     for msg in msg_iter {
         messages.push(msg.map_err(|e| e.to_string())?);
     }
-    // Reverse to chronological order (Old -> New) because we fetched DESC
     messages.reverse();
     Ok(messages)
 }
@@ -389,13 +462,14 @@ pub async fn get_social_messages_paginated(
 pub async fn save_social_message(
     state: tauri::State<'_, SocialDbState>,
     contact_id: i64,
+    session_id: Option<i64>, // ✨ Added session_id
     role: String,
     content: String,
 ) -> Result<i64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO social_messages (contact_id, role, content) VALUES (?1, ?2, ?3)",
-        params![contact_id, role, content],
+        "INSERT INTO social_messages (contact_id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
+        params![contact_id, session_id, role, content],
     )
     .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
@@ -523,4 +597,89 @@ pub async fn get_recent_social_chats(
         chats.push(chat.map_err(|e| e.to_string())?);
     }
     Ok(chats)
+}
+// --- ✨ Session Management Commands ---
+
+#[tauri::command]
+pub async fn get_social_sessions(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+) -> Result<Vec<SocialSession>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, contact_id, title, created_at, updated_at FROM social_sessions WHERE contact_id = ?1 ORDER BY updated_at DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![contact_id], |row| {
+            Ok(SocialSession {
+                id: row.get(0)?,
+                contact_id: row.get(1)?,
+                title: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut sessions = Vec::new();
+    for row in rows {
+        sessions.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(sessions)
+}
+
+#[tauri::command]
+pub async fn create_social_session(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    title: String,
+) -> Result<i64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO social_sessions (contact_id, title) VALUES (?1, ?2)",
+        params![contact_id, title],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn update_social_session_title(
+    state: tauri::State<'_, SocialDbState>,
+    id: i64,
+    title: String,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE social_sessions SET title = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+        params![title, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn touch_social_session(
+    state: tauri::State<'_, SocialDbState>,
+    id: i64,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE social_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_social_session(
+    state: tauri::State<'_, SocialDbState>,
+    id: i64,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    // Cascading delete handles messages
+    conn.execute("DELETE FROM social_sessions WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

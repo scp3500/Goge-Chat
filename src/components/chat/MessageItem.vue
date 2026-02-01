@@ -425,8 +425,8 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
           />
         </div>
 
-        <!-- User Avatar -->
-        <div v-if="configStore.settings.showUserAvatar" 
+        <!-- User Avatar (Strict Social/WeChat Mode Only) -->
+        <div v-if="configStore.settings.showUserAvatar && props.themeOverride === 'wechat'" 
              class="user-avatar-container click-enabled"
              @click="settingsStore.openSettings('profile')"
              title="个人资料设置">

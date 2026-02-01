@@ -17,6 +17,7 @@ export const useChatStore = defineStore('chat', () => {
     const folders = ref<Folder[]>([]);
     const activeId = ref<string | null>(null);
     const activeSocialContactId = ref<number | null>(null); // 👥 Social Mode Active Contact Persistence
+    const activeSocialSessionId = ref<number | null>(null); // 👥 Social Mode Active Session Persistence
     const currentMessages = ref<any[]>([]);
     const isGenerating = ref(false);
     const isLoading = ref(false);
@@ -70,6 +71,35 @@ export const useChatStore = defineStore('chat', () => {
 
     const updateSocialContactId = (id: number | null) => {
         activeSocialContactId.value = id;
+    };
+
+    const updateSocialSessionId = (id: number | null) => {
+        activeSocialSessionId.value = id;
+    };
+
+    // 💾 Persist Social Session
+    try {
+        const savedSessionId = localStorage.getItem('active_social_session_id');
+        if (savedSessionId) {
+            activeSocialSessionId.value = parseInt(savedSessionId, 10);
+            console.log("📍 [PERSISTENCE] Loaded active social session:", activeSocialSessionId.value);
+        }
+    } catch (e) {
+        console.error("Failed to load active social session:", e);
+    }
+
+    watch(activeSocialSessionId, (newId) => {
+        if (newId) {
+            localStorage.setItem('active_social_session_id', newId.toString());
+        } else {
+            localStorage.removeItem('active_social_session_id');
+        }
+    });
+
+    // 👥 Social Session Sync Trigger
+    const socialSessionVersion = ref(0);
+    const triggerSocialSessionRefresh = () => {
+        socialSessionVersion.value++;
     };
 
     // --- 暂停/恢复相关状态 ---
@@ -253,5 +283,9 @@ export const useChatStore = defineStore('chat', () => {
         updateSessionScroll,
         getSessionScroll,
         updateSocialContactId, // 👥 Exposed Action
+        updateSocialSessionId, // 👥 Exposed Action
+        activeSocialSessionId, // 👥 Exposed State
+        socialSessionVersion,   // 👥 Exposed State for Sync
+        triggerSocialSessionRefresh, // 👥 Exposed Action for Sync
     };
 });

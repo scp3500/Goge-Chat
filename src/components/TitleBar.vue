@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { HOME_SVG, SETTINGS_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, CLOSE_SVG, SUN_SVG, MOON_SVG } from '../constants/icons.ts';
+import { HOME_SVG, SETTINGS_SVG, MINIMIZE_SVG, MAXIMIZE_SVG, CLOSE_SVG, SUN_SVG, MOON_SVG, HISTORY_SVG } from '../constants/icons.ts';
 import ModelSelector from './chat/ModelSelector.vue';
 import PresetSelector from './chat/PresetSelector.vue';
 import { useConfigStore } from '../stores/config';
@@ -14,7 +14,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['open-settings', 'back-home']);
+const emit = defineEmits(['open-settings', 'back-home', 'toggle-sidebar', 'toggle-history']);
 
 const appWindow = getCurrentWindow();
 const isMaximized = ref(false);
@@ -40,7 +40,8 @@ const handleGlobalDrag = async (event) => {
   if (
     event.target.closest('.window-controls') || 
     event.target.closest('.back-btn') || 
-    event.target.closest('.selectors-group')
+    event.target.closest('.selectors-group') ||
+    event.target.closest('.history-btn')
   ) return;
   await appWindow.startDragging();
 };
@@ -54,6 +55,14 @@ const closeWin = async () => await appWindow.destroy();
 
 const openSettings = () => {
   emit('open-settings');
+};
+
+const toggleSidebar = () => {
+  emit('toggle-sidebar');
+};
+
+const toggleHistory = () => {
+  emit('toggle-history');
 };
 
 const resolveAvatarSrc = (path) => {
@@ -72,7 +81,8 @@ const resolveAvatarSrc = (path) => {
           @mousedown="handleGlobalDrag">
     <!-- Left Segment: Logo/Brand + Avatar -->
     <div class="titlebar-left">
-      <div v-if="configStore.settings.showUserAvatar && !configStore.settings.chatMode.enabled" class="user-avatar-container">
+      <!-- User Avatar: Show in Normal Mode titlebar only -->
+      <div v-if="false" class="user-avatar-container">
         <img v-if="configStore.userAvatarUrl" 
              :src="configStore.userAvatarUrl" 
              class="user-avatar" />
@@ -117,6 +127,15 @@ const resolveAvatarSrc = (path) => {
             v-html="SETTINGS_SVG"
           ></button>
         </template>
+
+        <!-- History Toggle Button (Shown in Chat Mode) -->
+        <button 
+          @click.stop="toggleHistory" 
+          class="control-btn history-btn" 
+          title="历史记录" 
+          v-html="HISTORY_SVG" 
+          v-if="configStore.settings.chatMode.enabled"
+        ></button>
 
         <button @click.stop="minimizeWin" class="control-btn" v-html="MINIMIZE_SVG"></button>
         <button @click.stop="toggleMaximizeWin" class="control-btn" v-html="MAXIMIZE_SVG"></button>

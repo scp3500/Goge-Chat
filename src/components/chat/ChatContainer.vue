@@ -35,28 +35,7 @@ const handleSend = async (text) => {
   triggerScroll();
 };
 
-// 监听 activeId 变化，加载历史记录
-watch(
-  activeId,
-  (newId) => {
-    if (newId) {
-      console.log("📍 activeId changed, triggering scroll check");
-      triggerScroll();
-    }
-  },
-  { immediate: true }
-);
-
-// 监听视图激活状态（从设置返回时触发）
-watch(
-  isChatViewActive,
-  (isActive) => {
-    if (isActive) {
-      console.log("👀 Chat view active, triggering scroll restoration");
-      triggerScroll();
-    }
-  }
-);
+// 消息列表现在自己处理初始滚动状态恢复 (MessageList.vue internally handles restoration)
 
 // 监听消息数量增加（新消息添加时才滚动，避免流式完成时的跳动）
 let previousMessageCount = 0;
