@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
 import { useSettingsStore } from './stores/settings';
+import { useUIStore } from './stores/ui';
 
 // 导入组件
 import SettingsModal from "./components/settings/SettingsModal.vue"; 
@@ -16,18 +17,17 @@ import AppNavBar from "./components/layout/AppNavBar.vue";
 
 const appWindow = getCurrentWindow();
 const configStore = useConfigStore();
+const uiStore = useUIStore();
 const chatStore = useChatStore();
 
 const isMaximized = ref(false); 
 const settingsStore = useSettingsStore();
 
 const activeModule = ref('chat');
-const isLeftSidebarOpen = ref(true); // Left sidebar (Contacts/Groups)
-const isHistoryOpen = ref(false);    // Right sidebar (Conversation History)
 
 // 处理打开设置
-const handleOpenSettings = () => {
-    settingsStore.openSettings();
+const handleOpenSettings = (category) => {
+    settingsStore.openSettings(category);
     chatStore.setChatViewActive(false);  // 通知聊天 store 视图已切换
 };
 
@@ -36,6 +36,36 @@ const handleBackToChat = () => {
     settingsStore.closeSettings();
     chatStore.setChatViewActive(true);  // 通知聊天 store 视图已激活
 }; 
+
+
+import { useFontLoader } from "./composables/useFontLoader";
+
+const { loadFont } = useFontLoader();
+
+// 🅰️ Global Font Injection
+const updateGlobalFonts = () => {
+    const enFont = loadFont(configStore.settings.fontFamilyEnglish, 'english');
+    const zhFont = loadFont(configStore.settings.fontFamilyChinese, 'chinese');
+    
+    // Apply to :root via document.documentElement.style
+    if (enFont) {
+        document.documentElement.style.setProperty('--font-family-en', enFont);
+    } else {
+        document.documentElement.style.removeProperty('--font-family-en');
+    }
+
+    if (zhFont) {
+        document.documentElement.style.setProperty('--font-family-zh', zhFont);
+    } else {
+        document.documentElement.style.removeProperty('--font-family-zh');
+    }
+};
+
+// Watch for font changes
+import { watch } from 'vue';
+watch(() => [configStore.settings.fontFamilyEnglish, configStore.settings.fontFamilyChinese], () => {
+    updateGlobalFonts();
+}, { immediate: true }); 
 
 
 /**
@@ -56,11 +86,46 @@ onMounted(async () => {
         chatStore.loadData()
     ]);
     
+    // After init, ensure fonts are applied (in case watch triggered before init content ready)
+    updateGlobalFonts(); 
+    
     // 初始化窗口状态并监听变化
     isMaximized.value = await appWindow.isMaximized();
     await appWindow.onResized(async () => {
         isMaximized.value = await appWindow.isMaximized();
     });
+
+    // 🖥️ 智能分辨率自适应 (Smart Resolution Adaptation)
+    try {
+        const monitor = await currentMonitor();
+        if (monitor) {
+            const screenWidth = monitor.size.width;
+            const screenHeight = monitor.size.height;
+            const scaleFactor = monitor.scaleFactor;
+            
+            console.log(`[Resolution Debug] Physical: ${screenWidth}x${screenHeight}, Scale: ${scaleFactor}`);
+            console.log(`[Resolution Debug] Logical (CSS Max): ${Math.floor(screenWidth / scaleFactor)}x${Math.floor(screenHeight / scaleFactor)}`);
+
+            // 如果是高分屏 (例如 2K/4K，宽度大于 1920 物理像素)
+            if (screenWidth > 1920) {
+                 const currentSize = await appWindow.innerSize();
+                 // 如果当前窗口还很小 (默认 1000px 宽)，则自动放大
+                 if (currentSize.width <= 1200) {
+                     // 目标：即宽占屏幕 60%~70%，高占 70%~80%
+                     const targetWidth = Math.floor(screenWidth * 0.65);
+                     const targetHeight = Math.floor(screenHeight * 0.75);
+                     
+                     // 使用 LogicalSize 或者 PhysicalSize (Tauri 2 推荐 PhysicalSize)
+                     // 但在 JS API 中通常直接传对象或者特定类
+                     // 这里简单的做法是设为 PhysicalSize
+                     await appWindow.setSize(new PhysicalSize(targetWidth, targetHeight));
+                     await appWindow.center();
+                 }
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to adapt window size:', e);
+    }
 });
 
 // 🩺 卸载时移除监听
@@ -84,9 +149,9 @@ onUnmounted(() => {
     <template v-if="configStore.settings.chatMode.enabled">
       <AppNavBar 
         v-model:activeModule="activeModule"
-        :is-collapsed="!isLeftSidebarOpen"
+        :is-collapsed="!uiStore.isLeftSidebarOpen"
         :is-in-settings="settingsStore.isModalOpen"
-        @toggleCollapse="isLeftSidebarOpen = !isLeftSidebarOpen"
+        @toggleCollapse="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
         @openSettings="handleOpenSettings"
         @openProfile="handleOpenSettings('profile')"
         @backHome="handleBackToChat" 
@@ -96,13 +161,13 @@ onUnmounted(() => {
           :is-settings="settingsStore.isModalOpen" 
           @open-settings="handleOpenSettings" 
           @back-home="handleBackToChat" 
-          @toggle-sidebar="isLeftSidebarOpen = !isLeftSidebarOpen"
-          @toggle-history="isHistoryOpen = !isHistoryOpen"
+          @toggle-sidebar="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
+          @toggle-history="uiStore.isHistoryOpen = !uiStore.isHistoryOpen"
         />
         <div class="content-area">
           <MainLayout 
-            :is-left-sidebar-open="isLeftSidebarOpen"
-            :is-history-open="isHistoryOpen"
+            :is-left-sidebar-open="uiStore.isLeftSidebarOpen"
+            :is-history-open="uiStore.isHistoryOpen"
             :active-module="activeModule"
             v-slot="{ activeContact }"
           >
@@ -162,7 +227,7 @@ html, body, #app {
   color: var(--text-color); 
   border-radius: 12px; 
   overflow: hidden; 
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-app);
   box-sizing: border-box;
   transition: border-radius 0.2s ease;
   

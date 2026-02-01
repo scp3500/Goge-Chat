@@ -34,24 +34,10 @@ const updateClock = () => {
   clock.value = now.toLocaleTimeString('zh-CN', { hour12: false });
 };
 
-const profile = ref({
-  nickname: '加载中...',
-  bio: '',
-  avatar: null
-});
-
 const contacts = ref([]);
 const groups = ref([]);
 
 const loadData = async () => {
-  // Load Profile
-  try {
-    profile.value = await invoke('get_social_profile');
-  } catch (e) {
-    console.error('⚠️ Failed to load profile (using default):', e);
-    // Keep default placeholder
-  }
-
   // Load Groups
   try {
     groups.value = await invoke('get_social_groups');
@@ -357,35 +343,7 @@ const handleDelete = async () => {
   border-radius: 8px;
 }
 
-.profile-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: var(--bg-hover);
-  border-radius: 12px;
-}
-
-.avatar-container {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-active);
-  flex-shrink: 0;
-}
-
-.avatar { width: 100%; height: 100%; object-fit: cover; }
-.avatar-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--theme-color); color: white; }
-
-.profile-info {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .nickname { margin: 0; font-size: 1rem; color: var(--text-color); }
-.bio { margin: 4px 0 0 0; font-size: 0.8rem; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .contact-list {
   flex: 1;
@@ -434,7 +392,7 @@ const handleDelete = async () => {
 .avatar-sm {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--user-avatar-radius);
   overflow: hidden;
   background: var(--bg-active);
   flex-shrink: 0;

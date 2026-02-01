@@ -65,13 +65,12 @@ const modules = [
 </script>
 
 <template>
-  <nav class="app-nav-bar" :class="{ 'immersive': configStore.settings.chatMode.enabled && isLight }">
+  <nav class="app-nav-bar" :class="{ 'immersive': configStore.settings.chatMode.enabled }">
     <div class="nav-top" data-tauri-drag-region>
       <div 
         class="user-avatar-container" 
         @click="emit('openProfile')" 
         title="个人资料"
-        data-tauri-drag-region
       >
         <img v-if="configStore.userAvatarUrl || profile.avatar" 
              :src="configStore.userAvatarUrl || resolveAvatarSrc(profile.avatar)" 
@@ -141,23 +140,24 @@ const modules = [
 }
 
 .app-nav-bar.immersive {
-  background: #28292c;
-  border-right: none;
+  background: var(--bg-chat-island);
+  border-right: 1px solid var(--border-glass);
 }
 
 .app-nav-bar.immersive .nav-item {
-  color: #999;
-  opacity: 1;
+  color: var(--text-color);
+  opacity: 0.6;
 }
 
 .app-nav-bar.immersive .nav-item:hover {
-  background: var(--bg-social-icon-hover); /* Visible box on hover */
-  color: #fff;
+  background: var(--bg-glass-hover); 
+  color: var(--text-color);
+  opacity: 1;
 }
 
 .app-nav-bar.immersive .nav-item.active {
-  color: #07c160; /* WeChat Green */
-  background: var(--bg-social-icon-active); /* Visible box on active */
+  color: var(--color-primary); 
+  background: var(--bg-glass-active);
 }
 
 .user-avatar-container {
@@ -165,6 +165,7 @@ const modules = [
   display: flex;
   justify-content: center;
   cursor: pointer;
+  -webkit-app-region: no-drag;
   /* 移除侧边栏头像的偏移转换，窄侧边栏不适合此类精调 */
   transition: transform 0.2s ease;
 }

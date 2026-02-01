@@ -14,6 +14,7 @@ export function useSettings() {
     /** 当前分类的标题 */
     const currentCategoryTitle = computed(() => {
         const titles: Record<string, string> = {
+            profile: '个人资料',
             models: '模型配置',
             appearance: '外观设置',
             advanced: '高级设置',
@@ -25,6 +26,7 @@ export function useSettings() {
     /** 当前分类的描述 */
     const currentCategoryDescription = computed(() => {
         const descriptions: Record<string, string> = {
+            profile: '自定义个人头像、昵称及社交显示效果',
             models: '配置AI模型提供商和相关参数',
             appearance: '自定义界面外观和显示效果',
             advanced: '高级功能和实验性特性',

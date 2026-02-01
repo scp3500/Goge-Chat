@@ -607,7 +607,15 @@ pub async fn get_social_sessions(
 ) -> Result<Vec<SocialSession>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, contact_id, title, created_at, updated_at FROM social_sessions WHERE contact_id = ?1 ORDER BY updated_at DESC")
+        .prepare(
+            "SELECT s.id, s.contact_id, s.title, s.created_at, 
+                    COALESCE(MAX(m.created_at), s.updated_at) as last_activity
+             FROM social_sessions s
+             LEFT JOIN social_messages m ON s.id = m.session_id
+             WHERE s.contact_id = ?1
+             GROUP BY s.id
+             ORDER BY last_activity DESC",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![contact_id], |row| {
@@ -616,7 +624,7 @@ pub async fn get_social_sessions(
                 contact_id: row.get(1)?,
                 title: row.get(2)?,
                 created_at: row.get(3)?,
-                updated_at: row.get(4)?,
+                updated_at: row.get(4)?, // Use the calculated last_activity
             })
         })
         .map_err(|e| e.to_string())?;

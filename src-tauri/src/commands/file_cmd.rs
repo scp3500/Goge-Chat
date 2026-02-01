@@ -18,13 +18,13 @@ pub async fn read_file_text_content(path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn upload_user_avatar(
-    _app: tauri::AppHandle,
+    app: tauri::AppHandle,
     file_path: String,
 ) -> Result<String, String> {
-    use crate::commands::config_cmd::get_local_config_dir;
+    use crate::commands::config_cmd::resolve_config_dir;
     use std::path::Path;
 
-    let config_dir = get_local_config_dir();
+    let config_dir = resolve_config_dir(&app);
     let upload_dir = config_dir.join("upload");
 
     if !upload_dir.exists() {

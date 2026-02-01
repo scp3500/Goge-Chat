@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useChatStore } from '../../stores/chat';
+import { useUIStore } from '../../stores/ui';
 import { 
     SEARCH_SVG, 
     PLUS_SVG, 
@@ -16,6 +17,7 @@ const props = defineProps({
 });
 
 const chatStore = useChatStore();
+const uiStore = useUIStore();
 const sessions = ref([]);
 const loading = ref(false);
 const searchQuery = ref("");
@@ -114,7 +116,16 @@ const handleDeleteSession = async (session, event) => {
 
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
-  const date = new Date(timeStr);
+  // 🛡️ Fix: Handle both SQLite "YYYY-MM-DD HH:MM:SS" (needs Z) and ISO "YYYY-MM-DDTHH:MM:SSZ"
+  let normalizedTime = timeStr;
+  if (!normalizedTime.includes('Z') && !normalizedTime.includes('+') && !normalizedTime.includes('T')) {
+      // If it looks like SQLite raw string (e.g. 2024-02-01 12:00:00), treat as UTC
+     normalizedTime = normalizedTime.replace(' ', 'T') + 'Z';
+  } else if (!normalizedTime.includes('Z') && !normalizedTime.includes('+')) {
+      normalizedTime += 'Z';
+  }
+  
+  const date = new Date(normalizedTime);
   const now = new Date();
   
   if (date.toLocaleDateString() === now.toLocaleDateString()) {
@@ -141,6 +152,14 @@ watch(() => chatStore.activeSocialSessionId, (newId) => {
 
 onMounted(() => {
   loadSessions();
+  // ⚡️ Auto-refresh when window regains focus to keep timestamps fresh
+  window.addEventListener('focus', loadSessions);
+});
+
+// Clean up
+import { onUnmounted } from 'vue';
+onUnmounted(() => {
+  window.removeEventListener('focus', loadSessions);
 });
 </script>
 
@@ -176,6 +195,7 @@ onMounted(() => {
           class="history-item"
           :class="{ active: chatStore.activeSocialSessionId === session.id, editing: editingSessionId === session.id }"
           @click="selectSession(session)"
+          @dblclick="uiStore.isHistoryOpen = false"
         >
           <!-- Editing Mode -->
           <div v-if="editingSessionId === session.id" class="edit-mode" @click.stop>
@@ -213,7 +233,7 @@ onMounted(() => {
   width: 260px; /* Slightly wider for actions */
   height: 100%;
   background: var(--bg-sidebar); /* Use standard sidebar bg */
-  border-right: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color); /* Fixed: Should be left border */
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -417,30 +437,14 @@ onMounted(() => {
 }
 
 /* Dark Mode Support handled via vars, but explicit overrides if needed */
-:global(.app-dark) .social-history-sidebar {
-  border-right-color: #333;
-}
-
-:global(.app-dark) .history-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-:global(.app-dark) .history-item.active {
-  background: rgba(255, 255, 255, 0.1) !important; 
-  color: #fff !important;
-}
-
-:global(.app-dark) .topic-title {
-  color: #eeeeee; /* Force readable text in dark mode */
-}
-
-/* Light Mode Hover Adjustment - Make it subtle dark mix instead of solid color */
-.history-item:hover {
-    background: rgba(0, 0, 0, 0.03);
-}
-
 .history-item.active {
-    background: rgba(0, 0, 0, 0.06); 
+  background: var(--bg-social-item-active);
+  color: var(--color-social-item-active-text);
+}
+
+.history-item.active .topic-title,
+.history-item.active .topic-meta {
+    color: var(--color-social-item-active-text);
 }
 
 /* --- Transition Animations --- */

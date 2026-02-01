@@ -60,6 +60,7 @@ const toggleSidebar = () => {
         @rename="(id, title) => emit('rename', id, title)"
         @reorder="(newList) => emit('reorder', newList)"
         @reorder-folders="(newList) => emit('reorder-folders', newList)"
+        @dblclick="isCollapsed = true"
       />
 
       <footer class="sidebar-footer">

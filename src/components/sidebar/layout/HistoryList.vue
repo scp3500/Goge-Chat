@@ -12,7 +12,7 @@ const chatStore = useChatStore();
 const drag = ref(false);
 
 const props = defineProps(['list', 'active', 'filter', 'isCollapsed']);
-const emit = defineEmits(['select', 'delete', 'rename', 'reorder', 'reorder-folders']);
+const emit = defineEmits(['select', 'delete', 'rename', 'reorder', 'reorder-folders', 'dblclick']);
 
 const editingInputRef = ref([]);
 
@@ -186,6 +186,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
                   @contextmenu="openContextMenu"
                   @enter-edit="id => editingId = id"
                   @rename="(id, title) => { emit('rename', id, title); editingId = null; }"
+                  @dblclick="emit('dblclick')"
                 />
               </template>
             </draggable>
@@ -219,6 +220,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
           @contextmenu="openContextMenu"
           @enter-edit="id => editingId = id"
           @rename="(id, title) => { emit('rename', id, title); editingId = null; }"
+          @dblclick="emit('dblclick')"
         />
       </template>
     </draggable>

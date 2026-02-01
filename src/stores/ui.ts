@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 export const useUIStore = defineStore('ui', () => {
     /** 
@@ -7,6 +7,19 @@ export const useUIStore = defineStore('ui', () => {
      * 'model-selector' | 'search-menu' | null
      */
     const activeMenuId = ref<string | null>(null);
+
+    // 📱 Layout State Persistence
+    const isHistoryOpen = ref(localStorage.getItem('ui_history_open') === 'true');
+    const isLeftSidebarOpen = ref(localStorage.getItem('ui_left_sidebar_open') !== 'false'); // Default true
+
+    // Watchers for persistence
+    watch(isHistoryOpen, (val) => {
+        localStorage.setItem('ui_history_open', val.toString());
+    });
+
+    watch(isLeftSidebarOpen, (val) => {
+        localStorage.setItem('ui_left_sidebar_open', val.toString());
+    });
 
     /**
      * 设置当前激活的菜单
@@ -38,6 +51,8 @@ export const useUIStore = defineStore('ui', () => {
 
     return {
         activeMenuId,
+        isHistoryOpen,
+        isLeftSidebarOpen,
         setActiveMenu,
         toggleMenu,
         isMenuOpen

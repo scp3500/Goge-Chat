@@ -23,8 +23,8 @@ const lastMsgLen = computed(() => {
   return props.messages[props.messages.length - 1].content?.length || 0;
 });
 
-watch(lastMsgLen, () => {
-  if (chatStore.isGenerating && !isUserScrolledUp.value) {
+watch(lastMsgLen, (newLen) => {
+  if (chatStore.isGenerating && chatStore.generatingSessionId === props.sessionId && !isUserScrolledUp.value) {
     scrollToBottomDefault();
   }
 });
@@ -39,7 +39,7 @@ const scrollToBottomDefault = async () => {
          behavior: 'auto' // Instant jump
        });
      }
-   }, 20); // Reduced delay for faster response
+   }, 20); 
 };
 
 const saveScrollPosition = () => {
@@ -136,7 +136,7 @@ defineExpose({
   scrollToBottom: (behavior = 'auto') => {
     if (!isRestoring.value && scrollRef.value) {
       scrollRef.value.scrollTo({
-        top: scrollRef.value.scrollHeight + 100, // 添加额外偏移确保滚到最底部
+        top: scrollRef.value.scrollHeight + 100, 
         behavior: behavior
       });
     }
@@ -177,9 +177,6 @@ const restorePosition = async () => {
         isRestoring.value = true;
         await performRestore(scrollRef.value, props.initialScrollPos);
         isRestoring.value = false;
-    } else {
-        // Fallback for new sessions in normal mode: scroll to bottom
-        scrollToBottomDefault();
     }
 };
 
@@ -195,10 +192,10 @@ watch(() => props.sessionId, async (newId) => {
 // 💡 监听生成状态变化,确保在操作按钮渲染后滚动到底部
 watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
   // 当生成结束时 (从 true 变为 false),触发一次最终滚动
-  if (wasGen && !isGen && !isUserScrolledUp.value) {
+  // 🟢 修复：必须确保是当前会话结束生成
+  if (wasGen && !isGen && chatStore.generatingSessionId === props.sessionId && !isUserScrolledUp.value) {
     // 等待操作按钮渲染完成
     await nextTick();
-    // 再多等一帧确保布局完全稳定
     setTimeout(() => {
       if (scrollRef.value) {
         scrollRef.value.scrollTo({
@@ -213,7 +210,7 @@ watch(() => chatStore.isGenerating, async (isGen, wasGen) => {
 
 onMounted(() => {
   scrollRef.value?.addEventListener('scroll', handleScroll);
-  restorePosition();
+  // restorePosition() 被 watch sessionId immediate: true 覆盖了，这里不需要重复调用
 });
 
 onBeforeUnmount(() => {

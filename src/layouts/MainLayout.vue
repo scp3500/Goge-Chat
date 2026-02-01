@@ -28,12 +28,22 @@ const handleSelect = (contact) => {
   if (contact) {
     chatStore.updateSocialContactId(contact.id);
   }
+  // 🚪 Auto-close settings on selection
+  if (settingsStore.isModalOpen) {
+    settingsStore.closeSettings();
+    chatStore.setChatViewActive(true);
+  }
 };
 
 const handleContactSelect = (contact) => {
   handleSelect(contact);
   // Jump to chat module when selecting a contact from the address book
   emit('update:activeModule', 'chat');
+};
+
+const handleOpenProfile = () => {
+  settingsStore.openSettings('profile');
+  chatStore.setChatViewActive(false);
 };
 
 // 🔄 Restore persisted contact on mount
@@ -90,7 +100,7 @@ const handleCloseSettings = () => {
         <!-- Settings Mode -->
         <SettingsModal 
           v-if="settingsStore.isModalOpen" 
-          @close="handleCloseSettings" 
+          @close="settingsStore.closeSettings()" 
         />
 
         <!-- Chat Mode -->
@@ -140,7 +150,7 @@ const handleCloseSettings = () => {
   width: 0;
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
   flex-shrink: 0;
-  border-right: 1px solid var(--border-glass);
+  border-left: 1px solid var(--border-glass); /* Fixed: Should be left border */
   overflow: hidden;
 }
 

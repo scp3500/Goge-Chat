@@ -74,6 +74,12 @@ pub struct AppConfig {
     #[serde(default = "default_prompt_library", rename = "promptLibrary")]
     pub prompt_library: serde_json::Value,
 
+    // NEW: Global Typography
+    #[serde(default, rename = "fontFamilyEnglish")]
+    pub font_family_english: String,
+    #[serde(default, rename = "fontFamilyChinese")]
+    pub font_family_chinese: String,
+
     // NEW: Chat Mode
     #[serde(default = "default_chat_mode", rename = "chatMode")]
     pub chat_mode: ChatModeConfig,
@@ -142,6 +148,11 @@ struct SettingsPart {
     show_user_avatar: bool,
     #[serde(default, rename = "userAvatarPath")]
     user_avatar_path: String,
+
+    #[serde(default, rename = "fontFamilyEnglish")]
+    font_family_english: String,
+    #[serde(default, rename = "fontFamilyChinese")]
+    font_family_chinese: String,
 
     #[serde(default = "default_chat_mode", rename = "chatMode")]
     chat_mode: ChatModeConfig, // Store chatMode in settings part
@@ -363,6 +374,8 @@ impl Default for AppConfig {
             user_avatar_path: "".into(),
             prompt_library: default_prompt_library(),
             chat_mode: default_chat_mode(),
+            font_family_english: "".into(),
+            font_family_chinese: "".into(),
         }
     }
 }
@@ -371,34 +384,59 @@ impl Default for AppConfig {
 // logic
 // ==================================================================================
 
-/// Resolves the config directory relative to the executable.
-/// Usually: <exe_dir>/config/
-pub fn get_local_config_dir() -> PathBuf {
-    let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
-    // If we are in a dev environment (e.g. target/debug/), this still places it next to the exe
-    let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
-    exe_dir.join("config")
-}
+/// Resolves the config directory. Priority: Stable AppConfig > Portable EXE/config
+pub fn resolve_config_dir(app: &AppHandle) -> PathBuf {
+    let stable_config_dir = app
+        .path()
+        .app_config_dir()
+        .expect("无法获取 AppConfig 目录");
 
-/// Helper to ensure the config directory exists
-fn ensure_config_dir(dir: &Path) -> Result<(), String> {
-    if !dir.exists() {
-        fs::create_dir_all(dir).map_err(|e| format!("Failed to create config directory: {}", e))?;
+    // 如果稳定目录不存在 settings.json，但 EXE 同级存在 config/settings.json，则执行一次性搬迁
+    if !stable_config_dir.join("settings.json").exists() {
+        let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
+        let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
+        let portable_config_dir = exe_dir.join("config");
+
+        if portable_config_dir.join("settings.json").exists() {
+            println!("📦 [Migration] 检测到便携式配置，正在搬迁至稳定目录...");
+            let _ = fs::create_dir_all(&stable_config_dir);
+
+            let files = [
+                "settings.json",
+                "providers.json",
+                "presets.json",
+                "prompts.json",
+                "secrets.json",
+            ];
+            for file in files {
+                let src = portable_config_dir.join(file);
+                let dst = stable_config_dir.join(file);
+                if src.exists() {
+                    let _ = fs::copy(src, dst);
+                }
+            }
+        }
     }
-    Ok(())
+
+    stable_config_dir
 }
 
 fn encode_key(key: &str) -> String {
-    BASE64_STANDARD.encode(key)
+    base64::engine::general_purpose::STANDARD.encode(key)
 }
 
 fn decode_key(encoded: &str) -> String {
-    String::from_utf8(BASE64_STANDARD.decode(encoded).unwrap_or_default()).unwrap_or_default()
+    String::from_utf8(
+        base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap_or_default(),
+    )
+    .unwrap_or_default()
 }
 
 #[tauri::command]
 pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
-    let config_dir = get_local_config_dir();
+    let config_dir = resolve_config_dir(&app);
     let settings_path = config_dir.join("settings.json");
     let providers_path = config_dir.join("providers.json");
     let presets_path = config_dir.join("presets.json");
@@ -475,6 +513,9 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
         config.show_user_avatar = settings.show_user_avatar;
         config.user_avatar_path = settings.user_avatar_path;
         config.chat_mode = settings.chat_mode;
+        // Map font settings
+        config.font_family_english = settings.font_family_english;
+        config.font_family_chinese = settings.font_family_chinese;
 
         config.providers = providers_part.providers;
         config.presets = presets_part.presets;
@@ -538,9 +579,13 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 }
 
 #[tauri::command]
-pub async fn save_config(_app: AppHandle, mut config: AppConfig) -> Result<(), String> {
-    let config_dir = get_local_config_dir();
-    ensure_config_dir(&config_dir)?;
+pub async fn save_config(app: AppHandle, mut config: AppConfig) -> Result<(), String> {
+    let config_dir = resolve_config_dir(&app);
+    // ensure_config_dir is redundant now since resolve_config_dir/create_dir_all handles it
+    // but we can add a check if we want to be safe
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    }
 
     println!("[Config] Saving to {:?}", config_dir);
 
@@ -622,6 +667,8 @@ pub async fn save_config(_app: AppHandle, mut config: AppConfig) -> Result<(), S
         show_user_avatar: config.show_user_avatar,
         user_avatar_path: config.user_avatar_path,
         chat_mode: config.chat_mode,
+        font_family_english: config.font_family_english,
+        font_family_chinese: config.font_family_chinese,
         prompt_library: None, // No longer saving here to avoid duplication
     };
     let settings_json = serde_json::to_string_pretty(&settings_part).map_err(|e| e.to_string())?;

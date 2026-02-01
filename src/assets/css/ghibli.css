@@ -52,3 +52,8 @@
     --token-var: #5c5c4d;
     --token-operator: #8b5e3c;
 }
+    /* Social Mode Interactions (Injected) */
+    --bg-social-item-hover: rgba(255, 255, 255, 0.04);
+    --bg-social-item-active: rgba(255, 255, 255, 0.08);
+    --color-social-item-active-text: #fff;
+

@@ -139,6 +139,8 @@ const selectAndUploadAvatar = async () => {
   }
 };
 
+
+
 const handleAvatarSave = async (croppedData) => {
   try {
     // croppedData is a base64 data-URL
@@ -149,6 +151,30 @@ const handleAvatarSave = async (croppedData) => {
     console.error('保存裁剪头像失败:', err);
   }
 };
+
+const selectFontFile = async (type) => {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{
+        name: 'Fonts',
+        extensions: ['ttf', 'otf', 'woff', 'woff2']
+      }]
+    });
+
+    if (selected && typeof selected === 'string') {
+       if (type === 'english') {
+           configStore.settings.fontFamilyEnglish = selected;
+       } else {
+           configStore.settings.fontFamilyChinese = selected;
+       }
+       handleUpdate();
+    }
+  } catch (err) {
+    console.error('选择字体失败:', err);
+  }
+};
+
 
 
 </script>
@@ -252,6 +278,38 @@ const handleAvatarSave = async (croppedData) => {
             @input="handleUpdate" 
           />
         </div>
+
+        <!-- 🅰️ Global Typography -->
+        <div class="control-item">
+          <label>全局字体设置 <span class="sub-label">支持直接选择本地 .ttf / .otf 文件</span></label>
+          <div class="font-settings-group">
+             <div class="font-row">
+                <label>英文 / 数字字体</label>
+                <div class="input-with-btn">
+                   <input 
+                     type="text" 
+                     v-model="configStore.settings.fontFamilyEnglish" 
+                     placeholder="例如: Segoe UI, Inter, 或选择文件"
+                     @change="handleUpdate"
+                   />
+                   <button class="icon-btn-small" @click="selectFontFile('english')" title="选择字体文件">📂</button>
+                </div>
+             </div>
+             <div class="font-row">
+                <label>中文字体</label>
+                <div class="input-with-btn">
+                   <input 
+                     type="text" 
+                     v-model="configStore.settings.fontFamilyChinese" 
+                     placeholder="例如: Microsoft YaHei, PingFang SC"
+                     @change="handleUpdate"
+                   />
+                   <button class="icon-btn-small" @click="selectFontFile('chinese')" title="选择字体文件">📂</button>
+                </div>
+             </div>
+          </div>
+        </div>
+
         <div class="control-item">
           <label>主题颜色</label>
           <div class="theme-grid">
@@ -578,5 +636,59 @@ input:checked + .slider:before { transform: translateX(18px); background-color: 
 .preset-tag:hover {
   background: var(--bg-glass-hover);
   border-color: var(--color-primary);
+}
+
+.font-settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--bg-input-dim);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+}
+
+.font-row label {
+    font-size: 11px;
+    margin-bottom: 4px !important;
+    opacity: 0.8;
+}
+
+.input-with-btn {
+    display: flex;
+    gap: 8px;
+}
+
+.input-with-btn input {
+    flex: 1;
+    background: var(--bg-main);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--text-color);
+}
+
+.input-with-btn input:focus {
+    border-color: var(--color-primary);
+}
+
+.icon-btn-small {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    border-radius: 6px;
+    background: var(--bg-glass-active);
+    border: 1px solid var(--border-glass);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    color: var(--text-color);
+}
+
+.icon-btn-small:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--color-primary);
 }
 </style>

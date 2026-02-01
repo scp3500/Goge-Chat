@@ -40,7 +40,7 @@ export const useChatStore = defineStore('chat', () => {
         localStorage.setItem('session_scroll_positions', JSON.stringify(newVal));
     }, { deep: true });
 
-    const updateSessionScroll = (sessionId: string, position: number) => {
+    const _updateLocalStorageScroll = (sessionId: string, position: number) => {
         if (!sessionId) return;
         sessionScrollPositions.value[sessionId] = position;
     };
@@ -273,14 +273,23 @@ export const useChatStore = defineStore('chat', () => {
         // Root Actions
         loadData,
         switchSession,
+        // Folders
+        ...folderActions,
+
         // Session Actions
         ...sessionActions,
 
         // Message Actions
         ...messageActions,
 
-        // 📜 Exposed Action (Placed AFTER spread to ensure our local version takes precedence)
-        updateSessionScroll,
+        // 📜 Exposed Action
+        updateSessionScroll: async (sessionId: string, position: number) => {
+            if (!sessionId) return;
+            // 1. Update local cache (primarily for Social Mode)
+            _updateLocalStorageScroll(sessionId, position);
+            // 2. Update DB (for Normal Mode sessions in historyList)
+            await sessionActions.updateSessionScroll(sessionId, position);
+        },
         getSessionScroll,
         updateSocialContactId, // 👥 Exposed Action
         updateSocialSessionId, // 👥 Exposed Action

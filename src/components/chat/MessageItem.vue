@@ -640,7 +640,7 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
 .avatar-img {
   width: 100%;
   height: 100%;
-  border-radius: 8px; /* Rounded square */
+  border-radius: var(--user-avatar-radius); /* Rounded square based on settings */
   background-color: var(--bg-input-dim);
   background-size: cover;
   background-position: center;

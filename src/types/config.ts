@@ -124,6 +124,10 @@ export interface AppSettings {
     userAvatarBorderRadius: number;
     userAvatarOffsetX: number;
     userAvatarOffsetY: number;
+
+    // 🅰️ Global Typography
+    fontFamilyEnglish: string;
+    fontFamilyChinese: string;
 }
 
 export interface ChatModeConfig {
@@ -266,12 +270,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
     userAvatarSize: 36,
     userAvatarBorderRadius: 6,
     userAvatarOffsetX: 0,
-    userAvatarOffsetY: 0
+    userAvatarOffsetY: 0,
+
+    // 🅰️ Global Typography
+    fontFamilyEnglish: "", // e.g. "Segoe UI", "Inter"
+    fontFamilyChinese: "", // e.g. "Microsoft YaHei", "PingFang SC"
 };
 
 
 // 设置分类
-export type SettingsCategory = 'models' | 'presets' | 'prompts' | 'appearance' | 'chatmode' | 'advanced' | 'about';
+export type SettingsCategory = 'profile' | 'models' | 'presets' | 'prompts' | 'appearance' | 'chatmode' | 'advanced' | 'about';
 
 // 配置类别（向后兼容别名）
 export type ConfigCategory = SettingsCategory;

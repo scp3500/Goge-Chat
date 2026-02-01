@@ -38,7 +38,16 @@ const loadConversations = async () => {
 
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
-  const date = new Date(timeStr);
+  // 🛡️ Fix: Handle both SQLite "YYYY-MM-DD HH:MM:SS" (needs Z) and ISO "YYYY-MM-DDTHH:MM:SSZ"
+  let normalizedTime = timeStr;
+  if (!normalizedTime.includes('Z') && !normalizedTime.includes('+') && !normalizedTime.includes('T')) {
+      // If it looks like SQLite raw string (e.g. 2024-02-01 12:00:00), treat as UTC
+     normalizedTime = normalizedTime.replace(' ', 'T') + 'Z';
+  } else if (!normalizedTime.includes('Z') && !normalizedTime.includes('+')) {
+      normalizedTime += 'Z';
+  }
+
+  const date = new Date(normalizedTime);
   const now = new Date();
   
   if (date.toLocaleDateString() === now.toLocaleDateString()) {
@@ -169,17 +178,27 @@ const selectChat = (chat) => {
 }
 
 .chat-item.active {
-  background-color: #e1e1e1; /* Light mode specific active color */
+  background-color: var(--bg-social-item-active);
+  color: var(--color-social-item-active-text);
 }
 
-:global(.app-dark) .chat-item.active {
-  background-color: var(--bg-social-item-active);
+.chat-item.active .name {
+    color: var(--color-social-item-active-text);
+    font-weight: 600;
 }
+
+.chat-item.active .last-msg,
+.chat-item.active .time {
+    color: var(--text-color); /* Fallback, but opacity handles the 'gray' */
+    opacity: 0.6;
+}
+
+/* :global(.app-dark) block removed as vars handle it now */
 
 .avatar-box {
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: var(--user-avatar-radius);
   overflow: hidden;
   background: var(--bg-active);
   flex-shrink: 0;

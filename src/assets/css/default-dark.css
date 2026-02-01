@@ -52,6 +52,11 @@
     /* Default assistant name color */
     --bg-window-controls-hover: rgba(255, 255, 255, 0.1);
 
+    /* Window Control Buttons (Rounded Square - Subtle or Transparent in Dark) */
+    --bg-window-btn: rgba(255, 255, 255, 0.05);
+    --border-window-btn: rgba(255, 255, 255, 0.05);
+    --radius-window-btn: 6px;
+
     --bg-selectors: rgba(0, 0, 0, 0.15);
     --border-selectors: rgba(255, 255, 255, 0.05);
 
@@ -60,6 +65,7 @@
     --bg-glass-active: rgba(255, 255, 255, 0.15);
     --border-glass: rgba(255, 255, 255, 0.08);
     --border-glass-bright: rgba(255, 255, 255, 0.15);
+    --border-app: rgba(128, 128, 128, 0.15);
     --shadow-main: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.1);
     --input-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 
@@ -129,8 +135,12 @@
     --theme-preset-4: #2c2c32;
 
     /* 13. Social Mode Interactions */
-    --bg-social-item-hover: #2e2e2e;
-    --bg-social-item-active: #3a3a3a;
+    /* 13. Social Mode Interactions */
+    --bg-social-item-hover: rgba(255, 255, 255, 0.04);
+    --bg-social-item-active: rgba(255, 255, 255, 0.08);
+    /* Must be distinct but not too bright */
+    --color-social-item-active-text: #fff;
+    /* Explicit text color var */
     --bg-social-icon-hover: rgba(255, 255, 255, 0.1);
     --bg-social-icon-active: rgba(255, 255, 255, 0.15);
 }

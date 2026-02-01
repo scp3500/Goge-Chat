@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
 const props = defineProps(['item', 'isActive', 'isEditingId', 'isCollapsed']);
-const emit = defineEmits(['select', 'rename', 'enter-edit', 'contextmenu']);
+const emit = defineEmits(['select', 'rename', 'enter-edit', 'contextmenu', 'dblclick']);
 
 const tempTitle = ref(props.item.title);
 const inputRef = ref(null);
@@ -31,6 +31,7 @@ const handleRename = () => {
       'collapsed': isCollapsed
     }"
     @click="$emit('select', item.id)"
+    @dblclick="$emit('dblclick')"
     @contextmenu.prevent="$emit('contextmenu', item.id, $event)"
   >
     <div class="active-indicator"></div>

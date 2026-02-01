@@ -6,31 +6,34 @@
 
 ## 🏮 简体中文
 
-**Goge Chat** 是一款基于 **Tauri**、**Vue 3** 和 **Rust** 构建的现代化、高性能 AI 聊天客户端。它旨在提供极致的响应速度与优雅的用户界面，同时确保所有数据都牢牢掌握在用户自己手中。
+**Goge Chat** 是一款基于 **Tauri 2.0**、**Vue 3** 和 **Rust** 构建的现代化、高性能 AI 聊天客户端。它旨在提供极致的响应速度与“奢华级”的视觉体验，同时确保您的数据隐私始终处于本地管控之下。
 
 ### ✨ 核心特性
 
-* **双槽主题模式**：为深色和浅色模式独立配置子主题，随系统自动无缝切换。
-* **精选预设**：内置 *Nord*, *One Dark*, *Sakura*, *Midnight* 等多款高颜值主题。
-* **本地持久化**：所有配置与聊天历史均存储在本地 `data/` 目录，支持便携化使用，隐私无忧。
-* **极致性能**：借力 Rust 后端与 Tauri 的轻量化特性，拥有极低的资源占用与极快的启动速度。
+*   **💎 Inky Glass 视觉规范**：独创的高饱和度毛玻璃特效，模拟奢侈品级的物理通透感。
+*   **🎭 双态切换**：拥有“标准模式”与“社交模式（WeChat Style）”，兼顾沉浸式生产力与轻量化对话。
+*   **🌈 双槽主题引擎**：支持为深色/浅色模式独立配置子主题，从 *Nord*、*One Dark* 到 *Sakura*、*Cyberpunk*，一键切换。
+*   **📦 零云存储，本地优先**：聊天历史与配置参数通过 Rust 后端加密存储在本地，支持便携式使用。
+*   **⚙️ 深度调优**：内置提示词库、预设管理、模型切换，提供超越浏览器端的使用体验。
 
-### 🛠️ 开发指南
+### 🛠️ 技术架构
 
-1. **安装依赖**
+-   **Frontend**: Vue 3 (Composition API) + Pinia + Vite
+-   **Backend**: Rust + Tauri 2.0 (Mobile Ready)
+-   **Storage**: Shared SQLite 核心 + Social Social DB
+-   **Styling**: Vanilla CSS (CSS Variables Driven)
 
+### 🚀 快速开始
+
+1.  **安装依赖**
     ```bash
     npm install
     ```
-
-2. **启动开发模式**
-
+2.  **启动开发环境**
     ```bash
     npm run tauri dev
     ```
-
-3. **构建正式版本**
-
+3.  **构建生产版本**
     ```bash
     npm run tauri build
     ```
@@ -39,43 +42,56 @@
 
 ## 🌐 English
 
-**Goge Chat** is a premium, high-performance AI chat interface built with **Tauri**, **Vue 3**, and **Rust**. It is designed to provide lightning-fast responsiveness and an elegant UI while ensuring all data remains under the user's control.
+**Goge Chat** is a premium, high-performance AI chat client built with **Tauri 2.0**, **Vue 3**, and **Rust**. It combines lightning-fast responsiveness with a "Hyper-Premium" glassmorphism UI, ensuring your data remains private and local.
 
 ### ✨ Key Features
 
-* **Dual-Slot Themes**: Independent sub-theme choices for Dark and Light modes, switching seamlessly with system settings.
-* **Premium Presets**: Curated styles including *Nord*, *One Dark*, *Sakura*, and *Midnight*.
-* **Local Persistence**: All settings and chat history are saved in a portable local `data/` directory for maximum privacy.
-* **High Performance**: Powerful Rust backend with a sleek Vue-driven frontend, ensuring minimal footprint and instant startup.
+*   **💎 Inky Glass Visuals**: Bespoke high-saturation blur effects and light refraction, delivering a premium "glass" tactile feel.
+*   **🎭 Dual-Mode Layout**: Toggle between "Standard Mode" (Classic) and "Social Mode" (IM-style), optimized for both focus and casual chat.
+*   **🌈 Dual-Slot Theme Engine**: Configure independent themes for Dark and Light modes (e.g., *Cyberpunk* for night, *Sakura* for day).
+*   **📦 Local-First Persistence**: Powered by Rust & SQLite, all your data is stored offline. No cloud, no tracking.
+*   **⚙️ Power-User Tools**: Built-in prompt library, system instruction presets, and instant model switching.
 
-### 🛠️ Development
+### 🏗️ Technical Stack
 
-1. **Install Dependencies**
+-   **UI Layer**: Vue 3 / Vite / Pinia
+-   **Core Engine**: Rust (Tauri 2.0)
+-   **Database**: Dual SQLite architecture (Core + Social)
+-   **Aesthetics**: 100% Theme-variable driven CSS
 
+### 🏎️ Development
+
+1.  **Dependencies**
     ```bash
     npm install
     ```
-
-2. **Run in Dev Mode**
-
+2.  **Dev Mode**
     ```bash
     npm run tauri dev
     ```
-
-3. **Build for Production**
-
+3.  **Build Production**
     ```bash
     npm run tauri build
     ```
 
 ---
 
-## 🔗 相关链接 | Links
+## 📂 项目结构 | Structure
 
-* **Repository**: [Goge-Chat](https://github.com/scp3500/Goge-Chat)
-* **Author**: [scp3500](https://github.com/scp3500)
+```text
+├── src/               # Vue Frontend
+│   ├── assets/        # Styles (Manifesto), icons, prompts
+│   ├── components/    # Reusable UI islands
+│   ├── layouts/       # Mode-specific layouts (Standard/Main)
+│   └── stores/        # Pinia state management
+├── src-tauri/         # Rust Backend
+│   └── src/           # Commands, DB logic, app entry
+└── data/              # Local storage (Generated at runtime)
+```
 
-## 📄 开源协议 | License
+---
+
+## 📄 协议 | License
 
 本项目基于 [MIT](LICENSE) 协议开源。
-This project is licensed under the [MIT](LICENSE) License.
+Licensed under the [MIT](LICENSE) License.

@@ -33,6 +33,7 @@ const PAGE_SIZE = 20;
 const loadMessages = async (contactId) => {
   try {
     messages.value = []; // Clear current
+    isInitialScrollDone.value = false; // 🙈 Hide immediately
     allLoaded.value = false;
     
     // Fetch last N messages
@@ -47,7 +48,12 @@ const loadMessages = async (contactId) => {
       allLoaded.value = true;
     }
     
-    triggerScroll('auto'); // ⚡️ Instant scroll to bottom on initial load
+    // 🛡️ Empty state: Show immediately since there's no scrolling needed
+    if (history.length === 0) {
+        isInitialScrollDone.value = true;
+    }
+    
+    triggerScroll('auto'); // ⚡️ Scroll immediately (polling will handle timing)
   } catch (e) {
     console.error("Failed to load social messages:", e);
   }
@@ -105,14 +111,36 @@ const loadMoreMessages = async () => {
   }
 };
 
-const triggerScroll = async (behavior = 'auto') => {
+const isInitialScrollDone = ref(true); // 🛡️ Default to visible to avoid "forever empty" bug
+
+const triggerScroll = async (behavior = 'auto', attempt = 0) => {
   await nextTick();
-  // Wait for blur 'out' phase (approx 125ms) + enter phase start
-  setTimeout(() => {
-    if (messageListRef.value?.scrollToBottom) {
-      messageListRef.value.scrollToBottom(behavior);
+  
+  // 🛡️ Retry logic: If ref is missing (e.g. during transition), wait and retry
+  if (!messageListRef.value) {
+      if (attempt < 20) { // Try for up to ~1 second (50ms * 20)
+          setTimeout(() => triggerScroll(behavior, attempt + 1), 50);
+      } else {
+          // Give up after timeout to prevent infinite hidden state
+          isInitialScrollDone.value = true;
+      }
+      return;
+  }
+  
+  // Ref exists, perform scroll
+  if (messageListRef.value.scrollToBottom) {
+    messageListRef.value.scrollToBottom(behavior);
+    
+    // Reveal list if hidden
+    if (!isInitialScrollDone.value) {
+        // Use double requestAnimationFrame to ensure rendering is complete
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                isInitialScrollDone.value = true;
+            });
+        });
     }
-  }, 80);
+  }
 };
 
 const activeSessionTitle = ref("");
@@ -204,7 +232,7 @@ const triggerAIRequest = async (targetMessage = null) => {
   triggerScroll('smooth'); // 🌊 Smooth scroll for AI start
 
   try {
-    // 2. Prepare AI request
+  // 2. Prepare AI request
     const onEvent = new Channel();
     let aiFullContent = "";
 
@@ -229,6 +257,11 @@ const triggerAIRequest = async (targetMessage = null) => {
         
         if (msgInArray.content === "__LOADING__") msgInArray.content = "";
         msgInArray.content += content;
+        
+        // ⚡️ FORCE SCROLL TO BOTTOM ON CHUNK (Social Mode Exclusive)
+        if (messageListRef.value?.scrollToBottom) {
+             messageListRef.value.scrollToBottom();
+        }
       }
     };
 
@@ -284,6 +317,8 @@ const triggerAIRequest = async (targetMessage = null) => {
   } finally {
     isGenerating.value = false;
     chatStore.isGenerating = false; // ⚡️ Sync state end
+    // ⚡️ FINAL SCROLL TO BOTTOM
+    triggerScroll('smooth');
   }
 };
 
@@ -436,7 +471,7 @@ const handleSaveEdit = async (messageId, index, newContent) => {
        </div>
     </header>
 
-    <div class="message-list-wrapper">
+    <div class="message-list-wrapper" :style="{ opacity: isInitialScrollDone ? 1 : 0 }">
         <Transition name="message-blur" mode="out-in">
           <MessageList
             :key="activeContact.id + '-' + chatStore.activeSocialSessionId"
@@ -457,12 +492,14 @@ const handleSaveEdit = async (messageId, index, newContent) => {
         </Transition>
     </div>
 
-    <ChatInput
-      :is-generating="isGenerating"
-      :override-send="true"
-      @send="handleSend"
-      @stop="handleStop"
-    />
+    <div class="chat-input-island">
+      <ChatInput
+        :is-generating="isGenerating"
+        :override-send="true"
+        @send="handleSend"
+        @stop="handleStop"
+      />
+    </div>
   </main>
 </template>
 
@@ -472,8 +509,9 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  width: 100%;
-  background: var(--bg-chat-island); /* Swapped to darker/grayer */
+  background: var(--bg-chat-island); /* Restore solid background */
+  padding: 0; /* Revert island style to fill frame */
+  box-sizing: border-box;
 }
 
 /* Force Light Background for MessageList in Social Mode */
@@ -481,7 +519,6 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
   min-height: 0;
   background: var(--bg-chat-island);
   overflow: hidden;
@@ -497,6 +534,10 @@ const handleSaveEdit = async (messageId, index, newContent) => {
     border-bottom: 1px solid var(--border-color); /* Use variable */
     background: var(--bg-chat-island);
     z-index: 10;
+}
+
+.chat-input-island {
+    background: var(--bg-chat-island);
 }
 
 .header-info {
@@ -582,15 +623,15 @@ const handleSaveEdit = async (messageId, index, newContent) => {
 :global(.app-dark) .chat-header,
 :global(.app-dark) .chat-input-wrapper,
 :global(.app-dark) .message-list-wrapper {
-    background: #1a1a1a;
-    border-color: #333;
+    background: var(--bg-chat-island);
+    border-color: var(--border-glass);
 }
 
 :global(.app-dark) .contact-name {
-    color: #fff;
+    color: var(--text-color-white);
 }
 
 :global(.app-dark) .typing-status {
-    color: #777;
+    color: var(--text-tertiary);
 }
 </style>

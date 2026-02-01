@@ -229,57 +229,70 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle();
 
-            // --- 1. 计算新的便携式数据目录 (EXE同级/data) ---
-            let exe_path =
-                std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
-            let exe_dir = exe_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("."));
-            let data_dir = exe_dir.join("data");
-
-            if !data_dir.exists() {
-                std::fs::create_dir_all(&data_dir).expect("无法创建便携式数据目录 (data)");
+            // --- 1. 定位稳定数据目录 (AppData/Local) ---
+            let app_data_dir = app_handle
+                .path()
+                .app_local_data_dir()
+                .expect("无法获取 AppData 目录");
+            if !app_data_dir.exists() {
+                std::fs::create_dir_all(&app_data_dir).expect("无法创建数据目录");
             }
 
-            let target_db_path = data_dir.join("goge.db");
+            let target_db_path = app_data_dir.join("goge.db");
+            let target_social_db_path = app_data_dir.join("gole_social.db");
 
-            // --- 2. 检查遗留数据并迁移 ---
+            // --- 2. 增强型迁移逻辑 ---
+            // 策略：如果稳定目录不存在数据库，则按优先级搜索旧数据并搬迁
             if !target_db_path.exists() {
-                // 优先检查同级目录下的 shell.db (上一个版本的名字)
-                let local_old_db = data_dir.join("shell.db");
-                if local_old_db.exists() {
-                    println!("📦 [Setup] 发现旧数据库 (shell.db)，正在迁移到 goge.db...");
-                    let _ = std::fs::rename(&local_old_db, &target_db_path);
-                } else if let Ok(old_app_dir) = app_handle.path().app_data_dir() {
-                    // 尝试从 AppData 迁移 (更久远的版本)
-                    let old_db_path = old_app_dir.join("alice_data.db");
-                    if old_db_path.exists() {
-                        println!("📦 [Setup] 发现 AppData 旧数据库，正在迁移...");
-                        let _ = std::fs::copy(&old_db_path, &target_db_path);
+                // A. 检查当前目录下的 "便携式" data 目录 (最近版本的临时位置)
+                let exe_path =
+                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let exe_dir = exe_path
+                    .parent()
+                    .unwrap_or_else(|| std::path::Path::new("."));
+                let portable_db = exe_dir.join("data").join("goge.db");
+
+                if portable_db.exists() {
+                    println!("📦 [Migration] 从便携式目录迁移 goge.db -> AppData");
+                    let _ = std::fs::copy(&portable_db, &target_db_path);
+                } else {
+                    // B. 尝试从更早版本的 shell.db 或 alice_data.db 迁移
+                    let local_old_db = exe_dir.join("data").join("shell.db");
+                    if local_old_db.exists() {
+                        let _ = std::fs::copy(&local_old_db, &target_db_path);
                     } else {
-                        let old_db_path_renamed = old_app_dir.join("shell.db");
-                        if old_db_path_renamed.exists() {
-                            let _ = std::fs::copy(&old_db_path_renamed, &target_db_path);
+                        let old_db_path = app_data_dir.join("alice_data.db");
+                        if old_db_path.exists() {
+                            let _ = std::fs::copy(&old_db_path, &target_db_path);
                         }
                     }
                 }
             }
 
-            println!("💾 [Setup] 使用数据库路径: {:?}", target_db_path);
+            // 社交数据库同理迁移
+            if !target_social_db_path.exists() {
+                let exe_path =
+                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let exe_dir = exe_path
+                    .parent()
+                    .unwrap_or_else(|| std::path::Path::new("."));
+                let portable_social_db = exe_dir.join("data").join("gole_social.db");
+                if portable_social_db.exists() {
+                    let _ = std::fs::copy(&portable_social_db, &target_social_db_path);
+                }
+            }
+
+            println!("💾 [Setup] 数据库路径: {:?}", target_db_path);
             let conn = Connection::open(&target_db_path).expect("无法初始化数据库连接");
             db::init_db(&conn).expect("数据库初始化或升级失败");
-
-            // ✨ 【状态管理】：注入数据库连接
             app.manage(DbState(Mutex::new(conn)));
 
-            // --- 3. 初始化社交数据库 (gole_social.db) ---
-            let social_db_path = data_dir.join("gole_social.db");
-            println!("💾 [Setup] 使用社交数据库路径: {:?}", social_db_path);
-            let social_conn = Connection::open(&social_db_path).expect("无法初始化社交数据库连接");
+            println!("💾 [Setup] 社交数据库路径: {:?}", target_social_db_path);
+            let social_conn =
+                Connection::open(&target_social_db_path).expect("无法初始化社交数据库连接");
             social_db::init_social_db(&social_conn).expect("社交数据库初始化失败");
             app.manage(social_db::SocialDbState(Mutex::new(social_conn)));
 
-            // ✨ 【核心新增】：注入物理中断状态锁
             app.manage(GoleState {
                 stop_flag: Arc::new(AtomicBool::new(false)),
             });

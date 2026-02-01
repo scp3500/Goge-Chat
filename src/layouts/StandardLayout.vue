@@ -4,6 +4,21 @@ import SideBar from "../components/sidebar/layout/SideBar.vue";
 import ChatContainer from "../components/chat/ChatContainer.vue";
 
 const chatStore = useChatStore();
+import { useSettingsStore } from '../stores/settings';
+const settingsStore = useSettingsStore();
+
+const handleSessionSelect = (id) => {
+  chatStore.switchSession(id);
+  if (settingsStore.isModalOpen) {
+    settingsStore.closeSettings();
+    chatStore.setChatViewActive(true);
+  }
+};
+
+const handleOpenProfile = () => {
+    settingsStore.openSettings('profile');
+    chatStore.setChatViewActive(false);
+};
 </script>
 
 <template>
@@ -12,7 +27,7 @@ const chatStore = useChatStore();
       :active="chatStore.activeId" 
       :list="chatStore.historyList" 
       @create="chatStore.createSession" 
-      @select="id => chatStore.switchSession(id)"
+      @select="handleSessionSelect"
       @delete="id => chatStore.deleteSession(id)"
       @rename="chatStore.renameSession"
       @reorder="newList => chatStore.reorderSessions(newList)"

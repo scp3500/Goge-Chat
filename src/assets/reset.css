@@ -12,15 +12,19 @@ body,
     overflow: hidden;
     font-size: var(--font-size-base);
     line-height: var(--font-ratio);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--font-family-en, "Segoe UI"), var(--font-family-zh, "Microsoft YaHei UI"), sans-serif;
     user-select: text;
     -webkit-user-select: text;
 
+
+
     /* 优化渲染质量，特别是在缩放时 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    /* Remove manual font smoothing for Windows clarity */
     text-rendering: optimizeLegibility;
-    image-rendering: -webkit-optimize-contrast;
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+
+
     /* 确保头像在缩放时依然清晰 */
 }
 

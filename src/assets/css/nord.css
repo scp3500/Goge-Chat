@@ -36,3 +36,8 @@
     /* Nord10 (Blue) */
     --color-user-bubble-text: #ECEFF4;
 }
+    /* Social Mode Interactions (Injected) */
+    --bg-social-item-hover: rgba(255, 255, 255, 0.04);
+    --bg-social-item-active: rgba(255, 255, 255, 0.08);
+    --color-social-item-active-text: #fff;
+

@@ -275,18 +275,28 @@ const resolveAvatarSrc = (path) => {
   color: var(--color-title-text-bright);
 }
 
-.window-controls { display: flex; height: 100%; align-items: center; -webkit-app-region: no-drag; }
+.window-controls { display: flex; height: 100%; align-items: center; -webkit-app-region: no-drag; gap: 8px; margin-right: 8px; }
 .control-btn { 
-  background: transparent; border: none; color: var(--color-window-controls); width: 42px; height: 28px; 
+  background: transparent; 
+  border: 1px solid transparent; 
+  color: var(--color-window-controls); 
+  width: 30px; 
+  height: 30px; 
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   -webkit-app-region: no-drag;
+  border-radius: var(--radius-window-btn, 6px);
+  transition: all 0.2s ease;
 }
-.control-btn:hover { background: var(--bg-window-controls-hover); color: var(--color-title-text-bright); }
+.control-btn:hover { 
+  background: var(--bg-window-btn); 
+  border-color: var(--border-window-btn); 
+  color: var(--color-title-text-bright); 
+}
 .settings-btn:hover { color: var(--text-color-white); }
 .theme-toggle:hover { color: var(--color-primary); }
 .theme-toggle :deep(svg),
 .settings-btn :deep(svg) { width: 14px; height: 14px; }
-.close-btn:hover { background: #c42b1c !important; }
+.close-btn:hover { background: #c42b1c !important; color: white !important; }
 
 
 </style>

@@ -36,18 +36,12 @@ const handleSend = async (text) => {
 };
 
 // 消息列表现在自己处理初始滚动状态恢复 (MessageList.vue internally handles restoration)
+// 且生成过程中的滚动也由 MessageList.vue 的 watch(lastMsgLen) 处理
 
-// 监听消息数量增加（新消息添加时才滚动，避免流式完成时的跳动）
-let previousMessageCount = 0;
-watch(
-  () => currentMessages.value?.length,
-  (newCount) => {
-    if (newCount > previousMessageCount) {
-      triggerScroll();
-    }
-    previousMessageCount = newCount || 0;
-  }
-);
+// ⚡️ Fix: Normal Mode auto-scroll on new message (User send or AI start)
+watch(() => currentMessages.value.length, () => {
+  triggerScroll();
+});
 
 
 
@@ -93,7 +87,7 @@ const handleScrollUpdate = (pos) => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: var(--bg-sidebar); /* 确保背景与侧边栏/标题栏一致，消除接缝 */
+  background: var(--bg-sidebar); 
   
   /* --- 🛠️ [可调参数] 悬浮外边距：上 右 下 左 --- */
   /* 这里控制对话框距离窗口边缘的距离，例如 "0 6px 6px 0" 代表右边和下边有6px缝隙 */

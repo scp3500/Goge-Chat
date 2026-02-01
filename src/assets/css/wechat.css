@@ -13,7 +13,7 @@
     --bg-code: #e8e8e8;
     --bg-code-header: #d6d6d6;
 
-    --text-color: #333333;
+    --text-color: #3b3b3b;
     --text-color-white: #333333;
     --text-secondary: #888888;
     --text-tertiary: #b2b2b2;
@@ -35,10 +35,10 @@
     --bg-menu: rgba(255, 255, 255, 0.8);
     --border-menu: rgba(0, 0, 0, 0.08);
 
-    /* Official WeChat Green */
-    --color-primary: #07c160;
-    --color-primary-bg: rgba(7, 193, 96, 0.1);
-    --color-primary-light: #06ad56;
+    /* Official WeChat Green (More Vibrant) */
+    --color-primary: #09bb07;
+    --color-primary-bg: rgba(9, 187, 7, 0.1);
+    --color-primary-light: #08a606;
 
     --border-glass: rgba(0, 0, 0, 0.05);
     --bg-glass: rgba(255, 255, 255, 0.9);
@@ -65,4 +65,9 @@
     --token-comment: #b2b2b2;
     --token-var: #333333;
     --token-operator: #000000;
+
+    /* Social Mode Interactions (Light Theme Override) */
+    --bg-social-item-hover: #e6e6e6;
+    --bg-social-item-active: #dadada;
+    --color-social-item-active-text: #222;
 }

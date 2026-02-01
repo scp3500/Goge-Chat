@@ -25,6 +25,7 @@
     --bg-glass-active: rgba(0, 0, 0, 0.12);
     --border-glass: rgba(0, 0, 0, 0.08);
     --border-glass-bright: rgba(0, 0, 0, 0.12);
+    --border-app: rgba(0, 0, 0, 0.05);
     --shadow-main: 0 4px 16px rgba(0, 0, 0, 0.08);
     --input-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 
@@ -33,6 +34,11 @@
     --color-title-text-bright: #000;
     --color-window-controls: #444;
     --bg-window-controls-hover: rgba(0, 0, 0, 0.1);
+
+    /* Window Control Buttons (Rounded Square) */
+    --bg-window-btn: rgba(0, 0, 0, 0.04);
+    --border-window-btn: rgba(0, 0, 0, 0.06);
+    --radius-window-btn: 6px;
 
     --bg-selectors: rgba(0, 0, 0, 0.05);
     --border-selectors: rgba(0, 0, 0, 0.1);
@@ -53,7 +59,8 @@
     --token-html-tag: #800000;
 
     /* Semantic Colors adjustments for Light Mode */
-    --color-success-bg: rgba(34, 197, 94, 0.15);
+    --color-success: #09bb07;
+    --color-success-bg: rgba(9, 187, 7, 0.1);
     --color-primary: #4F46E5;
     --color-primary-bg: rgba(79, 70, 229, 0.1);
     --color-primary-border: rgba(79, 70, 229, 0.2);
@@ -106,6 +113,7 @@
     --theme-preset-1: #FFFFFF;
     --bg-social-item-hover: #f0f0f0;
     --bg-social-item-active: #e2e2e2;
+    --color-social-item-active-text: var(--text-color);
     /* Light box for Light Mode */
     --bg-social-icon-hover: rgba(0, 0, 0, 0.05);
     --bg-social-icon-active: rgba(0, 0, 0, 0.1);
