@@ -13,6 +13,7 @@ pub struct Contact {
     pub status: Option<String>,
     pub prompt: Option<String>,
     pub model: Option<String>,
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,6 +83,7 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
             session_id INTEGER,  -- Allow NULL for legacy/global messages if needed, but we should migrate
             role TEXT NOT NULL,
             content TEXT NOT NULL,
+            file_metadata TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE,
             FOREIGN KEY (session_id) REFERENCES social_sessions (id) ON DELETE CASCADE
@@ -110,6 +112,9 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
     }
     if !columns.contains(&"model".to_string()) {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN model TEXT", []);
+    }
+    if !columns.contains(&"provider".to_string()) {
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN provider TEXT", []);
     }
 
     // Schema Migrations - social_messages (Adding session_id)
@@ -141,6 +146,20 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
             WHERE session_id IS NULL;
         ",
         )?;
+    }
+
+    // Refresh msg_columns for subsequent migrations
+    let mut stmt_msg = conn.prepare("PRAGMA table_info(social_messages)")?;
+    let msg_columns: Vec<String> = stmt_msg
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>>>()?;
+
+    if !msg_columns.contains(&"file_metadata".to_string()) {
+        println!("🔧 Migrating social_messages: adding file_metadata");
+        let _ = conn.execute(
+            "ALTER TABLE social_messages ADD COLUMN file_metadata TEXT",
+            [],
+        );
     }
 
     // Schema Migrations - profiles
@@ -228,7 +247,7 @@ pub async fn get_social_contacts(
 ) -> Result<Vec<Contact>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, name, avatar, group_id, status, prompt, model FROM contacts")
+        .prepare("SELECT id, name, avatar, group_id, status, prompt, model, provider FROM contacts")
         .map_err(|e| e.to_string())?;
     let contact_iter = stmt
         .query_map([], |row| {
@@ -240,6 +259,7 @@ pub async fn get_social_contacts(
                 status: row.get(4)?,
                 prompt: row.get(5)?,
                 model: row.get(6)?,
+                provider: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -280,9 +300,15 @@ pub async fn get_social_groups(
 pub struct SocialMessage {
     pub id: Option<i64>,
     pub contact_id: i64,
-    pub session_id: Option<i64>, // ✨ Added session_id
+    pub session_id: Option<i64>,
     pub role: String,
     pub content: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "fileMetadata")]
+    #[serde(alias = "file_metadata")]
+    pub file_metadata: Option<String>,
+
     pub created_at: Option<String>,
 }
 
@@ -294,11 +320,12 @@ pub async fn add_social_contact(
     group_id: Option<i64>,
     prompt: Option<String>,
     model: Option<String>,
+    provider: Option<String>,
 ) -> Result<i64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO contacts (name, avatar, group_id, prompt, model) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![name, avatar, group_id, prompt, model],
+        "INSERT INTO contacts (name, avatar, group_id, prompt, model, provider) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![name, avatar, group_id, prompt, model, provider],
     )
     .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
@@ -312,11 +339,12 @@ pub async fn update_social_contact(
     avatar: Option<String>,
     prompt: Option<String>,
     model: Option<String>,
+    provider: Option<String>,
 ) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "UPDATE contacts SET name = ?1, avatar = ?2, prompt = ?3, model = ?4 WHERE id = ?5",
-        params![name, avatar, prompt, model, id],
+        "UPDATE contacts SET name = ?1, avatar = ?2, prompt = ?3, model = ?4, provider = ?5 WHERE id = ?6",
+        params![name, avatar, prompt, model, provider, id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -345,7 +373,7 @@ pub async fn get_social_messages(
 ) -> Result<Vec<SocialMessage>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id ASC")
+        .prepare("SELECT id, contact_id, session_id, role, content, file_metadata, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
     let msg_iter = stmt
         .query_map(params![contact_id], |row| {
@@ -355,7 +383,8 @@ pub async fn get_social_messages(
                 session_id: row.get(2)?,
                 role: row.get(3)?,
                 content: row.get(4)?,
-                created_at: row.get(5)?,
+                file_metadata: row.get(5)?,
+                created_at: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -377,10 +406,10 @@ pub async fn get_recent_social_messages(
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     // Load the LAST N messages of a session
     let sql = if session_id.is_some() {
-        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 ORDER BY id DESC LIMIT ?3"
+        "SELECT id, contact_id, session_id, role, content, file_metadata, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 ORDER BY id DESC LIMIT ?3"
     } else {
         // Fallback: get all messages if no session specified (or for testing)
-        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id DESC LIMIT ?3"
+        "SELECT id, contact_id, session_id, role, content, file_metadata, created_at FROM social_messages WHERE contact_id = ?1 ORDER BY id DESC LIMIT ?3"
     };
 
     let params_list: Vec<&dyn rusqlite::ToSql> = if let Some(sid) = session_id.as_ref() {
@@ -400,7 +429,8 @@ pub async fn get_recent_social_messages(
                 session_id: row.get(2)?,
                 role: row.get(3)?,
                 content: row.get(4)?,
-                created_at: row.get(5)?,
+                file_metadata: row.get(5)?,
+                created_at: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -424,9 +454,9 @@ pub async fn get_social_messages_paginated(
     let conn = state.0.lock().map_err(|e| e.to_string())?;
 
     let sql = if session_id.is_some() {
-        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 AND id < ?3 ORDER BY id DESC LIMIT ?4"
+        "SELECT id, contact_id, session_id, role, content, file_metadata, created_at FROM social_messages WHERE contact_id = ?1 AND session_id = ?2 AND id < ?3 ORDER BY id DESC LIMIT ?4"
     } else {
-        "SELECT id, contact_id, session_id, role, content, created_at FROM social_messages WHERE contact_id = ?1 AND id < ?3 ORDER BY id DESC LIMIT ?4"
+        "SELECT id, contact_id, session_id, role, content, file_metadata, created_at FROM social_messages WHERE contact_id = ?1 AND id < ?3 ORDER BY id DESC LIMIT ?4"
     };
 
     let params_vec: Vec<&dyn rusqlite::ToSql> = if let Some(sid) = session_id.as_ref() {
@@ -445,7 +475,8 @@ pub async fn get_social_messages_paginated(
                 session_id: row.get(2)?,
                 role: row.get(3)?,
                 content: row.get(4)?,
-                created_at: row.get(5)?,
+                file_metadata: row.get(5)?,
+                created_at: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -465,11 +496,12 @@ pub async fn save_social_message(
     session_id: Option<i64>, // ✨ Added session_id
     role: String,
     content: String,
+    file_metadata: Option<String>,
 ) -> Result<i64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO social_messages (contact_id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
-        params![contact_id, session_id, role, content],
+        "INSERT INTO social_messages (contact_id, session_id, role, content, file_metadata) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![contact_id, session_id, role, content, file_metadata],
     )
     .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
@@ -560,7 +592,7 @@ pub async fn get_recent_social_chats(
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT c.id, c.name, c.avatar, c.group_id, c.status, c.prompt, c.model, 
+            "SELECT c.id, c.name, c.avatar, c.group_id, c.status, c.prompt, c.model, c.provider, 
                     m.content, m.created_at
              FROM contacts c
              LEFT JOIN (
@@ -584,9 +616,10 @@ pub async fn get_recent_social_chats(
                     status: row.get(4)?,
                     prompt: row.get(5)?,
                     model: row.get(6)?,
+                    provider: row.get(7)?,
                 },
-                last_message: row.get(7)?,
-                last_message_time: row.get(8)?,
+                last_message: row.get(8)?,
+                last_message_time: row.get(9)?,
                 unread_count: 0, // Placeholder
             })
         })

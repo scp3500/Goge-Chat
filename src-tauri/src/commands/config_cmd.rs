@@ -293,6 +293,20 @@ fn default_providers() -> serde_json::Value {
             "defaultModel": "qwen-turbo",
             "temperature": 0.7,
             "maxTokens": 4096
+        },
+        {
+            "id": "siliconflow",
+            "name": "SiliconFlow",
+            "icon": "siliconflow",
+            "enabled": false,
+            "apiKey": "",
+            "baseUrl": "https://api.siliconflow.cn",
+            "models": [
+                "deepseek-ai/DeepSeek-V3.2"
+            ],
+            "defaultModel": "deepseek-ai/DeepSeek-V3.2",
+            "temperature": 0.7,
+            "maxTokens": 4096
         }
     ])
 }
@@ -474,7 +488,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 
         // MERGE SECRETS INTO PROVIDERS
         if let serde_json::Value::Array(ref mut providers) = providers_part.providers {
-            for provider in providers {
+            for provider in providers.iter_mut() {
                 if let Some(id_val) = provider.get("id") {
                     if let Some(id) = id_val.as_str() {
                         if let Some(encoded_key) = secrets_part.secrets.get(id) {
@@ -482,6 +496,27 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
                             if !decoded.is_empty() {
                                 provider["apiKey"] = serde_json::Value::String(decoded);
                             }
+                        }
+                    }
+                }
+            }
+
+            // 🟢 [New Logic] Merge missing default providers into loaded providers
+            let existing_ids: Vec<String> = providers
+                .iter()
+                .filter_map(|p| p.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .collect();
+
+            let default_providers_val = default_providers();
+            if let serde_json::Value::Array(defaults) = default_providers_val {
+                for default_p in defaults {
+                    if let Some(default_id) = default_p.get("id").and_then(|v| v.as_str()) {
+                        if !existing_ids.contains(&default_id.to_string()) {
+                            println!(
+                                "[Config] Injecting missing default provider: {}",
+                                default_id
+                            );
+                            providers.push(default_p);
                         }
                     }
                 }

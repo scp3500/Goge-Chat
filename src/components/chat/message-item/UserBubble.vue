@@ -20,12 +20,18 @@ watch(() => props.isEditing, (newVal) => {
 
 const formatUserText = (text) => {
   if (!text) return '';
+  // 1. Remove markers
   let cleanText = text.replace(/\[REASON\]|\[SEARCH\]/g, '');
-  const attachmentTag = "\n\n--- 附件内容 ---";
-  const index = cleanText.indexOf(attachmentTag);
-  if (index !== -1) {
-    cleanText = cleanText.substring(0, index);
+  
+  // 2. Hide attachment content block (Robust Regex)
+  // Supports 2+ dashes and optional whitespace
+  const attachmentRegex = /\n?\n?--+\s*附件内容\s*--+/;
+  const match = cleanText.match(attachmentRegex);
+  
+  if (match) {
+    cleanText = cleanText.substring(0, match.index);
   }
+  
   return cleanText.trim();
 };
 </script>

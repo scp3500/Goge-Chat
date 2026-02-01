@@ -46,24 +46,30 @@ const handleOpenProfile = () => {
   chatStore.setChatViewActive(false);
 };
 
-// 🔄 Restore persisted contact on mount
-onMounted(async () => {
+// 🔄 Reactive contact resolution
+const refreshContact = async () => {
     if (chatStore.activeSocialContactId) {
         try {
-            // We need to fetch the contact details to populate selectedContact
-            // Option 1: Fetch all contacts and find (inefficient but safe)
-            // Option 2: Fetch specific contact (better)
             const contacts = await invoke("get_social_contacts");
             const found = contacts.find(c => c.id === chatStore.activeSocialContactId);
             if (found) {
                 selectedContact.value = found;
-                console.log("📍 [RESTORE] Restored active contact:", found.name);
+                console.log("📍 [REFRESH] Updated active contact data:", found.name, "Provider:", found.provider);
             }
         } catch (e) {
-            console.error("Failed to restore contact:", e);
+            console.error("Failed to refresh contact:", e);
         }
     }
-});
+};
+
+// 🔄 Restore persisted contact on mount
+onMounted(refreshContact);
+
+// 🕵️ Watch for external triggers or ID changes
+watch(() => chatStore.activeSocialContactId, refreshContact);
+// ✨ Add a version-based trigger for when data changes but ID doesn't
+watch(() => chatStore.socialSessionVersion, refreshContact);
+
 
 const handleCloseSettings = () => {
   settingsStore.closeSettings();

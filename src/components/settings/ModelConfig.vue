@@ -146,9 +146,19 @@ const fetchProviderModels = async () => {
             headers['dangerously-allow-browser'] = 'true';
         } else {
             url = baseUrl;
-            if (!url.endsWith('/models')) {
-                if (!url.endsWith('/')) url += '/';
-                url += 'models';
+            if (url.includes('siliconflow.cn') || !url.includes('/v1')) {
+                // For SiliconFlow and others without /v1, we need /v1/models
+                if (!url.endsWith('/v1')) {
+                    if (!url.endsWith('/')) url += '/';
+                    url += 'v1/models';
+                } else {
+                    url += '/models';
+                }
+            } else {
+                if (!url.endsWith('/models')) {
+                    if (!url.endsWith('/')) url += '/';
+                    url += 'models';
+                }
             }
             headers['Authorization'] = `Bearer ${providerConfig.value.apiKey}`;
         }
@@ -435,7 +445,10 @@ const confirmTest = () => {
                         if (props.providerId === 'ollama') return `${base}/api/chat`;
                         
                         // Default / OpenAI Compatible
-                        return base.endsWith('/v1/chat/completions') ? base : `${base}/v1/chat/completions`;
+                        const u = base.replace(/\/+$/, '');
+                        if (u.includes('/v1/chat/completions')) return u;
+                        if (u.endsWith('/v1')) return `${u}/chat/completions`;
+                        return `${u}/v1/chat/completions`;
                     })()
                 }}</code>
             </div>

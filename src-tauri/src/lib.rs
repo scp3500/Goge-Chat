@@ -67,15 +67,20 @@ async fn reset_ai_generation(state: State<'_, GoleState>) -> Result<(), String> 
 // ✨ 【核心新增指令 3】：源头生成标题 (Blocking Mode)
 // 彻底解决流式传输带来的协议头污染问题
 #[tauri::command]
-async fn generate_title(app: tauri::AppHandle, msg: Vec<Message>) -> Result<String, String> {
+async fn generate_title(
+    app: tauri::AppHandle,
+    msg: Vec<Message>,
+    explicit_provider_id: Option<String>,
+    explicit_model_id: Option<String>,
+) -> Result<String, String> {
     println!("🦀 Rust 后端: 正在请求 AI 生成标题 (非流式)...");
 
     // 1. 【动态读取】加载配置
     let config = commands::config_cmd::load_config(app).await?;
 
     // 2. 【安全校验】获取当前选中的提供商和模型
-    let selected_provider_id = config.default_provider_id.clone();
-    let selected_model_id = config.selected_model_id.clone();
+    let selected_provider_id = explicit_provider_id.unwrap_or(config.default_provider_id.clone());
+    let selected_model_id = explicit_model_id.unwrap_or(config.selected_model_id.clone());
 
     // 从 providers 数组中找到当前选中的提供商配置
     let providers = config

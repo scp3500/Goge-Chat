@@ -4,6 +4,7 @@ import { SEARCH_SVG, PLUS_SVG } from '../../constants/icons';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/config';
 import AIContactModal from '../modals/AIContactModal.vue';
+import { useChatStore } from '../../stores/chat';
 
 import { resolveSocialAvatar } from '../../utils/social';
 const resolveAvatarSrc = resolveSocialAvatar;
@@ -15,6 +16,7 @@ const props = defineProps({
 const emit = defineEmits(['select']);
 
 const configStore = useConfigStore();
+const chatStore = useChatStore();
 const searchQuery = ref('');
 const activeContactId = ref(null);
 const clock = ref('');
@@ -136,6 +138,7 @@ const handleDelete = async () => {
     }
     
     await loadData(); // Refresh list
+    chatStore.triggerSocialSessionRefresh(); // 🔔 Signal MainLayout to refresh selectedContact
     showModal.value = false;
   } catch (e) {
     console.error('❌ Failed to save contact:', e);

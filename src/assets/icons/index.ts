@@ -6,6 +6,7 @@ import anthropicIconRaw from './anthropic.svg?raw';
 import qwenIconRaw from './qwen.svg?raw';
 import ollamaIconRaw from './ollama.svg?raw';
 import geminiIconRaw from './gemini.svg?raw';
+import siliconflowIconRaw from './siliconflow.svg?raw';
 
 // 默认图标（用于自定义供应商）
 const DEFAULT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
@@ -19,6 +20,7 @@ export const PROVIDER_ICONS = {
     qwen: qwenIconRaw,
     ollama: ollamaIconRaw,
     gemini: geminiIconRaw,
+    siliconflow: siliconflowIconRaw,
     ohmygpt: openaiIconRaw, // 🟢 Fix: Map OhMyGpt to OpenAI icon
     default: DEFAULT_ICON, // 默认图标
 } as const;

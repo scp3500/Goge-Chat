@@ -168,7 +168,17 @@ const doCopy = async (text, el) => {
 };
 
 const hasVisibleContent = computed(() => {
-  return props.m.content && props.m.content.trim().length > 0;
+  if (!props.m.content) return false;
+  
+  // Reuse logic: filter markers and attachment blocks
+  let text = props.m.content.replace(/\[REASON\]|\[SEARCH\]/g, '');
+  const attachmentRegex = /\n?\n?--+\s*附件内容\s*--+/;
+  const match = text.match(attachmentRegex);
+  if (match) {
+    text = text.substring(0, match.index);
+  }
+  
+  return text.trim().length > 0;
 });
 
 const parsedFiles = computed(() => {
@@ -325,14 +335,9 @@ const parsedError = (errorObj) => {
     return errorObj;
 };
 
-const handleCloseError = async () => {
-    // 只是简单的从UI移除，或者尝试重新加载（当前选简单的删除）
-    // 但因为是 assistant 的最后一条消息，实际上可能需要清理 currentMessages
-    if (props.m.role === 'assistant' && props.index === chatStore.currentMessages.length - 1) {
-        // Option 1: Just hide local error (maybe not enough?)
-        // Option 2: Remove the message
-        chatStore.currentMessages.splice(props.index, 1);
-    }
+const handleCloseError = async (event) => {
+    // Simply trigger the delete logic to remove the failed message
+    emit('delete', props.m.id, event);
 };
 
 const handleRetryError = async () => {

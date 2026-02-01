@@ -216,6 +216,20 @@ export const DEFAULT_PROVIDERS: ModelProviderConfig[] = [
         defaultModel: 'qwen-turbo',
         temperature: 0.7,
         maxTokens: 4096
+    },
+    {
+        id: 'siliconflow',
+        name: 'SiliconFlow',
+        icon: 'siliconflow',
+        enabled: false,
+        apiKey: '',
+        baseUrl: 'https://api.siliconflow.cn',
+        models: [
+            'deepseek-ai/DeepSeek-V3.2'
+        ],
+        defaultModel: 'deepseek-ai/DeepSeek-V3.2',
+        temperature: 0.7,
+        maxTokens: 4096
     }
 ];
 

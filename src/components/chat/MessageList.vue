@@ -104,18 +104,18 @@ const handleSaveEdit = async (event, index, m) => {
   });
 };
 
-const handleDelete = async (messageId, event) => {
-  // Find the message and index from props.messages
-  const index = props.messages.findIndex(msg => msg.id === messageId);
-  const m = props.messages[index];
-  
-  if (!m) return;
+const handleDelete = async (m, event) => {
+  // Find the message index in the FULL array
+  const index = props.messages.indexOf(m);
+  if (index === -1) return;
 
   triggerConfirm(event, index, m, '删除消息', async () => {
     if (props.themeOverride) {
-      emit('delete', messageId, index);
+      // For social mode, we pass ID and the full index
+      emit('delete', m.id, index);
     } else {
-      await chatStore.deleteMessageAction(messageId, index);
+      // Normal mode
+      await chatStore.deleteMessageAction(m.id, index);
     }
   });
 };
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
           @cancel-edit="cancelEdit"
           @update-edit-content="val => editingContent = val"
           @save-edit="e => handleSaveEdit(e, i, m)"
-          @delete="(id, event) => handleDelete(id, event)"
+          @delete="(id, event) => handleDelete(m, event)"
           @regenerate="(id, event) => handleRegenerate(id, event)"
         />
       </div>

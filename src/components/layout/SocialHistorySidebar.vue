@@ -213,7 +213,7 @@ onUnmounted(() => {
           <!-- Display Mode -->
           <div v-else class="item-content">
             <div class="item-main">
-              <div class="topic-title">{{ session.title }}</div>
+              <div class="topic-title" :title="session.title">{{ session.title }}</div>
               <div class="topic-meta">{{ formatTime(session.updated_at || session.created_at) }}</div>
             </div>
             

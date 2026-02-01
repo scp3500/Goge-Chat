@@ -281,7 +281,7 @@ const triggerAIRequest = async (targetMessage = null) => {
     await invoke("ask_ai", {
       msg: history,
       onEvent,
-      explicitProviderId: configStore.settings.defaultProviderId, 
+      explicitProviderId: currentContact.provider || configStore.settings.defaultProviderId, 
       explicitModelId: currentContact.model,
       stream: isStreamEnabled
     });
@@ -294,7 +294,8 @@ const triggerAIRequest = async (targetMessage = null) => {
             contactId,
             sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
             role: "assistant",
-            content: aiFullContent
+            content: aiFullContent,
+            fileMetadata: null
         });
         msgInArray.id = savedId;
     }
@@ -305,9 +306,10 @@ const triggerAIRequest = async (targetMessage = null) => {
     // Check if title is default. Weak check using string inclusion or exact match.
     // Better to check against "默认会话" or "新对话"
     const isDefaultTitle = ["默认会话", "新对话"].includes(activeSessionTitle.value);
+    const shouldReSummary = validMsgCount % 20 === 0; // 每20条重新总结一次
     
-    if (validMsgCount >= 2 && isDefaultTitle && chatStore.activeSocialSessionId) {
-        console.log("🧠 Triggering Auto Summary...");
+    if (chatStore.activeSocialSessionId && ( (validMsgCount >= 2 && isDefaultTitle) || shouldReSummary )) {
+        console.log("🧠 Triggering Adaptive Summary...");
         autoSummaryTitle(chatStore.activeSocialSessionId);
     }
 
@@ -322,8 +324,9 @@ const triggerAIRequest = async (targetMessage = null) => {
   }
 };
 
-const handleSend = async (text) => {
-  if (!text.trim() || isGenerating.value) return;
+const handleSend = async (text, fileMetadata = null) => {
+  if (!text.trim() && !fileMetadata) return;
+  if (isGenerating.value) return;
 
   const contactId = props.activeContact.id;
   const userText = text.trim();
@@ -334,13 +337,15 @@ const handleSend = async (text) => {
         contactId,
         sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
         role: "user", 
-        content: userText 
+        content: userText,
+        fileMetadata // ✨ Support files
     });
     
     messages.value.push({ 
       id: savedUserId,
       role: "user", 
       content: userText,
+      fileMetadata, // ✨ Support files
       created_at: new Date().toISOString().replace('T', ' ').replace('Z', '') 
     });
     triggerScroll('smooth'); // 🌊 Smooth scroll for user action
@@ -356,26 +361,37 @@ const handleSend = async (text) => {
 // 🆕 Auto Summary Title Logic
 const autoSummaryTitle = async (sessionId) => {
     try {
-        const prompt = "请总结以上对话的标题(8-10字)。直接返回标题文字，不要代码，不要标点符号。";
+        const prompt = "请根据对话内容总结一个简洁生动的标题(20字以内)。直接返回标题文字，不要包含引号或多余标点。";
         
         // Filter out loading messages
         const filteredMsgs = messages.value.filter(m => m.content !== "__LOADING__");
         
-        // Take first few turns + prompt
-        const summaryMsgs = [
-            ...filteredMsgs.slice(0, 5).map(m => ({
+        // ✨ Use LAST few messages for "latest" context
+        const summaryMsgs = [];
+        
+        // Add Character Context (System Prompt)
+        if (props.activeContact.prompt) {
+            summaryMsgs.push({ role: "system", content: props.activeContact.prompt });
+        }
+        
+        // Take LAST 6 messages + prompt
+        summaryMsgs.push(
+            ...filteredMsgs.slice(-6).map(m => ({
                 role: m.role,
                 content: m.content
             })),
             { role: "user", content: prompt }
-        ];
+        );
 
-        console.log("=== [Social] Requesting Auto Title ===");
-        const rawTitle = await invoke("generate_title", { msg: summaryMsgs });
-        console.log("✨ Generated Title:", rawTitle);
-
-        let finalTitle = rawTitle.trim();
-        if (finalTitle.length > 10) finalTitle = finalTitle.substring(0, 10);
+        console.log("=== [Social] Requesting Adaptive Title Update ===");
+        const rawTitle = await invoke("generate_title", { 
+            msg: summaryMsgs,
+            explicitProviderId: props.activeContact.provider || configStore.settings.defaultProviderId,
+            explicitModelId: props.activeContact.model
+        });
+        
+        let finalTitle = rawTitle.trim().replace(/["'“”]/g, '');
+        if (finalTitle.length > 30) finalTitle = finalTitle.substring(0, 30);
 
         if (finalTitle && finalTitle.length > 0 && finalTitle !== "新对话") {
             // Update DB
@@ -401,24 +417,18 @@ const handleStop = async () => {
 };
 
 const handleDelete = async (messageId, index) => {
-    if (!messageId) {
-        // Fallback: search for the ID in local messages if mismatch
-        const msg = messages.value[index];
-        if (msg?.id) messageId = msg.id;
+    // If we have an ID, delete from DB first
+    if (messageId) {
+        try {
+            await invoke("delete_social_message", { id: messageId });
+        } catch (e) {
+            console.error("Failed to delete social message from DB:", e);
+        }
     }
     
-    if (!messageId) {
-        console.error("Critical: Cannot delete message without ID at index:", index);
-        return;
-    }
-
-    try {
-        await invoke("delete_social_message", { id: messageId });
-        // Logic fix: Ensure we splice the correct index in the ORIGIN messages array if filtered
-        // MessageList filters message.role !== 'system'
+    // Always remove from local UI if index is valid
+    if (index >= 0 && index < messages.value.length) {
         messages.value.splice(index, 1);
-    } catch (e) {
-        console.error("Failed to delete social message:", e);
     }
 };
 

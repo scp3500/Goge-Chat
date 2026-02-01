@@ -191,11 +191,22 @@ pub async fn ask_ai(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            println!("❌ 请求失败: {}", e);
+            e.to_string()
+        })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let err_body = response.text().await.unwrap_or_default();
+        println!("❌ API 返回错误 ({}): {}", status, err_body);
+        return Err(format!("API Error: {}", err_body));
+    }
 
     if !stream.unwrap_or(true) {
         // --- 🛑 非流式响应处理 ---
         let json: Value = response.json().await.map_err(|e| e.to_string())?;
+        println!("📩 收到非流式响应: {:?}", json);
         let choice = &json["choices"][0];
         let message = &choice["message"];
 
@@ -225,31 +236,43 @@ pub async fn ask_ai(
         }
 
         let chunk = chunk.map_err(|e| e.to_string())?;
-        buffer.push_str(&String::from_utf8_lossy(&chunk));
+        let chunk_str = String::from_utf8_lossy(&chunk);
+        buffer.push_str(&chunk_str);
 
         while let Some(newline_idx) = buffer.find('\n') {
             let line = buffer.drain(..=newline_idx).collect::<String>();
             let line = line.trim();
 
-            if line == "data: [DONE]" {
-                return Ok(());
+            if line.is_empty() || line == "data: [DONE]" {
+                if line == "data: [DONE]" {
+                    return Ok(());
+                }
+                continue;
             }
 
             if let Some(data) = line.strip_prefix("data: ") {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                    let choice = &json["choices"][0];
-                    let delta = &choice["delta"];
+                    if let Some(choices) = json["choices"].as_array() {
+                        if choices.is_empty() {
+                            continue;
+                        }
+                        let choice = &choices[0];
+                        let delta = &choice["delta"];
 
-                    if let Some(content) = delta["content"].as_str() {
-                        on_event
-                            .send(format!("c:{}", content))
-                            .map_err(|e| e.to_string())?;
-                    }
+                        if let Some(content) = delta["content"].as_str() {
+                            on_event
+                                .send(format!("c:{}", content))
+                                .map_err(|e| e.to_string())?;
+                        }
 
-                    if let Some(reasoning) = delta["reasoning_content"].as_str() {
-                        on_event
-                            .send(format!("r:{}", reasoning))
-                            .map_err(|e| e.to_string())?;
+                        if let Some(reasoning) = delta["reasoning_content"].as_str() {
+                            on_event
+                                .send(format!("r:{}", reasoning))
+                                .map_err(|e| e.to_string())?;
+                        }
+                    } else if let Some(err) = json["error"].as_object() {
+                        println!("❌ 流中发现错误: {:?}", err);
+                        return Err(format!("Stream Error: {:?}", err));
                     }
                 }
             }

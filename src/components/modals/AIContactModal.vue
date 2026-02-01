@@ -27,6 +27,7 @@ const name = ref('');
 const avatar = ref('');
 const prompt = ref('');
 const model = ref('');
+const provider = ref('');
 
 // Cropper State
 const showCropper = ref(false);
@@ -46,15 +47,27 @@ const resetForm = () => {
         avatar.value = props.contact.avatar || '';
         prompt.value = props.contact.prompt || '';
         model.value = props.contact.model || '';
+        provider.value = props.contact.provider || '';
+
+        // ✨ 自动修复：如果模型存在但供应商缺失，尝试从可用列表中查找
+        if (model.value && !provider.value) {
+            const found = availableModels.value.find(m => m.id === model.value);
+            if (found) {
+                provider.value = found.providerId;
+                console.log(`[AIContactModal] Auto-resolved provider for ${model.value}: ${provider.value}`);
+            }
+        }
     } else {
         name.value = '';
         avatar.value = presets[0]; // 默认选中第一个
         prompt.value = '';
         model.value = configStore.settings.selectedModelId || '';
+        provider.value = configStore.settings.defaultProviderId || '';
         
-        // 如果有可用模型，默认选中第一个
+        // 如果有可用模型且没有选中的，默认选中第一个
         if (!model.value && availableModels.value.length > 0) {
-            model.value = availableModels.value[0];
+            model.value = availableModels.value[0].id;
+            provider.value = availableModels.value[0].providerId;
         }
     }
 };
@@ -71,7 +84,8 @@ const handleConfirm = () => {
       name: name.value.trim(),
       avatar: avatar.value.trim(),
       prompt: prompt.value.trim(),
-      model: model.value
+      model: model.value,
+      provider: provider.value
     };
     emit('confirm', contactData);
   }
@@ -123,11 +137,28 @@ const availableModels = computed(() => {
         if (p.enabled) {
             p.models.forEach(m => {
                 const id = typeof m === 'string' ? m : m.id;
-                models.push(id);
+                models.push({
+                    id,
+                    value: `${p.id}:${id}`, // 复合 ID，处理不同平台同名模型
+                    name: typeof m === 'string' ? m : (m.name || m.id),
+                    providerId: p.id,
+                    providerName: p.name
+                });
             });
         }
     });
     return models;
+});
+
+const selectedModelValue = computed({
+    get: () => provider.value && model.value ? `${provider.value}:${model.value}` : '',
+    set: (val) => {
+        if (!val) return;
+        const [pId, ...mIdParts] = val.split(':');
+        const mId = mIdParts.join(':');
+        provider.value = pId;
+        model.value = mId;
+    }
 });
 
 const promptLibrary = computed(() => configStore.settings.promptLibrary || []);
@@ -194,8 +225,11 @@ const handlePromptSelect = (content) => {
 
             <div class="form-group">
               <label>模型选择</label>
-              <select v-model="model">
-                <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
+              <select v-model="selectedModelValue">
+                <option value="" disabled>选择模型...</option>
+                <option v-for="m in availableModels" :key="m.value" :value="m.value">
+                    [{{ m.providerName }}] {{ m.name }}
+                </option>
               </select>
             </div>
 
