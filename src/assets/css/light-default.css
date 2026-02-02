@@ -1,5 +1,5 @@
 /* Ensure this applies to ANY light mode scenario */
-:root.light-mode {
+[data-theme='light'], .light-mode {
     --bg-main: #FFFFFF;
 
 
@@ -122,4 +122,9 @@
     --scrollbar-thumb: rgba(0, 0, 0, 0.2);
     --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
     --scrollbar-thumb-active: rgba(0, 0, 0, 0.5);
+
+    /* Social Mode Interactions (Theme Specific) */
+    --bg-social-item-hover: rgba(0, 0, 0, 0.05);
+    --bg-social-item-active: rgba(0, 0, 0, 0.1);
+    --color-social-item-active-text: var(--text-color);
 }

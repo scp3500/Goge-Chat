@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import { configCommands, fileCommands } from '../tauri/commands';
 import { AppSettings, DEFAULT_SETTINGS, ModelProviderConfig, ModelPreset, PromptLibraryItem, ModelInfo } from '../types/config';
 import { PREBUILT_PROMPTS } from '../constants/prompts';
+import { invoke } from '@tauri-apps/api/core';
 
 export const useConfigStore = defineStore('config', () => {
     // ========== 状态 ==========
@@ -107,6 +108,17 @@ export const useConfigStore = defineStore('config', () => {
                 if (fixedDefaultPrompt && fixedDefaultPrompt.includes("Role: Prompt Singularity")) {
                     console.warn("[ConfigStore] Detected polluted defaultSystemPrompt, resetting to default.");
                     fixedDefaultPrompt = DEFAULT_SETTINGS.defaultSystemPrompt;
+                }
+
+                // 🛡️ [SYNC] 同步社交资料到配置
+                try {
+                    const socialProfile = await invoke<{ nickname: string, avatar: string }>('get_social_profile');
+                    if (socialProfile) {
+                        saved.nickname = socialProfile.nickname || saved.nickname;
+                        saved.userAvatarPath = socialProfile.avatar || saved.userAvatarPath;
+                    }
+                } catch (e) {
+                    console.warn('[ConfigStore] Failed to load social profile during init:', e);
                 }
 
                 // 合并配置，确保新增字段有默认值
@@ -321,6 +333,19 @@ export const useConfigStore = defineStore('config', () => {
 
             await configCommands.saveConfig(persistentSettings as AppSettings);
             lastError.value = null;
+
+            // 🛡️ [SYNC]: 同步到社交数据库
+            if (newPartialSettings.nickname !== undefined || newPartialSettings.userAvatarPath !== undefined) {
+                try {
+                    await invoke('update_social_profile', {
+                        nickname: settings.value.nickname,
+                        avatar: settings.value.userAvatarPath
+                    });
+                    console.log('[ConfigStore] Social profile synced successfully.');
+                } catch (e) {
+                    console.warn('[ConfigStore] Failed to sync social profile:', e);
+                }
+            }
 
             // 🔄 Reactive Avatar Loading: Reload if path changed
             if (newPartialSettings.userAvatarPath !== undefined && newPartialSettings.userAvatarPath !== lastLoadedPath) {

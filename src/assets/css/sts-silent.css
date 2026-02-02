@@ -31,9 +31,8 @@
     --token-comment: #6272a4;
     --token-var: #f8f8f2;
     --token-operator: #ffb86c;
-}
-    /* Social Mode Interactions (Injected) */
+    /* Social Mode Interactions (Theme Specific) */
     --bg-social-item-hover: rgba(255, 255, 255, 0.04);
     --bg-social-item-active: rgba(255, 255, 255, 0.08);
     --color-social-item-active-text: #fff;
-
+}

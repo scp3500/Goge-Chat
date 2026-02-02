@@ -5,14 +5,14 @@ import { Live2DModel, config } from 'pixi-live2d-display';
 // ========================================================
 // 🟢 【唯一控制按钮】 - 改这个数，Alice 就会变大变小
 // ========================================================
-const SIZE = 1.3;
+const SIZE = 1.25;
 // ========================================================
 
 const TARGET_WINDOW_WIDTH = 300 * SIZE;
 const TARGET_WINDOW_HEIGHT = 600 * SIZE;
 
 // 内部默认配置 (不需要改)
-const ALICE_ZOOM = 0.95;  // 默认全身展示
+const ALICE_ZOOM = 1;  // 默认全身展示
 const Y_OFFSET = 0.5;     // 默认居中
 
 // @ts-ignore
@@ -60,6 +60,7 @@ async function init() {
         });
 
         const modelUrl = '/live2d/alice/alice_model3.json';
+        //const modelUrl = '/live2d/hiyori/hiyori.model3.json';
         const model = await Live2DModel.from(modelUrl, {
             autoInteract: true,
             idleMotionGroup: 'Idle'
@@ -92,7 +93,7 @@ async function init() {
                 /**
                  * 🎮 [1. 手柄与手部控制] 🎮
                  */
-                set('Param66', 1.0);       // 手柄显示开关 (1.0 显示, 0.0 隐藏)
+                set('Param66', 0.0);       // 手柄显示开关 (1.0 显示, 0.0 隐藏)
                 set('Param61', 1.0);       // 手型：伸展 (0~1)
                 set('Param62', 0.0);       // 手型：收缩 (0~1)
 

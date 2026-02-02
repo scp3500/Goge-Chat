@@ -1,5 +1,5 @@
 /* Default Dark Theme (VS Code Dark+) attached to :root */
-:root {
+:root, [data-theme='dark'], .app-dark {
     /* ========================================================
        GoleChat 设计系统 - VS Code Dark+ Edition
        ======================================================== */
@@ -135,12 +135,9 @@
     --theme-preset-4: #2c2c32;
 
     /* 13. Social Mode Interactions */
-    /* 13. Social Mode Interactions */
     --bg-social-item-hover: rgba(255, 255, 255, 0.04);
     --bg-social-item-active: rgba(255, 255, 255, 0.08);
-    /* Must be distinct but not too bright */
     --color-social-item-active-text: #fff;
-    /* Explicit text color var */
     --bg-social-icon-hover: rgba(255, 255, 255, 0.1);
     --bg-social-icon-active: rgba(255, 255, 255, 0.15);
 }

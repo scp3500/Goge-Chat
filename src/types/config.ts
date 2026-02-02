@@ -104,6 +104,7 @@ export interface AppSettings {
     // 用户头像设置
     showUserAvatar: boolean;    // 是否显示用户头像
     userAvatarPath: string;     // 用户头像本地路径
+    nickname: string;           // 用户昵称
 
     // 搜索设置
     searchInstanceUrl: string;
@@ -270,6 +271,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enableBubble: false,
     showUserAvatar: false,
     userAvatarPath: "",
+    nickname: "Guest",
 
     apiKey: '', // 兼容旧版本
     chatMode: {

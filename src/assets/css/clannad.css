@@ -26,9 +26,8 @@
     --token-keyword: #87cefa;
     --token-string: #ffb7c5;
     --token-fn: #77dd77;
+    /* Social Mode Interactions (Theme Specific) */
+    --bg-social-item-hover: rgba(0, 0, 0, 0.05);
+    --bg-social-item-active: rgba(0, 0, 0, 0.1);
+    --color-social-item-active-text: var(--text-color);
 }
-    /* Social Mode Interactions (Injected) */
-    --bg-social-item-hover: rgba(255, 255, 255, 0.04);
-    --bg-social-item-active: rgba(255, 255, 255, 0.08);
-    --color-social-item-active-text: #fff;
-

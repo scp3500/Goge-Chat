@@ -28,20 +28,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome', 'openProfile']);
 
-const profile = ref({
-  nickname: 'Guest',
-  avatar: null
-});
-
-const loadProfile = async () => {
-  try {
-    profile.value = await invoke('get_social_profile');
-  } catch (e) {
-    console.warn('Failed to load profile in Nav:', e);
-  }
-};
-
-onMounted(loadProfile);
+// No local profile ref needed, use configStore
+const configStore = useConfigStore();
 
 const handleModuleClick = (moduleId) => {
   emit('update:activeModule', moduleId);
@@ -50,7 +38,6 @@ const handleModuleClick = (moduleId) => {
   }
 };
 
-const configStore = useConfigStore();
 const isLight = computed(() => configStore.settings.theme === 'light');
 
 const toggleTheme = () => {
@@ -75,10 +62,10 @@ const modules = [
         @click="emit('openProfile')" 
         title="个人资料"
       >
-        <img v-if="configStore.userAvatarUrl || profile.avatar" 
-             :src="configStore.userAvatarUrl || resolveAvatarSrc(profile.avatar)" 
+        <img v-if="configStore.userAvatarUrl" 
+             :src="configStore.userAvatarUrl" 
              class="user-avatar" />
-        <div v-else class="avatar-placeholder">{{ profile.nickname[0] }}</div>
+        <div v-else class="avatar-placeholder">{{ configStore.settings.nickname ? configStore.settings.nickname[0] : 'U' }}</div>
       </div>
       
       <div class="nav-items">

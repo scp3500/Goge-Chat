@@ -42,8 +42,12 @@ const handleAvatarUpload = async () => {
     }
 };
 
-const handleCropConfirm = (data) => {
-    configStore.updateConfig({ userAvatarPath: data });
+const handleCropConfirm = async (data) => {
+    try {
+        await configStore.uploadAvatar(data);
+    } catch (e) {
+        console.error('Failed to upload avatar in GeneralConfig:', e);
+    }
     showCropper.value = false;
 };
 
@@ -198,7 +202,7 @@ const resolveAvatarSrc = (path) => {
             <span class="hint">显示在聊天的用户气泡旁</span>
           </div>
           <div class="avatar-preview-wrap" @click="handleAvatarUpload">
-             <img v-if="configStore.settings.userAvatarPath" :src="resolveAvatarSrc(configStore.settings.userAvatarPath)" class="avatar-small" />
+             <img v-if="configStore.userAvatarUrl" :src="configStore.userAvatarUrl" class="avatar-small" />
              <div v-else class="avatar-placeholder">+</div>
           </div>
         </div>

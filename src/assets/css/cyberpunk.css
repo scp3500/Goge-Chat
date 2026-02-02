@@ -81,9 +81,12 @@
     --btn-copy-color-hover: #a0ffff;
     --btn-more-color: #00f3ff;
     --btn-more-color-hover: #a0ffff;
-}
-    /* Social Mode Interactions (Injected) */
+    /* Social Mode Interactions (Theme Specific) */
+    --bg-social-item-hover: rgba(252, 238, 10, 0.1);
+    --bg-social-item-active: rgba(252, 238, 10, 0.2);
+    --color-social-item-active-text: #fcee0a;
+    /* Social Mode Interactions (Theme Specific) */
     --bg-social-item-hover: rgba(255, 255, 255, 0.04);
     --bg-social-item-active: rgba(255, 255, 255, 0.08);
     --color-social-item-active-text: #fff;
-
+}

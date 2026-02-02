@@ -18,20 +18,13 @@ const resolveAvatarSrc = (path) => {
   return convertFileSrc(path);
 };
 
-const profile = ref({
-  nickname: '',
-  avatar: ''
-});
-
+// Local values for easier editing before sync
+const nickname = ref('');
 const isSaving = ref(false);
 const saveStatus = ref('');
 
 const loadProfile = async () => {
-  try {
-    profile.value = await invoke('get_social_profile');
-  } catch (e) {
-    console.error('Failed to load profile:', e);
-  }
+  nickname.value = configStore.settings.nickname;
 };
 
 const handleAvatarClick = async () => {
@@ -66,11 +59,7 @@ const handleAvatarClick = async () => {
 const handleAvatarSave = async (croppedData) => {
   try {
     const savedPath = await configStore.uploadAvatar(croppedData);
-    profile.value.avatar = savedPath;
-    await configStore.updateConfig({ userAvatarPath: savedPath });
-    
-    // Auto save profile when avatar changes
-    await saveProfile(true);
+    // Profile SYNC is now handled automatically by configStore.updateConfig
     showEditor.value = false;
   } catch (err) {
     console.error('保存裁剪头像失败:', err);
@@ -78,15 +67,14 @@ const handleAvatarSave = async (croppedData) => {
 };
 
 const saveProfile = async (silent = false) => {
+  if (nickname.value === configStore.settings.nickname) return;
+  
   if (!silent) {
     isSaving.value = true;
     saveStatus.value = '正在同步...';
   }
   try {
-    await invoke('update_social_profile', {
-      nickname: profile.value.nickname,
-      avatar: profile.value.avatar
-    });
+    await configStore.updateConfig({ nickname: nickname.value });
     if (!silent) {
       saveStatus.value = '已自动保存';
       setTimeout(() => { saveStatus.value = ''; }, 2000);
@@ -128,7 +116,7 @@ onMounted(loadProfile);
         <div class="avatar-edit-wrapper">
             <div class="avatar-edit" @click="handleAvatarClick">
                 <img v-if="configStore.userAvatarUrl" :src="configStore.userAvatarUrl" class="large-avatar" />
-                <div v-else class="avatar-placeholder large">{{ profile.nickname ? profile.nickname[0] : 'G' }}</div>
+                <div v-else class="avatar-placeholder large">{{ nickname ? nickname[0] : (configStore.settings.nickname ? configStore.settings.nickname[0] : 'G') }}</div>
                 <div class="avatar-overlay">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -147,7 +135,7 @@ onMounted(loadProfile);
           <div class="input-wrapper">
               <input 
                 type="text" 
-                v-model="profile.nickname" 
+                v-model="nickname" 
                 @blur="saveProfile()"
                 @change="saveProfile()"
                 placeholder="设置你的社交昵称..."

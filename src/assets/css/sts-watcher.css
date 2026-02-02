@@ -23,9 +23,8 @@
     --token-keyword: #da70d6;
     --token-control: #ffd700;
     --token-type: #ffffff;
-}
-    /* Social Mode Interactions (Injected) */
+    /* Social Mode Interactions (Theme Specific) */
     --bg-social-item-hover: rgba(255, 255, 255, 0.04);
     --bg-social-item-active: rgba(255, 255, 255, 0.08);
     --color-social-item-active-text: #fff;
-
+}

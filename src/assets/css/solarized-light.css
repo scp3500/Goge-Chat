@@ -45,9 +45,8 @@
     --bg-input-dim: #FDF6E3;
     --bg-card: #FDF6E3;
     --border-card: rgba(0, 0, 0, 0.05);
+    /* Social Mode Interactions (Theme Specific) */
+    --bg-social-item-hover: rgba(0, 0, 0, 0.05);
+    --bg-social-item-active: rgba(0, 0, 0, 0.1);
+    --color-social-item-active-text: var(--text-color);
 }
-    /* Social Mode Interactions (Injected) */
-    --bg-social-item-hover: rgba(255, 255, 255, 0.04);
-    --bg-social-item-active: rgba(255, 255, 255, 0.08);
-    --color-social-item-active-text: #fff;
-

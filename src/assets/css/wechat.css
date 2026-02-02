@@ -70,4 +70,8 @@
     --bg-social-item-hover: #e6e6e6;
     --bg-social-item-active: #dadada;
     --color-social-item-active-text: #222;
+    /* Social Mode Interactions (Theme Specific) */
+    --bg-social-item-hover: rgba(0, 0, 0, 0.05);
+    --bg-social-item-active: rgba(0, 0, 0, 0.1);
+    --color-social-item-active-text: var(--text-color);
 }
