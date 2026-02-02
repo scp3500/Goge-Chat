@@ -61,13 +61,13 @@
     /* Semantic Colors adjustments for Light Mode */
     --color-success: #09bb07;
     --color-success-bg: rgba(9, 187, 7, 0.1);
-    --color-primary: #4F46E5;
-    --color-primary-bg: rgba(79, 70, 229, 0.1);
-    --color-primary-border: rgba(79, 70, 229, 0.2);
-    --color-primary-alpha-30: rgba(79, 70, 229, 0.3);
-    --color-primary-alpha-50: rgba(79, 70, 229, 0.5);
-    --color-primary-alpha-70: rgba(79, 70, 229, 0.7);
-    --color-primary-light: #6366F1;
+    --color-primary: #07c160;
+    --color-primary-bg: rgba(7, 193, 96, 0.1);
+    --color-primary-border: rgba(7, 193, 96, 0.2);
+    --color-primary-alpha-30: rgba(7, 193, 96, 0.3);
+    --color-primary-alpha-50: rgba(7, 193, 96, 0.5);
+    --color-primary-alpha-70: rgba(7, 193, 96, 0.7);
+    --color-primary-light: #06ad56;
 
     /* Model Icons Context adjustments */
     --bg-model-icon: #E5E5EA;
@@ -111,8 +111,8 @@
 
     /* Theme Presets (Light) */
     --theme-preset-1: #FFFFFF;
-    --bg-social-item-hover: #f0f0f0;
-    --bg-social-item-active: #e2e2e2;
+    --bg-social-item-hover: #e6e6e6;
+    --bg-social-item-active: #dadada;
     --color-social-item-active-text: var(--text-color);
     /* Light box for Light Mode */
     --bg-social-icon-hover: rgba(0, 0, 0, 0.05);

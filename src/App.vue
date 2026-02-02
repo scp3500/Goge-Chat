@@ -13,6 +13,7 @@ import ChatContainer from "./components/chat/ChatContainer.vue";
 import StandardLayout from "./layouts/StandardLayout.vue";
 import MainLayout from "./layouts/MainLayout.vue";
 import SocialChatContainer from "./components/chat/SocialChatContainer.vue";
+import SocialContactProfile from "./components/social/SocialContactProfile.vue";
 import AppNavBar from "./components/layout/AppNavBar.vue";
 
 const appWindow = getCurrentWindow();
@@ -169,10 +170,15 @@ onUnmounted(() => {
             :is-left-sidebar-open="uiStore.isLeftSidebarOpen"
             :is-history-open="uiStore.isHistoryOpen"
             :active-module="activeModule"
-            v-slot="{ activeContact }"
+            v-slot="{ activeContact, activeModule: slotActiveModule }"
           >
+            <SocialContactProfile 
+              v-if="slotActiveModule === 'address_book' && activeContact"
+              :active-contact="activeContact"
+              @startChat="activeModule = 'chat'"
+            />
             <SocialChatContainer 
-              v-if="activeContact"
+              v-else-if="activeContact"
               :active-contact="activeContact"
             />
           </MainLayout>

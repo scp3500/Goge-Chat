@@ -26,12 +26,15 @@ dist-ssr
 *.sw?
 
 # --- Rust / Tauri 特有 (必须添加) ---
-# Rust 编译生成的二进制文件和缓存，这个文件夹通常有几百MB甚至数GB
-/src-tauri/target/
-
-# Tauri 生成的临时构建产物
+# Rust 编译生成的二进制文件和缓存
+target/
+**/target/
+src-tauri/target/
 src-tauri/gen/
 src-tauri/bin/
+**/src-tauri/target/
+**/src-tauri/gen/
+**/src-tauri/bin/
 
 # --- 安全与环境配置 ---
 # 如果你之后在项目中使用了 .env 文件来存储 Gemini 或 DeepSeek 的 API Key

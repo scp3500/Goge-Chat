@@ -14,6 +14,7 @@ pub struct Contact {
     pub prompt: Option<String>,
     pub model: Option<String>,
     pub provider: Option<String>,
+    pub remark: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -115,6 +116,9 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
     }
     if !columns.contains(&"provider".to_string()) {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN provider TEXT", []);
+    }
+    if !columns.contains(&"remark".to_string()) {
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN remark TEXT", []);
     }
 
     // Schema Migrations - social_messages (Adding session_id)
@@ -247,7 +251,7 @@ pub async fn get_social_contacts(
 ) -> Result<Vec<Contact>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, name, avatar, group_id, status, prompt, model, provider FROM contacts")
+        .prepare("SELECT id, name, avatar, group_id, status, prompt, model, provider, remark FROM contacts")
         .map_err(|e| e.to_string())?;
     let contact_iter = stmt
         .query_map([], |row| {
@@ -260,6 +264,7 @@ pub async fn get_social_contacts(
                 prompt: row.get(5)?,
                 model: row.get(6)?,
                 provider: row.get(7)?,
+                remark: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -321,11 +326,12 @@ pub async fn add_social_contact(
     prompt: Option<String>,
     model: Option<String>,
     provider: Option<String>,
+    remark: Option<String>,
 ) -> Result<i64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO contacts (name, avatar, group_id, prompt, model, provider) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![name, avatar, group_id, prompt, model, provider],
+        "INSERT INTO contacts (name, avatar, group_id, prompt, model, provider, remark) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![name, avatar, group_id, prompt, model, provider, remark],
     )
     .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
@@ -340,11 +346,12 @@ pub async fn update_social_contact(
     prompt: Option<String>,
     model: Option<String>,
     provider: Option<String>,
+    remark: Option<String>,
 ) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "UPDATE contacts SET name = ?1, avatar = ?2, prompt = ?3, model = ?4, provider = ?5 WHERE id = ?6",
-        params![name, avatar, prompt, model, provider, id],
+        "UPDATE contacts SET name = ?1, avatar = ?2, prompt = ?3, model = ?4, provider = ?5, remark = ?6 WHERE id = ?7",
+        params![name, avatar, prompt, model, provider, remark, id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -592,7 +599,7 @@ pub async fn get_recent_social_chats(
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT c.id, c.name, c.avatar, c.group_id, c.status, c.prompt, c.model, c.provider, 
+            "SELECT c.id, c.name, c.avatar, c.group_id, c.status, c.prompt, c.model, c.provider, c.remark,
                     m.content, m.created_at
              FROM contacts c
              LEFT JOIN (
@@ -617,9 +624,10 @@ pub async fn get_recent_social_chats(
                     prompt: row.get(5)?,
                     model: row.get(6)?,
                     provider: row.get(7)?,
+                    remark: row.get(8)?,
                 },
-                last_message: row.get(8)?,
-                last_message_time: row.get(9)?,
+                last_message: row.get(9)?,
+                last_message_time: row.get(10)?,
                 unread_count: 0, // Placeholder
             })
         })

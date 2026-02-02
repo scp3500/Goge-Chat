@@ -472,7 +472,7 @@ const handleSaveEdit = async (messageId, index, newContent) => {
   <main class="social-chat-container">
     <header class="chat-header" data-tauri-drag-region>
        <div class="header-info">
-           <span class="session-topic">{{ activeContact.name }}</span>
+           <span class="session-topic">{{ activeContact.remark || activeContact.name }}</span>
            <transition name="status-fade">
                <span v-if="isGenerating" class="typing-status">
                    &nbsp;正在输入<span class="dot-anim">...</span>
@@ -490,7 +490,7 @@ const handleSaveEdit = async (messageId, index, newContent) => {
             :themeOverride="'wechat'"
             :showSystemPrompt="false"
             :assistantAvatar="resolveAvatarSrc(activeContact.avatar, activeContact.id)"
-            :assistantName="activeContact.name"
+            :assistantName="activeContact.remark || activeContact.name"
             :initialScrollPos="chatStore.getSessionScroll(activeContact.id.toString())"
             :loadingMore="isLoadingMore"
             ref="messageListRef"

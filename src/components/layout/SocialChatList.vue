@@ -97,7 +97,7 @@ const selectChat = (chat) => {
         
         <div class="chat-info">
           <div class="chat-top">
-            <span class="name">{{ chat.contact.name }}</span>
+            <span class="name">{{ chat.contact.remark || chat.contact.name }}</span>
             <span class="time">{{ formatTime(chat.last_message_time) }}</span>
           </div>
           <div class="last-msg">{{ chat.last_message }}</div>

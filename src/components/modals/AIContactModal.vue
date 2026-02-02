@@ -24,6 +24,7 @@ const emit = defineEmits(['close', 'confirm']);
 
 const configStore = useConfigStore();
 const name = ref('');
+const remark = ref('');
 const avatar = ref('');
 const prompt = ref('');
 const model = ref('');
@@ -44,6 +45,7 @@ const presets = [
 const resetForm = () => {
     if (props.contact) {
         name.value = props.contact.name || '';
+        remark.value = props.contact.remark || '';
         avatar.value = props.contact.avatar || '';
         prompt.value = props.contact.prompt || '';
         model.value = props.contact.model || '';
@@ -59,6 +61,7 @@ const resetForm = () => {
         }
     } else {
         name.value = '';
+        remark.value = '';
         avatar.value = presets[0]; // 默认选中第一个
         prompt.value = '';
         model.value = configStore.settings.selectedModelId || '';
@@ -82,6 +85,7 @@ const handleConfirm = () => {
   if (name.value.trim()) {
     const contactData = {
       name: name.value.trim(),
+      remark: remark.value.trim() || null,
       avatar: avatar.value.trim(),
       prompt: prompt.value.trim(),
       model: model.value,
@@ -221,6 +225,11 @@ const handlePromptSelect = (content) => {
             <div class="form-group">
               <label>昵称</label>
               <input v-model="name" placeholder="为 AI 起个名字..." />
+            </div>
+
+            <div class="form-group">
+              <label>备注名</label>
+              <input v-model="remark" placeholder="设置备注名 (可选)..." />
             </div>
 
             <div class="form-group">

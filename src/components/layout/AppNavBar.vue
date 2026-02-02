@@ -186,7 +186,7 @@ const modules = [
 .avatar-placeholder {
   width: var(--user-avatar-size);
   height: var(--user-avatar-size);
-  background: var(--theme-color);
+  background: var(--color-primary);
   color: white;
   border-radius: var(--user-avatar-radius);
   display: flex;
@@ -225,7 +225,7 @@ const modules = [
 
 .nav-item.active {
   background: var(--bg-active);
-  color: var(--theme-color);
+  color: var(--color-primary);
   opacity: 1;
 }
 

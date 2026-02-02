@@ -190,7 +190,7 @@ const handleDelete = async () => {
                      <img v-if="contact.avatar" :src="resolveAvatarSrc(contact.avatar)" />
                  <div v-else class="avatar-placeholder-sm">{{ contact.name[0] }}</div>
               </div>
-              <div class="contact-name">{{ contact.name }}</div>
+              <div class="contact-name">{{ contact.remark || contact.name }}</div>
             </div>
           </div>
         </div>
@@ -211,7 +211,7 @@ const handleDelete = async () => {
                         <img v-if="contact.avatar" :src="resolveAvatarSrc(contact.avatar)" />
                      <div v-else class="avatar-placeholder-sm">{{ contact.name[0] }}</div>
                   </div>
-                  <div class="contact-name">{{ contact.name }}</div>
+                  <div class="contact-name">{{ contact.remark || contact.name }}</div>
                 </div>
             </div>
         </div>

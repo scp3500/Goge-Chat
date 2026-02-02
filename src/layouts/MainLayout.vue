@@ -37,8 +37,8 @@ const handleSelect = (contact) => {
 
 const handleContactSelect = (contact) => {
   handleSelect(contact);
-  // Jump to chat module when selecting a contact from the address book
-  emit('update:activeModule', 'chat');
+  // Jump to chat module is now handled by Profile page "Send Message" button
+  // emit('update:activeModule', 'chat'); 
 };
 
 const handleOpenProfile = () => {
@@ -113,7 +113,7 @@ const handleCloseSettings = () => {
         <div v-else class="chat-view-container">
           <Transition name="fade-up" mode="out-in">
             <div v-if="selectedContact" :key="selectedContact.id" class="chat-wrapper">
-               <slot :active-contact="selectedContact"></slot>
+               <slot :active-contact="selectedContact" :active-module="activeModule"></slot>
             </div>
             <div v-else class="social-placeholder">
                <div class="placeholder-icon" v-html="AI_EVO_SVG"></div>

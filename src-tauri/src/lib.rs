@@ -234,11 +234,14 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle();
 
-            // --- 1. 定位稳定数据目录 (AppData/Local) ---
-            let app_data_dir = app_handle
-                .path()
-                .app_local_data_dir()
-                .expect("无法获取 AppData 目录");
+            // --- 1. 定位“便携式”数据目录 (当前可执行文件同级目录下的 data) ---
+            let exe_path =
+                std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let exe_dir = exe_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."));
+            let app_data_dir = exe_dir.join("data");
+
             if !app_data_dir.exists() {
                 std::fs::create_dir_all(&app_data_dir).expect("无法创建数据目录");
             }
@@ -246,44 +249,23 @@ pub fn run() {
             let target_db_path = app_data_dir.join("goge.db");
             let target_social_db_path = app_data_dir.join("gole_social.db");
 
-            // --- 2. 增强型迁移逻辑 ---
-            // 策略：如果稳定目录不存在数据库，则按优先级搜索旧数据并搬迁
+            // --- 2. 迁移逻辑：如果 AppData 中有旧数据，则搬迁到此处 (可选，为了兼容性) ---
             if !target_db_path.exists() {
-                // A. 检查当前目录下的 "便携式" data 目录 (最近版本的临时位置)
-                let exe_path =
-                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
-                let exe_dir = exe_path
-                    .parent()
-                    .unwrap_or_else(|| std::path::Path::new("."));
-                let portable_db = exe_dir.join("data").join("goge.db");
-
-                if portable_db.exists() {
-                    println!("📦 [Migration] 从便携式目录迁移 goge.db -> AppData");
-                    let _ = std::fs::copy(&portable_db, &target_db_path);
-                } else {
-                    // B. 尝试从更早版本的 shell.db 或 alice_data.db 迁移
-                    let local_old_db = exe_dir.join("data").join("shell.db");
-                    if local_old_db.exists() {
-                        let _ = std::fs::copy(&local_old_db, &target_db_path);
-                    } else {
-                        let old_db_path = app_data_dir.join("alice_data.db");
-                        if old_db_path.exists() {
-                            let _ = std::fs::copy(&old_db_path, &target_db_path);
-                        }
+                if let Ok(old_data_dir) = app_handle.path().app_local_data_dir() {
+                    let old_db = old_data_dir.join("goge.db");
+                    if old_db.exists() {
+                        println!("📦 [Migration] 检测到 AppData 中的旧数据，正在搬迁至本地目录...");
+                        let _ = std::fs::copy(&old_db, &target_db_path);
                     }
                 }
             }
 
-            // 社交数据库同理迁移
             if !target_social_db_path.exists() {
-                let exe_path =
-                    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
-                let exe_dir = exe_path
-                    .parent()
-                    .unwrap_or_else(|| std::path::Path::new("."));
-                let portable_social_db = exe_dir.join("data").join("gole_social.db");
-                if portable_social_db.exists() {
-                    let _ = std::fs::copy(&portable_social_db, &target_social_db_path);
+                if let Ok(old_data_dir) = app_handle.path().app_local_data_dir() {
+                    let old_social_db = old_data_dir.join("gole_social.db");
+                    if old_social_db.exists() {
+                        let _ = std::fs::copy(&old_social_db, &target_social_db_path);
+                    }
                 }
             }
 
