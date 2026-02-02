@@ -1,4 +1,4 @@
-// src-tauri/src/lib.rs
+// Live2D logic moved to standalone project
 
 mod commands;
 mod db;

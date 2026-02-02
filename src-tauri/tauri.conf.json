@@ -12,6 +12,7 @@
     "app": {
         "windows": [
             {
+                "label": "main",
                 "title": "Goge Chat",
                 "width": 1000,
                 "height": 700,

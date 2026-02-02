@@ -1,0 +1,23 @@
+{
+    "name": "goge-live2d",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "tauri": "tauri"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2.0.0",
+        "@tauri-apps/plugin-opener": "^2.0.0",
+        "pixi-live2d-display": "^0.4.0",
+        "pixi.js": "^7.4.3"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.0.0",
+        "typescript": "^5.0.0",
+        "vite": "^5.0.0"
+    }
+}

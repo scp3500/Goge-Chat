@@ -11,6 +11,7 @@ import {
   HOME_SVG
 } from '../../constants/icons';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useConfigStore } from '../../stores/config';
 
 const resolveAvatarSrc = (path) => {
@@ -62,6 +63,8 @@ const modules = [
   { id: 'address_book', icon: NAV_ADDRESS_BOOK_SVG, label: '通讯录' },
 ];
 
+
+
 </script>
 
 <template>
@@ -93,6 +96,8 @@ const modules = [
     </div>
 
     <div class="nav-bottom">
+
+
       <button 
         class="nav-item theme-toggle" 
         @click="toggleTheme" 
