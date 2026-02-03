@@ -6,22 +6,34 @@
 
 ## 🏮 简体中文
 
-**Goge Chat** 是一款基于 **Tauri 2.0**、**Vue 3** 和 **Rust** 构建的现代化、高性能 AI 聊天客户端。它旨在提供极致的响应速度与“奢华级”的视觉体验，同时确保您的数据隐私始终处于本地管控之下。
+**Goge Chat：身边的本地化 AI 智能伙伴**
+
+Goge Chat 是一款以 **“本地优先”** 为核心理念的 AI 聊天客户端。在云端 AI 遍地的时代，我们更关注你的数据主权与私密性，通过优秀的本地架构，将高性能对话与持久化记忆带到你的桌面。
 
 ### ✨ 核心特性
 
-*   **💎 Inky Glass 视觉规范**：独创的高饱和度毛玻璃特效，模拟奢侈品级的物理通透感。
-*   **🎭 双态切换**：拥有“标准模式”与“社交模式（WeChat Style）”，兼顾沉浸式生产力与轻量化对话。
-*   **🌈 双槽主题引擎**：支持为深色/浅色模式独立配置子主题，从 *Nord*、*One Dark* 到 *Sakura*、*Cyberpunk*，一键切换。
-*   **📦 零云存储，本地优先**：聊天历史与配置参数通过 Rust 后端加密存储在本地，支持便携式使用。
-*   **⚙️ 深度调优**：内置提示词库、预设管理、模型切换，提供超越浏览器端的使用体验。
+#### 🔐 核心优势：全本地化与隐私安全
+*   **数据主权**：基于 **Rust + Tauri 2.0** 构建，你的所有聊天记录、提炼的记忆以及配置参数均 100% 存储于本地设备。
+*   **无云依赖**：不依赖任何第三方云端存储，确保你的隐私数据不会被上传或用于训练，实现真正的私密对话。
+*   **本地调优**：内置向量模型，所有的记忆检索与语义处理均在本地飞速运行，响应即时且稳定。
 
-### 🛠️ 技术架构
+#### 🎯 专属长期记忆，提升对话连贯性
+*   **静默提炼**：系统利用 **LanceDB** 向量数据库，在后台自动提炼对话中的关键信息（如偏好、习惯等）。
+*   **语义复用**：开启新会话时，AI 能自动唤回相关的历史背景，无需重复介绍，让交流如同老友重逢般自然。
 
--   **Frontend**: Vue 3 (Composition API) + Pinia + Vite
--   **Backend**: Rust + Tauri 2.0 (Mobile Ready)
--   **Storage**: Shared SQLite 核心 + Social Social DB
--   **Styling**: Vanilla CSS (CSS Variables Driven)
+#### 💎 均衡的视觉体验
+*   **设计语言**：采用精心调优的玻璃拟态（Glassmorphism）美学设计，配合细腻的流体动画，营造沉浸式且稳重的交互手感。
+*   **独立主题**：支持为明亮/深色模式独立配置子主题，完美契合不同光线环境下的视觉需求。
+
+#### 🔄 灵活的工作模式
+*   **标准模式**：简洁直观，适合专注的任务处理与长文对话。
+*   **社交模式**：参考常用通讯软件的逻辑，提供联系人分组管理，让 AI 沟通如同日常社交般轻松。
+
+### ️ 技术栈构成
+
+-   **Backend**: Rust (基于 memory_processor 的局部向量引擎, social_db 关系型管理)
+-   **Frontend**: Vue 3 + Pinia (通过 ConfigStore 实现多维度主题控制)
+-   **Core Storage**: Tauri 2.0 + SQLite + LanceDB
 
 ### 🚀 快速开始
 
@@ -42,51 +54,36 @@
 
 ## 🌐 English
 
-**Goge Chat** is a premium, high-performance AI chat client built with **Tauri 2.0**, **Vue 3**, and **Rust**. It combines lightning-fast responsiveness with a "Hyper-Premium" glassmorphism UI, ensuring your data remains private and local.
+**Goge Chat: A Local-First AI Companion Built for Privacy**
+
+Goge Chat is an AI desktop client rooted in the principle of **"Local-First"**. In an era of cloud-dominant AI, we prioritize your data sovereignty and privacy, bringing high-performance interaction and persistent memory directly to your local machine.
 
 ### ✨ Key Features
 
-*   **💎 Inky Glass Visuals**: Bespoke high-saturation blur effects and light refraction, delivering a premium "glass" tactile feel.
-*   **🎭 Dual-Mode Layout**: Toggle between "Standard Mode" (Classic) and "Social Mode" (IM-style), optimized for both focus and casual chat.
-*   **🌈 Dual-Slot Theme Engine**: Configure independent themes for Dark and Light modes (e.g., *Cyberpunk* for night, *Sakura* for day).
-*   **📦 Local-First Persistence**: Powered by Rust & SQLite, all your data is stored offline. No cloud, no tracking.
-*   **⚙️ Power-User Tools**: Built-in prompt library, system instruction presets, and instant model switching.
+*   **🔐 Core Advantage: Local-First & Privacy**: Built with **Rust & Tauri 2.0**, all your data—chats, memories, and settings—stays 100% on your device. No cloud storage, no tracking, total control.
+*   **🎯 Persistent Local Memory**: Leverages **LanceDB** to silently distill and retrieve context from past interactions locally. AI that understands you better over time without ever compromising your data.
+*   **💎 Refined Visual Aesthetics**: A professional implementation of glassmorphism with smooth animations, offering an elegant and immersive user experience.
+*   **🌈 Dual-Slot Theme Engine**: Truly independent theme configurations for Light and Dark modes to suit any environment.
+*   **🎭 Flexible Layouts**: Toggle between a productivity-focused **Standard Mode** and a familiar, IM-style **Social Mode** for managing personal AI contacts.
 
 ### 🏗️ Technical Stack
 
--   **UI Layer**: Vue 3 / Vite / Pinia
--   **Core Engine**: Rust (Tauri 2.0)
--   **Database**: Dual SQLite architecture (Core + Social)
--   **Aesthetics**: 100% Theme-variable driven CSS
-
-### 🏎️ Development
-
-1.  **Dependencies**
-    ```bash
-    npm install
-    ```
-2.  **Dev Mode**
-    ```bash
-    npm run tauri dev
-    ```
-3.  **Build Production**
-    ```bash
-    npm run tauri build
-    ```
+-   **Frontend**: Vue 3 / Vite / Pinia
+-   **Backend**: Rust (Tauri 2.0)
+-   **Storage**: Hybrid system—SQLite for relational data and LanceDB for vector-based local memory.
 
 ---
 
 ## 📂 项目结构 | Structure
 
 ```text
-├── src/               # Vue Frontend
-│   ├── assets/        # Styles (Manifesto), icons, prompts
-│   ├── components/    # Reusable UI islands
-│   ├── layouts/       # Mode-specific layouts (Standard/Main)
-│   └── stores/        # Pinia state management
-├── src-tauri/         # Rust Backend
-│   └── src/           # Commands, DB logic, app entry
-└── data/              # Local storage (Generated at runtime)
+├── src/               # UI Layer & Layouts
+│   ├── assets/        # Styles, Icons, Prompt Assets
+│   └── stores/        # Configuration & Theme Engine
+├── src-tauri/         # Core Logic (Rust)
+│   ├── src/memory/    # Local memory processing
+│   └── src/social_db.rs # Social data management
+└── data/              # Local data storage
 ```
 
 ---

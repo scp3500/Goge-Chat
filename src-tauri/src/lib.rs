@@ -167,6 +167,9 @@ pub fn run() {
             commands::memory_cmd::seed_memories,
             commands::memory_cmd::optimize_memories,
             memory_commands::trigger_fact_sync,
+            memory_commands::diagnose_database,
+            memory_commands::force_cleanup_database,
+            memory_commands::rebuild_database,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

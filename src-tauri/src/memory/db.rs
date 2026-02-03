@@ -9,6 +9,7 @@ use futures_util::TryStreamExt;
 use lancedb::query::ExecutableQuery as _;
 use lancedb::table::OptimizeAction;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tauri::AppHandle;
 
@@ -19,6 +20,16 @@ pub struct FactRecord {
     pub mode: String,
     pub role_id: String,
     pub metadata: String, // JSON string: { is_instruction, timestamp }
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct DatabaseDiagnostic {
+    pub total_records: usize,
+    pub records_by_role: HashMap<String, usize>,
+    pub records_by_mode: HashMap<String, usize>,
+    pub duplicate_count: usize,
+    pub oldest_timestamp: Option<i64>,
+    pub newest_timestamp: Option<i64>,
 }
 
 pub struct LanceDbManager {
@@ -360,16 +371,53 @@ impl LanceDbManager {
             .await
             .map_err(|e| e.to_string())?;
 
-        // 直接一行搞定所有任务：合并碎片 + 清理过时数据
+        // 使用 All 进行全面优化（包含压缩）
         table
             .optimize(OptimizeAction::All)
             .await
             .map_err(|e| e.to_string())?;
 
         let duration = start.elapsed();
-        if duration.as_millis() > 500 {
-            println!("⏱️ [数据库] 深度优化完成，耗时: {:?}", duration);
+        if duration.as_millis() > 200 {
+            println!("⏱️ [数据库] 优化完成，耗时: {:?}", duration);
         }
         Ok(())
+    }
+
+    pub async fn get_diagnostic(&self) -> Result<DatabaseDiagnostic, String> {
+        let memories = self.get_all_memories().await?;
+
+        let mut role_count = HashMap::new();
+        let mut mode_count = HashMap::new();
+        let mut id_set = HashSet::new();
+        let mut duplicates = 0;
+        let mut timestamps = Vec::new();
+
+        for mem in &memories {
+            *role_count.entry(mem.role_id.clone()).or_insert(0) += 1;
+            *mode_count.entry(mem.mode.clone()).or_insert(0) += 1;
+
+            if !id_set.insert(mem.id.clone()) {
+                duplicates += 1;
+            }
+
+            // 解析 metadata 中的 timestamp
+            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&mem.metadata) {
+                if let Some(ts) = meta.get("timestamp").and_then(|v| v.as_i64()) {
+                    timestamps.push(ts);
+                }
+            }
+        }
+
+        timestamps.sort();
+
+        Ok(DatabaseDiagnostic {
+            total_records: memories.len(),
+            records_by_role: role_count,
+            records_by_mode: mode_count,
+            duplicate_count: duplicates,
+            oldest_timestamp: timestamps.first().cloned(),
+            newest_timestamp: timestamps.last().cloned(),
+        })
     }
 }

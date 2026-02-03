@@ -8,6 +8,7 @@ import { PLUS_SVG } from '../../constants/icons';
 import { resolveSocialAvatar } from '../../utils/social';
 import ImageCropperModal from './ImageCropperModal.vue';
 import { readFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core'; // Ensure invoke is imported
 
 const resolveAvatarSrc = resolveSocialAvatar; // 💡 Re-use centralized logic
 
@@ -29,6 +30,10 @@ const avatar = ref('');
 const prompt = ref('');
 const model = ref('');
 const provider = ref('');
+
+// 🛠️ Database Maintenance State
+const isDevelopmentMode = ref(import.meta.env.DEV);
+const diagnosticReport = ref('');
 
 // Cropper State
 const showCropper = ref(false);
@@ -172,6 +177,58 @@ const handlePromptSelect = (content) => {
         prompt.value = content;
     }
 };
+
+// 🛠️ Maintenance Methods
+async function diagnoseDatabaseIssue() {
+  try {
+    const report = await invoke('diagnose_database');
+    // Format the structured report
+    diagnosticReport.value = JSON.stringify(report, null, 2);
+    console.log('诊断报告:', report);
+  } catch (error) {
+    console.error('诊断失败:', error);
+    alert(`诊断失败: ${error}`);
+  }
+}
+
+async function forceCleanup() {
+  if (!confirm('确定要执行强制清理吗？\n这会压缩数据库并清理已删除的记录。')) {
+    return;
+  }
+  
+  try {
+    const result = await invoke('force_cleanup_database');
+    alert(result);
+    // Refresh diagnostic report
+    await diagnoseDatabaseIssue();
+  } catch (error) {
+    console.error('清理失败:', error);
+    alert(`清理失败: ${error}`);
+  }
+}
+
+async function rebuildDatabase() {
+  if (!confirm('⚠️ 警告：这将清空所有记忆数据！\n确定要继续吗？')) {
+    return;
+  }
+  
+  const confirmCode = prompt('请输入确认码 "REBUILD" 以继续:');
+  if (confirmCode !== 'REBUILD') {
+    alert('操作已取消');
+    return;
+  }
+  
+  try {
+    const result = await invoke('rebuild_database', { confirmationCode: confirmCode });
+    alert(result);
+    diagnosticReport.value = '';
+    // Refresh the whole UI to clear any stale data
+    location.reload();
+  } catch (error) {
+    console.error('重建失败:', error);
+    alert(`重建失败: ${error}`);
+  }
+}
 </script>
 
 <template>
@@ -259,6 +316,31 @@ const handlePromptSelect = (content) => {
                 rows="6" 
                 placeholder="定义这个 AI 的性格和职责..."
               ></textarea>
+            </div>
+
+            <!-- 🛠️ Database Maintenance Section (Dev Mode Only) -->
+            <div class="database-maintenance" v-if="isDevelopmentMode">
+              <div class="maintenance-header">
+                <h4>🛠️ 数据库维护工具</h4>
+                <span class="debug-badge">DEBUG</span>
+              </div>
+              
+              <div class="maintenance-actions">
+                <button @click="diagnoseDatabaseIssue" class="btn-diagnose">
+                  📊 诊断
+                </button>
+                <button @click="forceCleanup" class="btn-cleanup">
+                  🧹 强制清理
+                </button>
+                <button @click="rebuildDatabase" class="btn-rebuild danger">
+                  ⚠️ 重建数据库
+                </button>
+              </div>
+              
+              <!-- 诊断结果显示区 -->
+              <div v-if="diagnosticReport" class="diagnostic-report modern-scroll">
+                <pre>{{ diagnosticReport }}</pre>
+              </div>
             </div>
         </div>
         
@@ -542,4 +624,88 @@ const handlePromptSelect = (content) => {
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+
+/* 🛠️ Maintenance Styles */
+.database-maintenance {
+  margin-top: 10px;
+  padding: 16px;
+  border: 1.5px dashed var(--color-danger-alpha-30);
+  border-radius: 14px;
+  background: var(--color-danger-alpha-5);
+}
+
+.maintenance-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.maintenance-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.debug-badge {
+  background: var(--color-danger);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.maintenance-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.maintenance-actions button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  color: white;
+}
+
+.btn-diagnose {
+  background: #4dabf7;
+}
+
+.btn-cleanup {
+  background: #51cf66;
+}
+
+.btn-rebuild {
+  background: var(--color-danger);
+}
+
+.maintenance-actions button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.diagnostic-report {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-input-dim);
+  border-radius: 10px;
+  border: 1px solid var(--border-glass-bright);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.diagnostic-report pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
 </style>
