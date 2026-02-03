@@ -16,6 +16,7 @@ const props = defineProps({
   activeContact: { type: Object, default: null }
 });
 
+const emit = defineEmits(['select']);
 const chatStore = useChatStore();
 const uiStore = useUIStore();
 const sessions = ref([]);
@@ -137,6 +138,7 @@ const formatTime = (timeStr) => {
 const selectSession = (session) => {
   if (editingSessionId.value === session.id) return;
   chatStore.updateSocialSessionId(session.id);
+  emit('select', session);
 };
 
 // Reload when contact changes or title is auto-updated

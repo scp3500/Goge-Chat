@@ -5,6 +5,7 @@ import type { ChatSession } from '../../api/chat';
 import type { PausedChunks } from './state';
 import { useConfigStore } from '../config';
 import { DEFAULT_SYSTEM_PROMPT } from '../../constants/prompts';
+import { Logger } from '../../utils/logger';
 
 interface MessageState {
     activeId: Ref<string | null>;
@@ -122,6 +123,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         isLoading.value = true;
         try {
             const history = await invoke<any[]>("get_messages", { sessionId });
+            /*
             console.log("📥 Frontend received messages:", {
                 count: history?.length || 0,
                 messages: history?.map(m => ({
@@ -131,6 +133,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     reasoningLen: m.reasoningContent?.length || 0
                 }))
             });
+            */
 
             // 只在确认是当前会话时才更新消息
             if (activeId.value === sessionId) {
@@ -143,7 +146,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
 
                 // 🛡️ 智能合并：如果当前正在生成消息，将正在生成的临时消息追加到历史记录后
                 if (isGenerating.value && generatingSessionId.value === sessionId && tempGeneratedMessage.value) {
-                    console.log(" [loadMessages] Merging active generation into history");
+                    // console.log(" [loadMessages] Merging active generation into history");
                     newMessages.push({
                         role: "assistant", // 确保是 assistant
                         model: configStore.settings.selectedModelId,
@@ -199,11 +202,13 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
     };
 
     const saveAssistantResponse = async (sessionId: string, content: string, reasoningContent: string | null, fileMetadata: string | null = null, searchMetadata: string | null = null) => {
+        /*
         console.log("💾 [SAVE] === START SAVING ===");
         console.log("💾 [SAVE] Content length:", content.length);
         console.log("💾 [SAVE] Reasoning content length:", reasoningContent?.length || 0);
         console.log("💾 [SAVE] File metadata:", fileMetadata);
         console.log("💾 [SAVE] Search metadata:", searchMetadata);
+        */
 
         const saveParams = {
             sessionId,
@@ -216,8 +221,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             searchMetadata
         };
 
-        console.log("💾 [SAVE] saveParams:", JSON.stringify(saveParams, null, 2));
-        console.log("💾 [SAVE] Invoking save_message...");
+        // console.log("💾 [SAVE] saveParams:", JSON.stringify(saveParams, null, 2));
+        // console.log("💾 [SAVE] Invoking save_message...");
         const msgId = await invoke<number>("save_message", saveParams);
 
         // 更新本地消息的 ID
@@ -226,8 +231,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             lastMsg.id = msgId;
             lastMsg.model = configStore.settings.selectedModelId;
         }
-        console.log("💾 [SAVE] save_message completed");
-        console.log("💾 [SAVE] === END SAVING ===");
+        // console.log("💾 [SAVE] save_message completed");
+        // console.log("💾 [SAVE] === END SAVING ===");
     };
 
     /**
@@ -276,7 +281,23 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         if (!activeId.value || isGenerating.value) return;
         if (!isRegeneratingFromHistory && !text.trim()) return;
 
+        const startTime = Date.now();
+        Logger.stage('Chat Sequence Started');
+
         const sessionId = activeId.value;
+        const currentMode = configStore.settings.chatMode?.enabled ? "Social" : "Standard";
+
+        // Log Context
+        Logger.context({
+            'Session ID': sessionId,
+            'Mode': currentMode,
+            'Model': configStore.settings.selectedModelId,
+            'Provider': configStore.settings.defaultProviderId,
+            'Reasoning': useReasoning.value,
+            'Search': useSearch.value,
+            'Regenerating': isRegeneratingFromHistory
+        });
+
         isGenerating.value = true;
 
         // 设置正在生成消息的会话 ID 并清空之前的缓存
@@ -313,19 +334,23 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             }
 
             // 添加加载中的助手消息
-            console.log("🤖 [sendMessage] Creating assistant message with model:", configStore.settings.selectedModelId);
             currentMessages.value.push({
                 role: "assistant",
                 model: configStore.settings.selectedModelId,
-                providerId: configStore.settings.defaultProviderId, // 🟢 Fix: Store provider ID explicitly
+                providerId: configStore.settings.defaultProviderId,
                 content: '__LOADING__',
                 reasoningContent: '',
                 fileMetadata: null,
                 searchMetadata: null
             });
 
+            Logger.info('Step: User message saved and UI updated');
+
             const onEvent = new Channel<string>();
             let aiFullContent = '';
+            let ttft = 0; // Time to first token
+            let searchStartTime = 0;
+            let memoryStartTime = 0;
 
             // 监听搜索状态事件
             const unlistenSearch = await listen('search-status', (event: any) => {
@@ -333,18 +358,40 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
                 if (payload.status === 'searching') {
+                    searchStartTime = Date.now();
+                    Logger.info(`Searching: ${payload.query}`);
                     lastMsg.searchStatus = 'searching';
                     lastMsg.searchQuery = payload.query;
                 } else if (payload.status === 'done') {
+                    const searchDuration = Date.now() - searchStartTime;
+                    Logger.success('Search completed', searchDuration, { results: payload.results?.length });
                     lastMsg.searchStatus = 'done';
                     lastMsg.searchMetadata = JSON.stringify(payload.results);
                 } else if (payload.status === 'error') {
+                    Logger.error('Search failed', payload.message);
                     lastMsg.searchStatus = 'error';
+                }
+            });
+
+            // 监听记忆检索事件
+            const unlistenMemory = await listen('memory-status', (event: any) => {
+                const payload = event.payload;
+                if (payload.status === 'searching') {
+                    memoryStartTime = Date.now();
+                    Logger.info('Retrieving memory context...');
+                } else if (payload.status === 'done') {
+                    const memoryDuration = Date.now() - memoryStartTime;
+                    Logger.success('Memory retrieval completed', memoryDuration, { hasContext: payload.has_context });
                 }
             });
 
             onEvent.onmessage = (data) => {
                 if (!isGenerating.value) return;
+
+                if (ttft === 0 && (data.startsWith("c:") || data.startsWith("r:"))) {
+                    ttft = Date.now() - startTime;
+                    Logger.timing('Time to First Token (TTFT)', ttft);
+                }
 
                 // 只要是当前会话就更新（不管视图是否隐藏）
                 const isCurrentSession = activeId.value === generatingSessionId.value;
@@ -378,9 +425,9 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                         lastMsg.reasoningContent += content;
                     }
                 } else if (data.startsWith("data: ")) {
-                    console.log(`🧠 [DEBUG] Raw data event: ${data.substring(0, 50)}...`);
+                    // console.log(`🧠 [DEBUG] Raw data event: ${data.substring(0, 50)}...`);
                 } else {
-                    console.log(`🧠 [DEBUG] Unknown event prefix: ${data.substring(0, 10)}`);
+                    // console.log(`🧠 [DEBUG] Unknown event prefix: ${data.substring(0, 10)}`);
                 }
             };
 
@@ -390,7 +437,9 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 content: m.content,
                 reasoningContent: m.reasoningContent,
                 fileMetadata: m.fileMetadata,
-                searchMetadata: m.searchMetadata
+                searchMetadata: m.searchMetadata,
+                mode: currentMode,
+                roleId: "default"
             }));
 
             // 获取当前预设
@@ -416,7 +465,9 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     content: finalSystemPrompt,
                     reasoningContent: null,
                     fileMetadata: null,
-                    searchMetadata: null
+                    searchMetadata: null,
+                    mode: currentMode,
+                    roleId: "default"
                 });
             } else if (msgsToSend.length > 0 && msgsToSend[0].role === 'system') {
                 msgsToSend[0].content = finalSystemPrompt;
@@ -432,7 +483,9 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                         content: sessionSpecificPrompt,
                         reasoningContent: null,
                         fileMetadata: null,
-                        searchMetadata: null
+                        searchMetadata: null,
+                        mode: currentMode,
+                        roleId: "default"
                     });
                 } else {
                     console.log('🧠 [DEBUG] Updating existing system prompt with session specific:', sessionSpecificPrompt);
@@ -495,11 +548,12 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                     }
                 }
             } finally {
-
                 unlistenSearch();
+                unlistenMemory();
             }
 
-            console.log("🧠 [FINAL] AI generation completed");
+            const totalDuration = Date.now() - startTime;
+            Logger.success('AI generation completed', totalDuration);
 
             // 获取最后一条消息的深度思考内容
             const lastMsg = currentMessages.value[currentMessages.value.length - 1];

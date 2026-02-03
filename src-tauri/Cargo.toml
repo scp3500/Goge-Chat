@@ -34,3 +34,16 @@ scraper = "0.19.0"
 regex = "1"
 base64 = "0.22.1"
 tauri-plugin-fs = "2.4.5"
+uuid = { version = "1.0", features = ["v4"] }
+
+# --- Alice Memory Engine Dependencies ---
+lancedb = "0.15"
+candle-core = "0.8"
+candle-nn = "0.8"
+candle-transformers = "0.8"
+tokenizers = "0.21"
+arrow-array = "53"
+arrow-schema = "53"
+half = { version = "2.4", features = ["num-traits"] }
+byteorder = "1.5"
+chrono = { version = "0.4", features = ["serde"] }

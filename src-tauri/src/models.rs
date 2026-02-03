@@ -28,6 +28,12 @@ pub struct Message {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "roleId")]
+    #[serde(alias = "role_id")]
+    pub role_id: Option<String>,
 }
 
 /// AI 请求封装

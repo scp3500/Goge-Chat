@@ -85,7 +85,7 @@ pub async fn upload_user_avatar(
 #[tauri::command]
 pub async fn read_file_base64(path: String) -> Result<String, String> {
     use base64::{engine::general_purpose, Engine as _};
-    println!("📖 Rust: Reading binary file to base64: {}", path);
+
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     Ok(general_purpose::STANDARD.encode(bytes))
 }

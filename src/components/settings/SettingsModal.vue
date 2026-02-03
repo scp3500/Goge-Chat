@@ -12,6 +12,7 @@ import AppearanceConfig from './AppearanceConfig.vue';
 import GeneralConfig from './GeneralConfig.vue';
 import ChatModeConfig from './ChatModeConfig.vue';
 import ProfileConfig from './ProfileConfig.vue';
+import DataConfig from './DataConfig.vue';
 
 
 // 使用 composables
@@ -259,6 +260,11 @@ const handleClose = () => {
         <!-- 通用设置 -->
         <GeneralConfig
           v-else-if="settingsStore.activeCategory === 'general'"
+        />
+
+        <!-- 数据/记忆管理 -->
+        <DataConfig
+            v-else-if="settingsStore.activeCategory === 'data'"
         />
 
         <!-- 占位符 -->

@@ -163,15 +163,13 @@ pub fn get_messages(session_id: String, state: State<DbState>) -> Result<Vec<Mes
                 reasoning_content: cm.reasoning_content,
                 file_metadata: cm.file_metadata,
                 search_metadata: cm.search_metadata,
-                provider: cm.provider, // 🟢 Fix: Add missing provider field
+                provider: cm.provider,
+                mode: Some("Standard".into()),
+                role_id: Some("Global".into()),
             }
         })
         .collect();
-    println!("📊 Total messages loaded: {}", messages.len());
-    println!(
-        "📊 First message reasoning content: {:?}",
-        messages.first().and_then(|m| m.reasoning_content.as_ref())
-    );
+
     Ok(messages)
 }
 

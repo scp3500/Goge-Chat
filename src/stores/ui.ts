@@ -26,7 +26,6 @@ export const useUIStore = defineStore('ui', () => {
      * @param id 菜单 ID，传 null 则关闭所有菜单
      */
     const setActiveMenu = (id: string | null) => {
-        console.log('🖥️ UI Store: setActiveMenu', id);
         activeMenuId.value = id;
     };
 
@@ -40,7 +39,6 @@ export const useUIStore = defineStore('ui', () => {
         } else {
             activeMenuId.value = id;
         }
-        console.log('🖥️ UI Store: toggleMenu', id, '->', activeMenuId.value);
     };
 
     /**

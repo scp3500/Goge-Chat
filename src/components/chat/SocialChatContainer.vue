@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { useConfigStore } from "../../stores/config";
 import { useChatStore } from "../../stores/chat";
@@ -175,35 +175,118 @@ const initSessions = async (contactId) => {
   }
 };
 
-watch(() => props.activeContact?.id, async (newId) => {
-  if (newId) {
-    // 1. Init Session first
-    await initSessions(newId);
-    // 2. Then load messages
-    await loadMessages(newId);
-  }
-}, { immediate: true });
+// 🧠 记忆同步控制器 (Memory Sync Controller)
+const activeSyncSessions = new Set();
+const hasNewMessages = ref(false); // 追踪当前会话是否产生了新交互
 
-// Watch for session changes (clicked in sidebar)
-watch(() => chatStore.activeSocialSessionId, async (newSid) => {
-  if (newSid && props.activeContact?.id) {
-    // 🔄 Touch session to update its accessed time
-    try {
-        await invoke("touch_social_session", { id: newSid });
-    } catch (e) {
-        console.warn("Failed to touch session:", e);
+const syncCurrentMemoryOnLeave = async (contactSnapshot, sessionId) => {
+    if (!contactSnapshot || !sessionId) return;
+    
+    // 🛡️ [限制修复]：如果当前会话没有产生任何新消息，则跳过同步，避免垃圾提取
+    if (!hasNewMessages.value) {
+        console.log(`[Memory] 会话 ${sessionId} 无新交互，跳过结算`);
+        return;
     }
     
-    // Update title
-    try {
-        const sessions = await invoke("get_social_sessions", { contactId: props.activeContact.id });
-        const s = sessions.find(x => x.id === newSid);
-        if (s) activeSessionTitle.value = s.title;
-    } catch(e) {}
+    // 如果该会话已经在同步中，不要重复触发
+    if (activeSyncSessions.has(sessionId)) return;
     
-    await loadMessages(props.activeContact.id);
-  }
+    activeSyncSessions.add(sessionId);
+    try {
+        const strRoleId = String(contactSnapshot.id);
+        const intSessionId = parseInt(sessionId, 10);
+        
+        console.warn(`🚀 [Memory] 正在执行结算同步 | 角色: ${contactSnapshot.name} (ID: ${strRoleId}) | 会话: ${intSessionId}`);
+        
+        await invoke("trigger_fact_sync", {
+            sessionId: intSessionId,
+            roleId: strRoleId,
+            mode: "Social"
+        });
+        
+        console.log(`✅ [Memory] 同步请求已确认`);
+    } catch (e) {
+        console.error(`❌ [Memory] 同步异常:`, e);
+    } finally {
+        activeSyncSessions.delete(sessionId);
+    }
+};
+
+// 追踪“当前正处于稳定状态”的上下文
+let lastActiveContext = { contact: null, sessionId: null };
+
+// --- 核心逻辑：统一离场监控 ---
+
+// 1. 组件初始化/销毁钩子
+onMounted(() => {
+    console.log("🟢 [SocialChat] 进入聊天容器");
+    // 🛡️ 修复：不要在这里立即快照，否则 SID 变化前会锁定错误的上下文
 });
+
+onUnmounted(() => {
+    console.log("🚪 [SocialChat] 离开聊天容器，执行最后结算...");
+    if (lastActiveContext.contact && lastActiveContext.sessionId) {
+        syncCurrentMemoryOnLeave(lastActiveContext.contact, lastActiveContext.sessionId);
+    }
+});
+
+// 2. 深度监控上下文变换：角色 ID 或 会话 ID 任何一个变了，都视为“切换”
+watch(
+  () => ({
+    cid: props.activeContact?.id,
+    sid: chatStore.activeSocialSessionId
+  }),
+  async (newCtx, oldCtx) => {
+    // A. 如果 oldCtx 有值，说明是从一个有效会话“切出来”的，触发结算
+    if (oldCtx?.cid && oldCtx?.sid) {
+        // 🛡️ 核心修复：确保同步时使用“离开那一瞬间”的旧快照 ID 和 旧 Context 
+        if (lastActiveContext.contact && String(lastActiveContext.contact.id) === String(oldCtx.cid)) {
+            console.log(`📤 [Sync-Trigger] 正在离开角色: ${lastActiveContext.contact.name} (SID: ${oldCtx.sid})`);
+            syncCurrentMemoryOnLeave(lastActiveContext.contact, oldCtx.sid);
+            lastActiveContext.sessionId = null; 
+        }
+    }
+
+    // B. 处理“新进入”的逻辑
+    if (newCtx.cid) {
+      if (newCtx.cid !== oldCtx?.cid) {
+          // Case 1: 角色变了，需要先拉取该角色的会话列表，再决定打开哪个 SID
+          console.log(`📥 [Context] 角色变更为: ${newCtx.cid}, 初始化会话...`);
+          await initSessions(newCtx.cid);
+          // 🚀 [核心修复]：不再 return，确保即便 Session ID 没变也会继续向下执行加载逻辑
+      }
+      
+      // Case 2: 角色没变，但 Session ID 变了 (或者刚初始化完)
+      // 继续向下执行加载逻辑，不要 return
+      console.log(`📥 [Context] 确认上下文: ${newCtx.cid} | Session: ${newCtx.sid}`);
+      
+      // 更新当前的稳定上下文快照，标记当前为“可信且对齐”的聊天状态
+      lastActiveContext = {
+          contact: { ...props.activeContact },
+          sessionId: chatStore.activeSocialSessionId
+      };
+      
+      hasNewMessages.value = false; // 🔄 重置新消息标志位，进入新上下文
+      
+      console.log(`🎯 [Context] 上下文锁定: ${lastActiveContext.contact.name} | Session: ${lastActiveContext.sessionId}`);
+      
+      // 更新 UI (标题和消息)
+      try {
+          const sessions = await invoke("get_social_sessions", { contactId: newCtx.cid });
+          const target = sessions.find(s => s.id === chatStore.activeSocialSessionId);
+          if (target) activeSessionTitle.value = target.title;
+          
+          await invoke("touch_social_session", { id: chatStore.activeSocialSessionId });
+      } catch(e) {}
+      
+      await loadMessages(newCtx.cid);
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// 🚀 Software Init Sync removed to prevent ghost memory resurrection
+// Only sync on actual deliberate 'leave' actions now.
 
 const triggerAIRequest = async (targetMessage = null) => {
   if (isGenerating.value) return;
@@ -270,7 +353,9 @@ const triggerAIRequest = async (targetMessage = null) => {
     const msgIndex = messages.value.indexOf(assistantMsg);
     const history = messages.value.slice(0, msgIndex).map(m => ({
         role: m.role,
-        content: m.content
+        content: m.content,
+        mode: "Social",
+        role_id: String(props.activeContact.id) // 修正：统一使用 snake_case 并保持 ID 归属
     }));
 
     // Add system prompt using REFRESHED data
@@ -348,6 +433,7 @@ const handleSend = async (text, fileMetadata = null) => {
       fileMetadata, // ✨ Support files
       created_at: new Date().toISOString().replace('T', ' ').replace('Z', '') 
     });
+    hasNewMessages.value = true; // ✍️ 标记产生了新交互
     triggerScroll('smooth'); // 🌊 Smooth scroll for user action
 
     // 2. Trigger AI
@@ -438,33 +524,28 @@ const handleRegenerate = async (messageId, index) => {
     const targetMsg = messages.value[index];
     if (!targetMsg || targetMsg.role !== 'assistant') return;
 
-    // Fixed: Do NOT delete subsequent messages as requested by user.
     // Instead, just regenerate THIS specific message in place.
+    hasNewMessages.value = true;
     await triggerAIRequest(targetMsg);
 };
 
-const handleSaveEdit = async (messageId, index, newContent) => {
+const emit = defineEmits(['show-profile']);
+
+const handleSaveEdit = async (messageId, index, content) => {
     try {
-        await invoke("update_social_message", { id: messageId, content: newContent });
-        
-        // Update local state
-        const msg = messages.value[index];
+        await invoke("update_social_message", { id: messageId, content });
+        const msg = messages.value.find(m => m.id === messageId);
         if (msg) {
-            msg.content = newContent;
-            
-            // If it's a user message, we usually want to regenerate the following assistant response
-            if (msg.role === 'user') {
-                if (index < messages.value.length - 1) {
-                    const nextMsg = messages.value[index + 1];
-                    if (nextMsg.role === 'assistant') {
-                        await triggerAIRequest(nextMsg);
-                    }
-                }
-            }
+            msg.content = content;
+            hasNewMessages.value = true;
         }
     } catch (e) {
         console.error("Save edit failed:", e);
     }
+};
+
+const handleAvatarClick = () => {
+    emit('show-profile');
 };
 </script>
 
@@ -498,6 +579,7 @@ const handleSaveEdit = async (messageId, index, newContent) => {
             @regenerate="handleRegenerate"
             @save-edit="handleSaveEdit"
             @load-more="loadMoreMessages"
+            @avatar-click="handleAvatarClick"
           />
         </Transition>
     </div>

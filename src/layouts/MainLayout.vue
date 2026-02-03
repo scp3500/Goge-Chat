@@ -46,19 +46,49 @@ const handleOpenProfile = () => {
   chatStore.setChatViewActive(false);
 };
 
+const handleSessionSelect = (session) => {
+    // 0. Update contact first to ensure context is correct
+    if (session.contact_id && (!selectedContact.value || selectedContact.value.id !== session.contact_id)) {
+        chatStore.updateSocialContactId(session.contact_id);
+    }
+    
+    // 1. If we are in another module (like address_book), switch back to chat
+    if (props.activeModule !== 'chat') {
+        emit('update:activeModule', 'chat');
+    }
+
+    // 2. ⚡️ Core Fix: If settings modal is open, close it to reveal the chat/messages
+    if (settingsStore.isModalOpen) {
+        settingsStore.closeSettings();
+        chatStore.setChatViewActive(true);
+    }
+    
+    // 3. Update session ID (Sidebar also does this, but we force it here to be sure)
+    chatStore.updateSocialSessionId(session.id);
+};
+
 // 🔄 Reactive contact resolution
 const refreshContact = async () => {
-    if (chatStore.activeSocialContactId) {
-        try {
+    try {
+        if (chatStore.activeSocialContactId) {
             const contacts = await invoke("get_social_contacts");
             const found = contacts.find(c => c.id === chatStore.activeSocialContactId);
             if (found) {
                 selectedContact.value = found;
-                console.log("📍 [REFRESH] Updated active contact data:", found.name, "Provider:", found.provider);
+                console.log("📍 [REFRESH] Restored active contact:", found.name);
             }
-        } catch (e) {
-            console.error("Failed to refresh contact:", e);
+        } else {
+            // 💡 [Initial Fallback]: If no persisted ID, pick the one with the latest message
+            const recentChats = await invoke("get_recent_social_chats");
+            if (recentChats && recentChats.length > 0) {
+                const latest = recentChats[0].contact;
+                selectedContact.value = latest;
+                chatStore.updateSocialContactId(latest.id);
+                console.log("📍 [REFRESH] No persisted contact, auto-selected latest:", latest.name);
+            }
         }
+    } catch (e) {
+        console.error("Failed to refresh contact:", e);
     }
 };
 
@@ -98,6 +128,7 @@ const handleCloseSettings = () => {
     <div class="history-sidebar-container" :class="{ 'is-open': isHistoryOpen }">
       <SocialHistorySidebar 
         :active-contact="selectedContact"
+        @select="handleSessionSelect"
       />
     </div>
 

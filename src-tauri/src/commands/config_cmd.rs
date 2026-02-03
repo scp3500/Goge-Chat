@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{path::BaseDirectory, AppHandle, Manager};
+use tauri::AppHandle;
 
 // ==================================================================================
 // core data structures
@@ -398,41 +398,22 @@ impl Default for AppConfig {
 // logic
 // ==================================================================================
 
-/// Resolves the config directory. Priority: Stable AppConfig > Portable EXE/config
-pub fn resolve_config_dir(app: &AppHandle) -> PathBuf {
-    let stable_config_dir = app
-        .path()
-        .app_config_dir()
-        .expect("无法获取 AppConfig 目录");
+/// Resolves the config directory. Priority: Portable EXE/data/config > Stable AppConfig
+pub fn resolve_config_dir(_app: &AppHandle) -> PathBuf {
+    // --- 1. 定位“便携式”数据目录 ---
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
+    let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
+    let portable_config_dir = exe_dir.join("data").join("config");
 
-    // 如果稳定目录不存在 settings.json，但 EXE 同级存在 config/settings.json，则执行一次性搬迁
-    if !stable_config_dir.join("settings.json").exists() {
-        let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
-        let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
-        let portable_config_dir = exe_dir.join("config");
-
-        if portable_config_dir.join("settings.json").exists() {
-            println!("📦 [Migration] 检测到便携式配置，正在搬迁至稳定目录...");
-            let _ = fs::create_dir_all(&stable_config_dir);
-
-            let files = [
-                "settings.json",
-                "providers.json",
-                "presets.json",
-                "prompts.json",
-                "secrets.json",
-            ];
-            for file in files {
-                let src = portable_config_dir.join(file);
-                let dst = stable_config_dir.join(file);
-                if src.exists() {
-                    let _ = fs::copy(src, dst);
-                }
-            }
-        }
+    if !portable_config_dir.exists() {
+        let _ = fs::create_dir_all(&portable_config_dir);
     }
 
-    stable_config_dir
+    // --- 2. 迁移逻辑 (仅用于兼容旧版 AppConfig 路径) ---
+    // 如果稳定目录中存在且便携式目录刚创建/为空，可以考虑搬迁
+    // 但根据用户要求，现在强制使用 debug/data 逻辑
+
+    portable_config_dir
 }
 
 fn encode_key(key: &str) -> String {
@@ -465,7 +446,6 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 
     // 1. Check if new format exists (checking settings.json is enough as an indicator)
     if settings_path.exists() {
-        println!("[Config] Loading split config from {:?}", config_dir);
         let settings_content = fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".into());
         let providers_content =
             fs::read_to_string(&providers_path).unwrap_or_else(|_| "{\"providers\":[]}".into());
@@ -576,38 +556,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
         return Ok(config);
     }
 
-    // 2. Fallback: Check legacy AppData config
-    // Note: app.path() requires `tauri::Manager`
-    let legacy_config_path = app
-        .path()
-        .resolve("config.json", BaseDirectory::AppConfig)
-        .ok();
-
-    if let Some(path) = legacy_config_path {
-        if path.exists() {
-            println!("[Config] Found legacy config at {:?}, migrating...", path);
-            match fs::read_to_string(&path) {
-                Ok(content) => {
-                    match serde_json::from_str::<AppConfig>(&content) {
-                        Ok(mut old_config) => {
-                            // Inject default presets if missing (legacy file won't have it, but Struct default does)
-                            // Actually serde default handles it, but let's be safe
-                            if old_config.default_preset_id.is_empty() {
-                                old_config.default_preset_id = default_preset_id();
-                            }
-
-                            // 3. Migrate: Save to new location
-                            // We don't delete the old file for safety, just ignore it next time
-                            save_config(app.clone(), old_config.clone()).await?;
-                            return Ok(old_config);
-                        }
-                        Err(e) => println!("[Config] Failed to parse legacy config: {}", e),
-                    }
-                }
-                Err(e) => println!("[Config] Failed to read legacy config: {}", e),
-            }
-        }
-    }
+    // --- 2. 移除 C 盘 AppData 回退逻辑，强制使用便携式目录 ---
 
     // 4. Default
     Ok(AppConfig::default())

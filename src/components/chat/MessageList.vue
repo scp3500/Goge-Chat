@@ -8,7 +8,7 @@ import ModernConfirm from './ModernConfirm.vue';
 import SystemPromptBanner from './SystemPromptBanner.vue';
 
 const props = defineProps(['messages', 'sessionId', 'initialScrollPos', 'themeOverride', 'showSystemPrompt', 'assistantAvatar', 'assistantName', 'loadingMore']);
-const emit = defineEmits(['update-pos', 'delete', 'regenerate', 'save-edit', 'load-more']);
+const emit = defineEmits(['update-pos', 'delete', 'regenerate', 'save-edit', 'load-more', 'avatar-click']);
 
 const chatStore = useChatStore();
 const scrollRef = ref(null);
@@ -248,6 +248,7 @@ onBeforeUnmount(() => {
           @save-edit="e => handleSaveEdit(e, i, m)"
           @delete="(id, event) => handleDelete(m, event)"
           @regenerate="(id, event) => handleRegenerate(id, event)"
+          @avatar-click="$emit('avatar-click')"
         />
       </div>
     </Transition>

@@ -26,7 +26,7 @@ const props = defineProps({
   assistantName: { type: String, default: null }
 });
 
-const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'regenerate', 'update-edit-content']);
+const emit = defineEmits(['start-edit', 'cancel-edit', 'save-edit', 'delete', 'regenerate', 'update-edit-content', 'avatar-click']);
 
 const chatStore = useChatStore();
 const configStore = useConfigStore();
@@ -450,6 +450,7 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
         :model-name="displayModelName"
         :provider-name="displayProviderName"
         :date="formattedDate"
+        @avatar-click="$emit('avatar-click')"
       />
 
       <div class="assistant-bubble-container" :class="{ 'loading-hidden': m.content === '__LOADING__' && !showLoadingBar }">

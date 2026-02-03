@@ -84,7 +84,7 @@ const toggleSidebar = () => {
   /* 动力学曲线：确保缩放极其顺滑 */
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
   background: var(--bg-sidebar); 
-  height: 100vh; 
+  height: 100%; 
   display: flex; 
   flex-direction: column; 
   
@@ -120,6 +120,7 @@ const toggleSidebar = () => {
   /* 🚩 解除固定宽度限制 */
   width: 100%;
   min-width: 0; 
+  min-height: 0;
   transition: opacity 0.2s ease;
 }
 

@@ -5,6 +5,7 @@ import { resolveSocialAvatar } from '../../utils/social';
 import { invoke } from '@tauri-apps/api/core';
 import AIContactModal from '../modals/AIContactModal.vue';
 import { useChatStore } from '../../stores/chat';
+import { useSettingsStore } from '../../stores/settings';
 
 const props = defineProps({
   activeContact: {
@@ -17,6 +18,7 @@ const emit = defineEmits(['startChat']);
 
 const configStore = useConfigStore();
 const chatStore = useChatStore();
+const settingsStore = useSettingsStore();
 const showEditModal = ref(false);
 
 const handleStartChat = () => {
@@ -27,16 +29,11 @@ const handleEditProfile = () => {
   showEditModal.value = true;
 };
 
-const handleDeleteContact = async () => {
-  if (confirm(`确定要删除联系人 ${props.activeContact.remark || props.activeContact.name} 吗？`)) {
-    try {
-      await invoke('delete_social_contact', { id: props.activeContact.id });
-      chatStore.updateSocialContactId(null);
-      chatStore.triggerSocialSessionRefresh();
-    } catch (e) {
-      alert('删除失败: ' + e);
-    }
-  }
+const handleManageMemories = () => {
+    // 1. 设置过滤器：使用物理 ID 确保唯一性
+    settingsStore.dataFilterRoleId = props.activeContact.id;
+    // 2. 打开设置页
+    settingsStore.openSettings('data');
 };
 
 const handleConfirmEdit = async (data) => {
@@ -87,7 +84,12 @@ const hasRemark = computed(() => !!props.activeContact.remark);
 
         <!-- Edit Remark Action -->
         <button class="action-btn edit-btn" @click="handleEditProfile">
-          设置备注
+          个人资料
+        </button>
+
+        <!-- Manage Memories Action -->
+        <button class="action-btn memory-btn" @click="handleManageMemories">
+          记忆管理
         </button>
       </div>
     </div>
@@ -231,6 +233,21 @@ const hasRemark = computed(() => !!props.activeContact.remark);
 .edit-btn:hover {
   background: var(--bg-glass-hover);
   transform: translateY(-1px);
+}
+
+.memory-btn {
+  background: transparent;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-glass);
+  font-size: 0.9rem;
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.memory-btn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* 适配不同模式的主题变量 */

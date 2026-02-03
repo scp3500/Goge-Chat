@@ -343,7 +343,6 @@ pub(crate) fn update_session_config(
 // --- 消息管理逻辑 ---
 
 pub(crate) fn get_messages(conn: &Connection, session_id: i64) -> Result<Vec<ChatMessage>> {
-    println!("📥 [DB] Loading messages for session ID: {}", session_id);
     let mut stmt = conn.prepare(
         "SELECT id, session_id, role, content, reasoning_content, file_metadata, search_metadata, created_at, model, provider FROM messages WHERE session_id = ?1 ORDER BY id ASC"
     )?;

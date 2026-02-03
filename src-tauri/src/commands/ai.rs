@@ -1,15 +1,19 @@
 use crate::commands::config_cmd;
+use crate::memory::processor::{get_relevant_context, MemoryState};
 use crate::models::{ChatRequest, Message};
 use futures_util::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tauri::{ipc::Channel, AppHandle, Emitter, State, Window};
+use tokio::sync::RwLock;
 
 #[tauri::command]
 pub async fn ask_ai(
     app: AppHandle,
     state: State<'_, crate::GoleState>,
+    memory_state: State<'_, Arc<RwLock<MemoryState>>>,
     msg: Vec<Message>,
     on_event: Channel<String>,
     window: Window,
@@ -19,6 +23,7 @@ pub async fn ask_ai(
     // 🟢 新增：允许前端显式传入当前绘画的 provider 和 model
     explicit_provider_id: Option<String>,
     explicit_model_id: Option<String>,
+    client: State<'_, reqwest::Client>,
 ) -> Result<(), String> {
     // 1. 加载配置
     let config = config_cmd::load_config(app).await?;
@@ -51,7 +56,6 @@ pub async fn ask_ai(
         ));
     }
 
-    let client = reqwest::Client::new();
     let messages = msg;
 
     // 检查是否需要强制使用推理 (如果用户手动输入了 [REASON] 标记)
@@ -137,6 +141,69 @@ pub async fn ask_ai(
         }
     }
 
+    // --- 🧠 Alice Memory Integration ---
+    if let Some(last_user_msg) = messages.iter().rev().find(|m| m.role == "user") {
+        let mode = last_user_msg.mode.as_deref().unwrap_or("Standard");
+        let role_id = last_user_msg.role_id.as_deref().unwrap_or("default");
+
+        let query = last_user_msg.content.clone();
+
+        // 发送记忆检索开始事件
+        let _ = window.emit(
+            "memory-status",
+            json!({ "status": "searching", "query": query }),
+        );
+        let start_time = std::time::Instant::now();
+
+        let context =
+            get_relevant_context(memory_state.inner().clone(), &query, mode, role_id).await?;
+
+        let duration = start_time.elapsed().as_millis();
+
+        if !context.is_empty() {
+            println!(
+                "🧠 [记忆注入] 模式: {}, 角色: {}, 耗时: {}ms (注入 {} 字符)",
+                mode,
+                role_id,
+                duration,
+                context.len()
+            );
+
+            // 发送记忆检索完成事件
+            let _ = window.emit(
+                "memory-status",
+                json!({ "status": "done", "duration": duration, "has_context": true }),
+            );
+            // 找到系统提示词并注入
+            if let Some(sys_msg) = clean_msgs.iter_mut().find(|m| m.role == "system") {
+                sys_msg.content = format!("{}\n\n{}", context, sys_msg.content);
+            } else {
+                // 如果没有系统提示词，在最前面插入一个
+                clean_msgs.insert(
+                    0,
+                    Message {
+                        id: None,
+                        model: None,
+                        role: "system".to_string(),
+                        content: context,
+                        reasoning_content: None,
+                        file_metadata: None,
+                        search_metadata: None,
+                        provider: None,
+                        mode: None,
+                        role_id: None,
+                    },
+                );
+            }
+        } else {
+            // 发送记忆检索完成事件 (无结果)
+            let _ = window.emit(
+                "memory-status",
+                json!({ "status": "done", "duration": duration, "has_context": false }),
+            );
+        }
+    }
+
     let temperature =
         temperature.or_else(|| provider_config["temperature"].as_f64().map(|f| f as f32));
     let max_tokens = max_tokens.or_else(|| provider_config["maxTokens"].as_u64().map(|u| u as u32));
@@ -151,6 +218,7 @@ pub async fn ask_ai(
             state,
             on_event,
             stream.unwrap_or(true),
+            &client,
         )
         .await;
     }
@@ -183,7 +251,7 @@ pub async fn ask_ai(
         }
     };
 
-    println!("🔗 最终对话请求地址: {}", url);
+    // println!("🔗 最终对话请求地址: {}", url);
 
     let response = client
         .post(&url)
@@ -206,7 +274,7 @@ pub async fn ask_ai(
     if !stream.unwrap_or(true) {
         // --- 🛑 非流式响应处理 ---
         let json: Value = response.json().await.map_err(|e| e.to_string())?;
-        println!("📩 收到非流式响应: {:?}", json);
+        // println!("📩 收到非流式响应: {:?}", json); // 移除冗余
         let choice = &json["choices"][0];
         let message = &choice["message"];
 
@@ -228,6 +296,8 @@ pub async fn ask_ai(
     // --- 🌊 流式响应处理 ---
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
+    let mut ttft_logged = false;
+    let start_gen = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
@@ -260,6 +330,10 @@ pub async fn ask_ai(
                         let delta = &choice["delta"];
 
                         if let Some(content) = delta["content"].as_str() {
+                            if !ttft_logged {
+                                println!("⏱️ [性能] AI 响应 TTFT: {:?}", start_gen.elapsed());
+                                ttft_logged = true;
+                            }
                             on_event
                                 .send(format!("c:{}", content))
                                 .map_err(|e| e.to_string())?;
@@ -279,7 +353,7 @@ pub async fn ask_ai(
         }
     }
 
-    println!("✅ AI 生成任务已彻底释放");
+    // println!("✅ AI 生成任务已彻底释放");
     Ok(())
 }
 
@@ -309,9 +383,8 @@ async fn handle_gemini_native(
     state: State<'_, crate::GoleState>,
     on_event: Channel<String>,
     stream: bool,
+    client: &reqwest::Client,
 ) -> Result<(), String> {
-    let client = reqwest::Client::new();
-
     // 1. 转换消息格式
     let contents: Vec<GeminiContent> = messages
         .into_iter()
@@ -356,6 +429,8 @@ async fn handle_gemini_native(
     if !response.status().is_success() {
         let status = response.status();
         let err_text = response.text().await.unwrap_or_default();
+        // The original instruction had a syntactically incorrect line here.
+        // Assuming the intent was to return the error.
         return Err(format!("Gemini API 错误 (状态码 {}): {}", status, err_text));
     }
 
@@ -381,6 +456,8 @@ async fn handle_gemini_native(
     // --- 🌊 流式处理 ---
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
+    let mut ttft_logged = false;
+    let start_gen = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
@@ -418,6 +495,13 @@ async fn handle_gemini_native(
                     if let Some(parts) = json["candidates"][0]["content"]["parts"].as_array() {
                         for part in parts {
                             if let Some(text) = part["text"].as_str() {
+                                if !ttft_logged {
+                                    println!(
+                                        "⏱️ [性能] AI (Gemini) 响应 TTFT: {:?}",
+                                        start_gen.elapsed()
+                                    );
+                                    ttft_logged = true;
+                                }
                                 on_event
                                     .send(format!("c:{}", text))
                                     .map_err(|e| e.to_string())?;

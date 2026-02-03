@@ -8,6 +8,8 @@ const props = defineProps({
   date: String
 });
 
+const emit = defineEmits(['avatar-click']);
+
 const isImage = computed(() => {
   if (!props.icon) return false;
   const i = props.icon.trim();
@@ -22,7 +24,9 @@ const isImage = computed(() => {
 <template>
   <div class="assistant-header">
     <div class="header-left">
-      <div class="avatar-icon" :class="{ 'is-image': isImage }">
+      <div class="avatar-icon" 
+           :class="{ 'is-image': isImage, 'clickable': true }"
+           @click="emit('avatar-click')">
         <template v-if="isImage">
           <img :src="icon" class="avatar-image-actual" />
         </template>
@@ -62,6 +66,14 @@ const isImage = computed(() => {
   justify-content: center;
   color: var(--text-color-white);
   flex-shrink: 0;
+}
+
+.avatar-icon.clickable {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.avatar-icon.clickable:hover {
+  transform: scale(1.05);
 }
 
 .avatar-icon.is-image {

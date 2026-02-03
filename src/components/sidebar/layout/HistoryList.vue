@@ -254,7 +254,7 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); });
   padding: 8px 0; 
   overflow-y: auto; 
   position: relative; 
-  min-height: 100%;
+  min-height: 0;
 }
 
 .drag-list {

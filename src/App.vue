@@ -29,6 +29,7 @@ const activeModule = ref('chat');
 // 处理打开设置
 const handleOpenSettings = (category) => {
     settingsStore.openSettings(category);
+    uiStore.isHistoryOpen = false;   // 🚪 自动隐藏历史会话
     chatStore.setChatViewActive(false);  // 通知聊天 store 视图已切换
 };
 
@@ -170,6 +171,10 @@ onUnmounted(() => {
             :is-left-sidebar-open="uiStore.isLeftSidebarOpen"
             :is-history-open="uiStore.isHistoryOpen"
             :active-module="activeModule"
+            @update:activeModule="(val) => { 
+              activeModule = val; 
+              handleBackToChat(); 
+            }"
             v-slot="{ activeContact, activeModule: slotActiveModule }"
           >
             <SocialContactProfile 
@@ -180,6 +185,7 @@ onUnmounted(() => {
             <SocialChatContainer 
               v-else-if="activeContact"
               :active-contact="activeContact"
+              @show-profile="activeModule = 'address_book'"
             />
           </MainLayout>
         </div>

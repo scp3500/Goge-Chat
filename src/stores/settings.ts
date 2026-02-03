@@ -26,6 +26,9 @@ export const useSettingsStore = defineStore('settings', () => {
     /** 搜索关键词（用于设置项搜索） */
     const searchQuery = ref('');
 
+    /** 数据管理页面的初始角色过滤器 (用于从个人资料页跳转) */
+    const dataFilterRoleId = ref<string | null>(null);
+
     // ========== 方法 ==========
 
     /**
