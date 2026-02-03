@@ -202,7 +202,7 @@ const list = computed({
 .status-tag.off { background: var(--bg-glass); color: var(--text-tertiary); }
 .toggle-btn { width: 36px; height: 20px; background: var(--bg-glass-active); border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.3s; }
 .toggle-btn.on { background: var(--color-primary); }
-.toggle-slider { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
+.toggle-slider { width: 16px; height: 16px; background: var(--color-white); border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: left 0.3s; }
 .toggle-btn.on .toggle-slider { left: 18px; }
 
 .draggable-list {
@@ -228,7 +228,7 @@ const list = computed({
 
 .menu-item { padding: 8px 12px; font-size: 13px; color: var(--text-color); border-radius: 6px; cursor: pointer; user-select: none; }
 .menu-item:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
-.menu-item.delete { color: #ff6b6b; }
+.menu-item.delete { color: var(--color-error-light); }
 .menu-sep { height: 1px; background: var(--border-glass); margin: 4px 0; }
 
 .edit-input {

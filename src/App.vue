@@ -220,7 +220,8 @@ html, body, #app {
   overflow: hidden !important; 
   height: 100%; 
   margin: 0; 
-  background: transparent; 
+  background: transparent !important; 
+  background-color: transparent !important;
 }
 
 /* ... 视图切换动画保持不变 ... */
@@ -249,6 +250,9 @@ html, body, #app {
   /* 🧊 全局毛玻璃层：让窗口背后带一点透感 */
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  
+  /* 🛡️ 终极修剪补丁：强制使用 clip-path 进行物理裁剪，解决 backdrop-filter 边缘溢出问题 */
+  clip-path: inset(0 round 12px);
 }
 
 .app-layout.is-chat-mode {
@@ -265,6 +269,7 @@ html, body, #app {
 .app-layout.is-maximized { 
   border-radius: 0; 
   border: none;
+  clip-path: none;
 }
 
 .content-area { 

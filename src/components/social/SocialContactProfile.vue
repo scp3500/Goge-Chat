@@ -213,15 +213,18 @@ const hasRemark = computed(() => !!props.activeContact.remark);
 }
 
 .message-btn {
-  background: #07c160; /* WeChat Green Fixed */
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(7, 193, 96, 0.2);
+  background: var(--color-wechat-green); /* WeChat Green Fixed */
+  color: var(--color-white);
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-wechat);
 }
 
 .message-btn:hover {
-  background: #06ad56;
+  background: var(--color-wechat-green-hover);
+  box-shadow: var(--shadow-wechat-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(7, 193, 96, 0.3);
 }
 
 .edit-btn {
@@ -256,7 +259,7 @@ const hasRemark = computed(() => !!props.activeContact.remark);
 }
 
 :global(.app-light) .edit-btn {
-    background: #fff;
+    background: var(--color-white);
     border-color: #ddd;
 }
 </style>

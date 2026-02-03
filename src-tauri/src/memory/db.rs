@@ -205,6 +205,35 @@ impl LanceDbManager {
         Ok(())
     }
 
+    /// 批量删除事实记录 (性能优化)
+    pub async fn delete_facts_batch(&self, ids: &[String]) -> Result<(), String> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        println!("🗑️ [数据库] 执行批量删除: {} 条记录", ids.len());
+        let conn = self.connect().await.map_err(|e| e.to_string())?;
+        let table = conn
+            .open_table("memories")
+            .execute()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // 构建批量删除的过滤条件
+        let filter = ids
+            .iter()
+            .map(|id| format!("id = '{}'", id))
+            .collect::<Vec<_>>()
+            .join(" OR ");
+
+        table.delete(&filter).await.map_err(|e| e.to_string())?;
+
+        // 只优化一次,而不是每次删除都优化
+        let _ = self.optimize_table().await;
+
+        Ok(())
+    }
+
     pub async fn clear_memories(&self) -> Result<(), String> {
         let conn = self.connect().await.map_err(|e| e.to_string())?;
         // 尝试删除表 (可能失败，如果表已被删除)

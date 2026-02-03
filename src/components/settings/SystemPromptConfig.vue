@@ -184,7 +184,7 @@ const applyLibraryItem = (item) => {
   background: var(--color-primary);
   border: none;
   border-radius: 12px;
-  color: #fff;
+  color: var(--color-white);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

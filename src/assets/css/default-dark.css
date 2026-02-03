@@ -1,14 +1,16 @@
 /* Default Dark Theme (VS Code Dark+) attached to :root */
-:root, [data-theme='dark'], .app-dark {
+:root,
+[data-theme='dark'],
+.app-dark {
     /* ========================================================
        GoleChat 设计系统 - VS Code Dark+ Edition
        ======================================================== */
 
     /* 1. 色彩基准 */
-    --bg-main: rgba(30, 31, 32, 0.9);
+    --bg-main: #1e1f20;
     /* Translucent main background */
-    --bg-sidebar: rgba(30, 31, 32, 0.95);
-    --bg-titlebar: rgba(30, 31, 32, 0.95);
+    --bg-sidebar: #1e1f20;
+    --bg-titlebar: #1e1f20;
     --bg-chat-island: rgba(19, 19, 20, 0.6);
     /* Deeper/Darker than frame */
 
@@ -115,8 +117,9 @@
     --bg-button-active: rgba(129, 140, 248, 0.2);
 
     /* 12. Extracted Component Variables */
-    --bg-assistant-bubble: #2c2c2c;
-    --border-assistant-bubble: rgba(255, 255, 255, 0.05);
+    --bg-assistant-bubble: #1e1e1e;
+    --border-assistant-bubble: rgba(255, 255, 255, 0.08);
+    --color-assistant-bubble-text: #d4d4d4;
 
     --bg-dropdown: rgba(15, 15, 17, 0.88);
     --border-dropdown: rgba(255, 255, 255, 0.1);

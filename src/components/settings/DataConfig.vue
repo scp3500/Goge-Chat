@@ -537,9 +537,9 @@ const getModeLabel = (mode) => {
 .badges { display: flex; gap: 6px; }
 
 .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
-.badge.mode.social { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-.badge.mode.standard { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.badge.role { background: rgba(255, 255, 255, 0.05); color: var(--text-tertiary); border: 1px solid var(--border-glass); }
+.badge.mode.social { background: var(--color-reasoning-bg); color: var(--color-reasoning-light); }
+.badge.mode.standard { background: var(--color-info-alpha-20); color: var(--color-info-light); }
+.badge.role { background: var(--glass-white-05); color: var(--text-tertiary); border: 1px solid var(--border-glass); }
 
 .card-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
 .memory-card:hover .card-actions { opacity: 1; }
@@ -553,7 +553,7 @@ const getModeLabel = (mode) => {
     cursor: pointer;
 }
 .action-btn:hover { background: var(--bg-glass-hover); color: var(--text-color-white); }
-.action-btn.delete:hover { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+.action-btn.delete:hover { color: var(--color-error-light); background: var(--color-error-alpha-10); }
 
 .card-body {
     font-size: 14px;
@@ -592,7 +592,7 @@ const getModeLabel = (mode) => {
 .btn-primary { background: var(--color-primary); color: white; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
 .btn-primary-small { background: var(--color-primary); color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .btn-secondary { background: var(--bg-glass-hover); color: var(--text-color-white); border: 1px solid var(--border-glass); padding: 8px 16px; border-radius: 8px; cursor: pointer; }
-.btn-danger-outline { background: transparent; border: 1px solid #f87171; color: #f87171; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+.btn-danger-outline { background: transparent; border: 1px solid var(--color-error-light); color: var(--color-error-light); padding: 8px 16px; border-radius: 8px; cursor: pointer; }
 .btn-text { background: transparent; border: none; color: var(--text-tertiary); font-size: 12px; cursor: pointer; }
 
 .icon-btn-refresh {

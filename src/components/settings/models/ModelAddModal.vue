@@ -86,7 +86,7 @@ const toggleFeature = (feat: ModelFeature) => {
 .modal-overlay-v3 {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85);
+    background: var(--overlay-heavy);
     backdrop-filter: blur(8px);
     z-index: 2000;
     display: flex;
@@ -136,6 +136,6 @@ const toggleFeature = (feat: ModelFeature) => {
 }
 .cancel-btn { background: var(--bg-glass); color: var(--text-color); }
 .cancel-btn:hover { background: var(--bg-glass-hover); }
-.confirm-btn { background: var(--color-primary); color: #fff; }
+.confirm-btn { background: var(--color-primary); color: var(--color-white); }
 .confirm-btn:hover { opacity: 0.9; }
 </style>

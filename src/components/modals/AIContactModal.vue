@@ -369,7 +369,7 @@ async function rebuildDatabase() {
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay-medium);
   backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex;
@@ -385,7 +385,7 @@ async function rebuildDatabase() {
   width: 480px;
   max-width: 100%;
   max-height: 85vh;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
   overflow: hidden;

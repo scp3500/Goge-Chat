@@ -623,7 +623,7 @@ const confirmTest = () => {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--bg-input-dim, rgba(255,255,255,0.03));
+    background: var(--bg-input-dim, var(--glass-white-03));
     border: 1.5px solid var(--border-glass-bright);
     border-radius: 8px;
     padding: 4px 10px;
@@ -838,8 +838,8 @@ const confirmTest = () => {
 
 .check-conn-btn-v2:hover { background: var(--bg-glass-hover); }
 .check-conn-btn-v2.testing { opacity: 0.7; }
-.check-conn-btn-v2.success { color: #10b981; background: rgba(16, 185, 129, 0.1); }
-.check-conn-btn-v2.error { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.check-conn-btn-v2.success { color: var(--color-success); background: var(--color-success-alpha-10); }
+.check-conn-btn-v2.error { color: var(--color-error); background: var(--color-error-alpha-10); }
 
 .url-preview-v3 {
     font-size: 12px;
@@ -864,11 +864,11 @@ const confirmTest = () => {
 }
 
 .conn-error-msg-v3 {
-    font-size: 11px;
-    color: #ef4444;
-    padding: 8px 12px;
-    background: rgba(239, 68, 68, 0.05);
-    border: 1px solid rgba(239, 68, 68, 0.1);
+    color: var(--color-error);
+    font-size: 12px;
+    margin-top: 8px;
+    background: var(--color-error-alpha-05);
+    border: 1px solid var(--color-error-alpha-10);
     border-radius: 8px;
 }
 
@@ -1042,7 +1042,7 @@ const confirmTest = () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--overlay-medium);
     backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
@@ -1097,7 +1097,7 @@ const confirmTest = () => {
 }
 
 .custom-select-v3 {
-    background: var(--bg-input-dim, rgba(255,255,255,0.03));
+    background: var(--bg-input-dim, var(--glass-white-03));
     border: 1px solid var(--border-glass);
     border-radius: 12px;
     padding: 12px 16px;

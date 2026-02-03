@@ -232,7 +232,6 @@ const resolveAvatarSrc = (path) => {
     padding: 2px;
     border-radius: 99px;
     border: 1px solid var(--border-selectors);
-    border-right: none;
 }
 
 .v-divider {
@@ -292,7 +291,7 @@ const resolveAvatarSrc = (path) => {
   border-color: var(--border-window-btn); 
   color: var(--color-title-text-bright); 
 }
-.settings-btn:hover { color: var(--text-color-white); }
+.settings-btn:hover { color: var(--color-primary); }
 .theme-toggle:hover { color: var(--color-primary); }
 .theme-toggle :deep(svg),
 .settings-btn :deep(svg) { width: 14px; height: 14px; }

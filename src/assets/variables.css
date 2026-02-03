@@ -39,4 +39,74 @@
     --theme-preset-2: #1b1b1f;
     --theme-preset-3: #0f0f10;
     --theme-preset-4: #2c2c32;
+
+    /* ========================================================
+       Semantic Color System - Functional Colors
+       ======================================================== */
+
+    /* Success Colors */
+    --color-success: #10b981;
+    --color-success-hover: #059669;
+    --color-success-alpha-10: rgba(16, 185, 129, 0.1);
+    --color-success-alpha-20: rgba(16, 185, 129, 0.2);
+
+    /* Error/Danger Colors */
+    --color-error: #ef4444;
+    --color-error-hover: #dc2626;
+    --color-error-light: #f87171;
+    --color-error-alpha-05: rgba(239, 68, 68, 0.05);
+    --color-error-alpha-10: rgba(239, 68, 68, 0.1);
+
+    /* Warning Colors */
+    --color-warning: #f59e0b;
+    --color-warning-alpha-10: rgba(245, 158, 11, 0.1);
+
+    /* Info Colors */
+    --color-info: #3b82f6;
+    --color-info-light: #60a5fa;
+    --color-info-alpha-10: rgba(59, 130, 246, 0.1);
+    --color-info-alpha-20: rgba(59, 130, 246, 0.2);
+
+    /* Social Mode - WeChat Colors */
+    --color-wechat-green: #07c160;
+    --color-wechat-green-hover: #06ad56;
+    --color-wechat-green-shadow: rgba(7, 193, 96, 0.2);
+    --color-wechat-green-shadow-hover: rgba(7, 193, 96, 0.3);
+
+    /* Special Feature Tags */
+    --color-reasoning: #b080ff;
+    --color-reasoning-light: #a78bfa;
+    --color-reasoning-bg: rgba(150, 100, 255, 0.1);
+
+    /* Pure Colors */
+    --color-white: #ffffff;
+    --color-black: #000000;
+
+    /* ========================================================
+       Shadow System
+       ======================================================== */
+    --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.3);
+    --shadow-2xl: 0 30px 60px rgba(0, 0, 0, 0.4);
+    --shadow-wechat: 0 4px 12px var(--color-wechat-green-shadow);
+    --shadow-wechat-hover: 0 6px 16px var(--color-wechat-green-shadow-hover);
+
+    /* ========================================================
+       Overlay & Modal Backgrounds
+       ======================================================== */
+    --overlay-light: rgba(0, 0, 0, 0.4);
+    --overlay-medium: rgba(0, 0, 0, 0.6);
+    --overlay-heavy: rgba(0, 0, 0, 0.85);
+
+    /* ========================================================
+       Glass Effect Utilities
+       ======================================================== */
+    --glass-white-03: rgba(255, 255, 255, 0.03);
+    --glass-white-05: rgba(255, 255, 255, 0.05);
+    --glass-white-10: rgba(255, 255, 255, 0.1);
+    --glass-black-10: rgba(0, 0, 0, 0.1);
+    --glass-black-20: rgba(0, 0, 0, 0.2);
 }

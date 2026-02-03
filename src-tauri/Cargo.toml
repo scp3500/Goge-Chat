@@ -47,3 +47,9 @@ arrow-schema = "53"
 half = { version = "2.4", features = ["num-traits"] }
 byteorder = "1.5"
 chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+opt-level = "z"     # 优化二进制大小
+lto = true          # 链接时优化
+codegen-units = 1   # 更好的优化,但编译更慢
+strip = true        # 移除调试符号

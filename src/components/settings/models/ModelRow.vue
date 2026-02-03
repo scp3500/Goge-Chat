@@ -55,7 +55,7 @@ const BRAIN_SVG_SMALL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" heig
     align-items: center;
     padding: 12px 16px;
     transition: background 0.2s;
-    border-bottom: 1px solid var(--border-glass-dim, rgba(255,255,255,0.03));
+    border-bottom: 1px solid var(--border-glass-dim, var(--glass-white-03));
 }
 .model-row-v3:last-child { border-bottom: none; }
 .model-row-v3:hover { background: var(--bg-glass-hover); }
@@ -116,7 +116,7 @@ const BRAIN_SVG_SMALL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" heig
 
 .feat-tag.vision { background: var(--color-success-alpha-10, rgba(0,255,100,0.1)); color: var(--color-success); }
 .feat-tag.web { background: var(--color-primary-alpha-10, rgba(0,100,255,0.1)); color: var(--color-primary); }
-.feat-tag.reasoning { background: rgba(150, 100, 255, 0.1); color: #b080ff; }
+.feat-tag.reasoning { background: var(--color-reasoning-bg); color: var(--color-reasoning); }
 .feat-tag.tools { background: var(--color-warning-alpha-10, rgba(255,150,0,0.1)); color: var(--color-warning); }
 
 .feat-tag :deep(svg) { width: 14px; height: 14px; }

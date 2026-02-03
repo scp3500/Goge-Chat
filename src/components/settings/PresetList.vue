@@ -190,7 +190,7 @@ const list = computed({
 
 .menu-item { padding: 8px 12px; font-size: 13px; color: var(--text-color); border-radius: 6px; cursor: pointer; user-select: none; }
 .menu-item:hover { background: var(--bg-menu-hover); color: var(--text-color-white); }
-.menu-item.delete { color: #ff6b6b; }
+.menu-item.delete { color: var(--color-error-light); }
 .menu-sep { height: 1px; background: var(--border-menu); margin: 4px 0; }
 
 .edit-input {

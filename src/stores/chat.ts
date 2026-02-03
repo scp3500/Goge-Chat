@@ -7,6 +7,7 @@ import type { Folder, PausedChunks } from './chat/state';
 import { useFolderActions } from './chat/folders';
 import { useSessionActions } from './chat/sessions';
 import { useMessageActions } from './chat/messages';
+import { debounce } from '../utils/debounce';
 
 // Re-export types for consumers
 export type { Folder, ChatSession };
@@ -35,9 +36,13 @@ export const useChatStore = defineStore('chat', () => {
         console.error("Failed to load scroll positions:", e);
     }
 
-    // Persist scroll positions on change
+    // Persist scroll positions on change (debounced for performance)
+    const debouncedSaveScroll = debounce((positions: Record<string, number>) => {
+        localStorage.setItem('session_scroll_positions', JSON.stringify(positions));
+    }, 300);
+
     watch(sessionScrollPositions, (newVal) => {
-        localStorage.setItem('session_scroll_positions', JSON.stringify(newVal));
+        debouncedSaveScroll(newVal);
     }, { deep: true });
 
     const _updateLocalStorageScroll = (sessionId: string, position: number) => {

@@ -13,7 +13,7 @@ const configStore = useConfigStore();
       <!-- 聊天模式 (Chat Mode) -->
       <section class="config-card">
         <div class="card-header">
-           <div class="icon-wrap" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+           <div class="icon-wrap" style="background: var(--color-success-alpha-10); color: var(--color-success);">
              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
            </div>
            <div class="title-wrap">

@@ -44,13 +44,23 @@ pub async fn upsert_fact(
         .await?;
     let duration_search = start_search.elapsed();
 
-    // 3. 执行冲突清理
+    // 3. 收集需要删除的 ID (批量操作优化)
     let start_cleanup = Instant::now();
-    for (old_fact, distance) in results {
-        let similarity = 1.0 - (distance / 2.0);
-        if old_fact.content == content || similarity > 0.85 {
-            state_read.db.delete_fact(&old_fact.id).await?;
-        }
+    let ids_to_delete: Vec<String> = results
+        .into_iter()
+        .filter_map(|(old_fact, distance)| {
+            let similarity = 1.0 - (distance / 2.0);
+            if old_fact.content == content || similarity > 0.85 {
+                Some(old_fact.id)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // 批量删除 (只调用一次 optimize_table)
+    if !ids_to_delete.is_empty() {
+        state_read.db.delete_facts_batch(&ids_to_delete).await?;
     }
     let duration_cleanup = start_cleanup.elapsed();
 

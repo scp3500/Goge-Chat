@@ -6,7 +6,8 @@ body,
     padding: 0;
     height: 100%;
     width: 100%;
-    background-color: var(--bg-main);
+    background-color: transparent !important;
+    background: transparent !important;
     color: #cccccc;
     /* 更柔和的护眼颜色 */
     overflow: hidden;
@@ -64,6 +65,8 @@ a,
 html,
 body,
 #app {
+    background-color: transparent !important;
+    background: transparent !important;
     cursor: default !important;
     user-select: text;
     -webkit-user-select: text;

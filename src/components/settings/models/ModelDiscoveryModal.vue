@@ -61,7 +61,7 @@ const filteredModels = computed(() => {
 .modal-overlay-v3 {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85);
+    background: var(--overlay-heavy);
     backdrop-filter: blur(8px);
     z-index: 2000;
     display: flex;
@@ -120,8 +120,8 @@ const filteredModels = computed(() => {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: linear-gradient(to right, rgba(255,255,255,0.03), transparent);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: linear-gradient(to right, var(--glass-white-03), transparent);
+    border: 1px solid var(--glass-white-05);
     border-radius: 12px;
     transition: transform 0.2s, border-color 0.2s;
 }
