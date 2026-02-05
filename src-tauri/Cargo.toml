@@ -35,6 +35,8 @@ regex = "1"
 base64 = "0.22.1"
 tauri-plugin-fs = "2.4.5"
 uuid = { version = "1.0", features = ["v4"] }
+rand = "0.8"
+tokio-util = "0.7"
 
 # --- Alice Memory Engine Dependencies ---
 lancedb = "0.15"

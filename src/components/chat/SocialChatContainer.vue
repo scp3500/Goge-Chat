@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { invoke, Channel } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useConfigStore } from "../../stores/config";
 import { useChatStore } from "../../stores/chat";
 import MessageList from "./MessageList.vue";
@@ -24,6 +25,7 @@ const configStore = useConfigStore();
 const chatStore = useChatStore();
 const messages = ref([]);
 const isGenerating = ref(false);
+const isTyping = ref(false); // 🎭 Immersive mode typing indicator
 const messageListRef = ref(null);
 const isLoadingMore = ref(false); // ⏳ Loading state
 const allLoaded = ref(false);     // 🏁 End of history
@@ -218,8 +220,73 @@ let lastActiveContext = { contact: null, sessionId: null };
 // --- 核心逻辑：统一离场监控 ---
 
 // 1. 组件初始化/销毁钩子
-onMounted(() => {
+let typingUnlisten = null;
+let retractionUnlisten = null;
+let newMessageUnlisten = null;
+
+onMounted(async () => {
     console.log("🟢 [SocialChat] 进入聊天容器");
+    
+    // 🎭 Listen for immersive mode events
+    try {
+        typingUnlisten = await listen('typing-status', (event) => {
+            const { contactId, isTyping: typing } = event.payload;
+            if (contactId === props.activeContact?.id) {
+                isTyping.value = typing;
+            }
+        });
+        
+        retractionUnlisten = await listen('message-retracted', (event) => {
+            const { messageId } = event.payload;
+            const index = messages.value.findIndex(m => m.id === messageId);
+            if (index !== -1) {
+                messages.value.splice(index, 1);
+            }
+        });
+        
+        // 🆕 Listen for new messages from immersive mode
+        newMessageUnlisten = await listen('new-social-message', (event) => {
+            const { messageId, contactId, sessionId, role, content, createdAt } = event.payload;
+            
+            console.log(`📨 [new-social-message] 收到消息:`, {
+                messageId,
+                contactId,
+                sessionId,
+                role,
+                content: content.substring(0, 50),
+                currentContact: props.activeContact?.id,
+                currentSession: chatStore.activeSocialSessionId
+            });
+            
+            // Only add if it's for the current contact and session
+            if (contactId === props.activeContact?.id && sessionId === chatStore.activeSocialSessionId) {
+                // Check if message already exists (avoid duplicates)
+                const exists = messages.value.find(m => m.id === messageId);
+                if (!exists) {
+                    console.log(`✅ [new-social-message] 添加消息到当前会话 (role: ${role})`);
+                    messages.value.push({
+                        id: messageId,
+                        role,
+                        content,
+                        created_at: createdAt
+                    });
+                    
+                    // Auto-scroll to new message
+                    nextTick(() => {
+                        triggerScroll('smooth');
+                    });
+                } else {
+                    console.log(`⚠️ [new-social-message] 消息已存在，跳过`);
+                }
+            } else {
+                console.log(`❌ [new-social-message] 消息不属于当前会话，忽略`);
+            }
+        });
+        
+        console.log("🎭 [Immersive] Event listeners registered");
+    } catch (e) {
+        console.error("Failed to register immersive event listeners:", e);
+    }
     // 🛡️ 修复：不要在这里立即快照，否则 SID 变化前会锁定错误的上下文
 });
 
@@ -228,6 +295,11 @@ onUnmounted(() => {
     if (lastActiveContext.contact && lastActiveContext.sessionId) {
         syncCurrentMemoryOnLeave(lastActiveContext.contact, lastActiveContext.sessionId);
     }
+    
+    // 🎭 Cleanup immersive event listeners
+    if (typingUnlisten) typingUnlisten();
+    if (retractionUnlisten) retractionUnlisten();
+    if (newMessageUnlisten) newMessageUnlisten();
 });
 
 // 2. 深度监控上下文变换：角色 ID 或 会话 ID 任何一个变了，都视为“切换”
@@ -239,6 +311,14 @@ watch(
   async (newCtx, oldCtx) => {
     // A. 如果 oldCtx 有值，说明是从一个有效会话“切出来”的，触发结算
     if (oldCtx?.cid && oldCtx?.sid) {
+        // 🎭 取消旧会话的所有待执行行为，防止消息出现在错误的会话中
+        try {
+            await invoke("cancel_immersive_behaviors", { sessionId: oldCtx.sid });
+            console.log(`🛑 [Session-Switch] 已取消会话 ${oldCtx.sid} 的待执行行为`);
+        } catch (e) {
+            console.warn("Failed to cancel old session behaviors:", e);
+        }
+        
         // 🛡️ 核心修复：确保同步时使用“离开那一瞬间”的旧快照 ID 和 旧 Context 
         if (lastActiveContext.contact && String(lastActiveContext.contact.id) === String(oldCtx.cid)) {
             console.log(`📤 [Sync-Trigger] 正在离开角色: ${lastActiveContext.contact.name} (SID: ${oldCtx.sid})`);
@@ -355,7 +435,7 @@ const triggerAIRequest = async (targetMessage = null) => {
         role: m.role,
         content: m.content,
         mode: "Social",
-        role_id: String(props.activeContact.id) // 修正：统一使用 snake_case 并保持 ID 归属
+        role_id: m.role === 'assistant' ? String(props.activeContact.id) : undefined
     }));
 
     // Add system prompt using REFRESHED data
@@ -417,6 +497,15 @@ const handleSend = async (text, fileMetadata = null) => {
   const userText = text.trim();
 
   try {
+    // 🎭 Cancel any pending immersive behaviors first
+    try {
+        await invoke("cancel_immersive_behaviors", { 
+            sessionId: chatStore.activeSocialSessionId 
+        });
+    } catch (e) {
+        console.warn("Failed to cancel immersive behaviors:", e);
+    }
+    
     // 1. Save and add user message locally with ID
     const savedUserId = await invoke("save_social_message", { 
         contactId,
@@ -436,8 +525,80 @@ const handleSend = async (text, fileMetadata = null) => {
     hasNewMessages.value = true; // ✍️ 标记产生了新交互
     triggerScroll('smooth'); // 🌊 Smooth scroll for user action
 
-    // 2. Trigger AI
-    await triggerAIRequest();
+    // 2. 🎭 Check if immersive mode is enabled
+    if (configStore.settings.immersiveMode?.enabled) {
+        // 🎭 Immersive Mode: Generate AI response WITHOUT saving/displaying
+        // The backend will handle the immersive display through events
+        
+        isGenerating.value = true;
+        chatStore.isGenerating = true;
+        
+        try {
+            // Generate AI response (we need the content but won't save it)
+            const onEvent = new Channel();
+            let aiFullContent = "";
+            
+            // Re-fetch contact info for latest prompt/model
+            let currentContact = props.activeContact;
+            try {
+                const contacts = await invoke("get_social_contacts");
+                const updated = contacts.find(c => c.id === props.activeContact.id);
+                if (updated) currentContact = updated;
+            } catch (e) {
+                console.warn("Failed to refresh contact info:", e);
+            }
+            
+            onEvent.onmessage = (data) => {
+                if (data.startsWith("c:")) {
+                    aiFullContent += data.substring(2);
+                }
+            };
+            
+            // Build message history
+            const history = messages.value.map(m => ({
+                role: m.role,
+                content: m.content,
+                mode: "Social",
+                role_id: m.role === 'assistant' ? String(contactId) : undefined
+            }));
+            
+            if (currentContact.prompt) {
+                history.unshift({ role: "system", content: currentContact.prompt });
+            }
+            
+            // Generate AI response
+            await invoke("ask_ai", {
+                msg: history,
+                onEvent,
+                explicitProviderId: currentContact.provider || configStore.settings.defaultProviderId,
+                explicitModelId: currentContact.model,
+                stream: false // Don't stream in immersive mode
+            });
+            
+            // Now send through immersive mode (backend will handle display)
+            await invoke("send_social_message_immersive", {
+                sessionId: chatStore.activeSocialSessionId,
+                contactId,
+                content: aiFullContent
+            });
+            
+        } catch (e) {
+            console.error("Immersive AI generation failed:", e);
+            // Fallback: add error message
+            messages.value.push({
+                role: "assistant",
+                content: "发生错误: " + e,
+                created_at: new Date().toISOString().replace('T', ' ').replace('Z', '')
+            });
+        } finally {
+            isGenerating.value = false;
+            chatStore.isGenerating = false;
+        }
+        
+    } else {
+        // Traditional mode: direct AI request with immediate display
+        await triggerAIRequest();
+    }
 
   } catch (e) {
     console.error("Social chat send error:", e);
@@ -555,7 +716,7 @@ const handleAvatarClick = () => {
        <div class="header-info">
            <span class="session-topic">{{ activeContact.remark || activeContact.name }}</span>
            <transition name="status-fade">
-               <span v-if="isGenerating" class="typing-status">
+               <span v-if="isGenerating || isTyping" class="typing-status">
                    &nbsp;正在输入<span class="dot-anim">...</span>
                </span>
            </transition>

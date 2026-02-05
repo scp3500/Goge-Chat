@@ -1,3 +1,4 @@
+use crate::immersive_settings::ImmersiveSettings;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -83,6 +84,10 @@ pub struct AppConfig {
     // NEW: Chat Mode
     #[serde(default = "default_chat_mode", rename = "chatMode")]
     pub chat_mode: ChatModeConfig,
+
+    // NEW: Immersive Mode (沉浸式模式)
+    #[serde(default = "default_immersive_mode", rename = "immersiveMode")]
+    pub immersive_mode: ImmersiveSettings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -156,6 +161,9 @@ struct SettingsPart {
 
     #[serde(default = "default_chat_mode", rename = "chatMode")]
     chat_mode: ChatModeConfig, // Store chatMode in settings part
+
+    #[serde(default = "default_immersive_mode", rename = "immersiveMode")]
+    immersive_mode: ImmersiveSettings,
 
     // Legacy support for promptLibrary in settings.json (optional)
     #[serde(default, rename = "promptLibrary")]
@@ -359,6 +367,11 @@ fn default_dark_plus_theme() -> String {
     "dark_plus".into()
 }
 
+// Immersive Mode Defaults
+fn default_immersive_mode() -> ImmersiveSettings {
+    ImmersiveSettings::default()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -388,6 +401,7 @@ impl Default for AppConfig {
             user_avatar_path: "".into(),
             prompt_library: default_prompt_library(),
             chat_mode: default_chat_mode(),
+            immersive_mode: default_immersive_mode(),
             font_family_english: "".into(),
             font_family_chinese: "".into(),
         }
@@ -528,6 +542,7 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
         config.show_user_avatar = settings.show_user_avatar;
         config.user_avatar_path = settings.user_avatar_path;
         config.chat_mode = settings.chat_mode;
+        config.immersive_mode = settings.immersive_mode;
         // Map font settings
         config.font_family_english = settings.font_family_english;
         config.font_family_chinese = settings.font_family_chinese;
@@ -651,6 +666,7 @@ pub async fn save_config(app: AppHandle, mut config: AppConfig) -> Result<(), St
         show_user_avatar: config.show_user_avatar,
         user_avatar_path: config.user_avatar_path,
         chat_mode: config.chat_mode,
+        immersive_mode: config.immersive_mode,
         font_family_english: config.font_family_english,
         font_family_chinese: config.font_family_chinese,
         prompt_library: None, // No longer saving here to avoid duplication

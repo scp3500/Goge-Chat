@@ -273,22 +273,12 @@ pub async fn ask_ai(
 
     if !stream.unwrap_or(true) {
         // --- 🛑 非流式响应处理 ---
-        let json: Value = response.json().await.map_err(|e| e.to_string())?;
-        // println!("📩 收到非流式响应: {:?}", json); // 移除冗余
-        let choice = &json["choices"][0];
-        let message = &choice["message"];
+        let content =
+            crate::ai_utils::call_ai_backend(&client, &api_key, &base_url, &payload).await?;
 
-        if let Some(content) = message["content"].as_str() {
-            on_event
-                .send(format!("c:{}", content))
-                .map_err(|e| e.to_string())?;
-        }
-
-        if let Some(reasoning) = message["reasoning_content"].as_str() {
-            on_event
-                .send(format!("r:{}", reasoning))
-                .map_err(|e| e.to_string())?;
-        }
+        on_event
+            .send(format!("c:{}", content))
+            .map_err(|e| e.to_string())?;
 
         return Ok(());
     }
@@ -385,6 +375,25 @@ async fn handle_gemini_native(
     stream: bool,
     client: &reqwest::Client,
 ) -> Result<(), String> {
+    if !stream {
+        // --- 🛑 非流式处理 ---
+        let content = crate::ai_utils::call_gemini_backend(
+            client,
+            &api_key,
+            &base_url,
+            &model,
+            messages.clone(),
+        )
+        .await?;
+
+        on_event
+            .send(format!("c:{}", content))
+            .map_err(|e| e.to_string())?;
+
+        return Ok(());
+    }
+
+    // --- 🌊 流式处理 ---
     // 1. 转换消息格式
     let contents: Vec<GeminiContent> = messages
         .into_iter()
@@ -402,11 +411,7 @@ async fn handle_gemini_native(
     let payload = GeminiRequest { contents };
 
     // 2. 构造 URL
-    let mode = if stream {
-        "streamGenerateContent"
-    } else {
-        "generateContent"
-    };
+    let mode = "streamGenerateContent";
 
     let url = format!(
         "{}/v1beta/models/{}:{}?key={}",
@@ -416,7 +421,7 @@ async fn handle_gemini_native(
         api_key
     );
 
-    println!("🚀 [Native Gemini] 请求地址 (stream: {}): {}", stream, url);
+    println!("🚀 [Native Gemini] 请求地址 (stream: true): {}", url);
 
     let response = client
         .post(&url)
@@ -429,28 +434,7 @@ async fn handle_gemini_native(
     if !response.status().is_success() {
         let status = response.status();
         let err_text = response.text().await.unwrap_or_default();
-        // The original instruction had a syntactically incorrect line here.
-        // Assuming the intent was to return the error.
         return Err(format!("Gemini API 错误 (状态码 {}): {}", status, err_text));
-    }
-
-    if !stream {
-        // --- 🛑 非流式处理 ---
-        let json: Value = response.json().await.map_err(|e| e.to_string())?;
-        if let Some(candidates) = json["candidates"].as_array() {
-            if let Some(candidate) = candidates.first() {
-                if let Some(parts) = candidate["content"]["parts"].as_array() {
-                    for part in parts {
-                        if let Some(text) = part["text"].as_str() {
-                            on_event
-                                .send(format!("c:{}", text))
-                                .map_err(|e| e.to_string())?;
-                        }
-                    }
-                }
-            }
-        }
-        return Ok(());
     }
 
     // --- 🌊 流式处理 ---

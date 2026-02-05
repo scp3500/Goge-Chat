@@ -89,6 +89,19 @@ pub fn init_social_db(conn: &Connection) -> Result<()> {
             FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE,
             FOREIGN KEY (session_id) REFERENCES social_sessions (id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS character_states (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id INTEGER NOT NULL,
+            session_id INTEGER NOT NULL,
+            mood TEXT NOT NULL DEFAULT 'neutral',
+            busy_level REAL NOT NULL DEFAULT 0.5,
+            interest_level REAL NOT NULL DEFAULT 0.5,
+            message_count INTEGER NOT NULL DEFAULT 0,
+            last_analyzed DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (contact_id) REFERENCES contacts (id) ON DELETE CASCADE,
+            FOREIGN KEY (session_id) REFERENCES social_sessions (id) ON DELETE CASCADE,
+            UNIQUE(contact_id, session_id)
+        );
         ",
     )?;
 
@@ -642,7 +655,7 @@ pub async fn get_recent_social_chats(
 // --- ✨ Session Management Commands ---
 
 #[tauri::command]
-pub async fn get_social_sessions(
+pub fn get_social_sessions(
     state: tauri::State<'_, SocialDbState>,
     contact_id: i64,
 ) -> Result<Vec<SocialSession>, String> {
@@ -678,7 +691,7 @@ pub async fn get_social_sessions(
 }
 
 #[tauri::command]
-pub async fn create_social_session(
+pub fn create_social_session(
     state: tauri::State<'_, SocialDbState>,
     contact_id: i64,
     title: String,
@@ -693,7 +706,7 @@ pub async fn create_social_session(
 }
 
 #[tauri::command]
-pub async fn update_social_session_title(
+pub fn update_social_session_title(
     state: tauri::State<'_, SocialDbState>,
     id: i64,
     title: String,
@@ -708,10 +721,7 @@ pub async fn update_social_session_title(
 }
 
 #[tauri::command]
-pub async fn touch_social_session(
-    state: tauri::State<'_, SocialDbState>,
-    id: i64,
-) -> Result<(), String> {
+pub fn touch_social_session(state: tauri::State<'_, SocialDbState>, id: i64) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE social_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
@@ -722,7 +732,7 @@ pub async fn touch_social_session(
 }
 
 #[tauri::command]
-pub async fn delete_social_session(
+pub fn delete_social_session(
     state: tauri::State<'_, SocialDbState>,
     id: i64,
 ) -> Result<(), String> {
@@ -731,4 +741,172 @@ pub async fn delete_social_session(
     conn.execute("DELETE FROM social_sessions WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// --- ✨ Character State Management Commands ---
+
+/// 获取角色状态
+#[tauri::command]
+pub fn get_character_state(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    session_id: i64,
+) -> Result<Option<serde_json::Value>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    let result = conn
+        .query_row(
+            "SELECT mood, busy_level, interest_level, message_count, last_analyzed 
+             FROM character_states 
+             WHERE contact_id = ?1 AND session_id = ?2",
+            params![contact_id, session_id],
+            |row| {
+                Ok(serde_json::json!({
+                    "mood": row.get::<_, String>(0)?,
+                    "busyLevel": row.get::<_, f32>(1)?,
+                    "interestLevel": row.get::<_, f32>(2)?,
+                    "messageCount": row.get::<_, u32>(3)?,
+                    "lastAnalyzed": row.get::<_, String>(4)?,
+                }))
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    Ok(result)
+}
+
+/// 保存或更新角色状态
+#[tauri::command]
+pub fn upsert_character_state(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    session_id: i64,
+    mood: String,
+    busy_level: f32,
+    interest_level: f32,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO character_states (contact_id, session_id, mood, busy_level, interest_level, message_count, last_analyzed)
+         VALUES (?1, ?2, ?3, ?4, ?5, 0, datetime('now'))
+         ON CONFLICT(contact_id, session_id) 
+         DO UPDATE SET 
+            mood = excluded.mood,
+            busy_level = excluded.busy_level,
+            interest_level = excluded.interest_level,
+            last_analyzed = datetime('now')",
+        params![contact_id, session_id, mood, busy_level, interest_level],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// 增加消息计数
+#[tauri::command]
+pub fn increment_message_count(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    session_id: i64,
+) -> Result<u32, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    // 确保记录存在
+    conn.execute(
+        "INSERT OR IGNORE INTO character_states (contact_id, session_id, mood, busy_level, interest_level, message_count)
+         VALUES (?1, ?2, 'neutral', 0.5, 0.5, 0)",
+        params![contact_id, session_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 增加计数
+    conn.execute(
+        "UPDATE character_states 
+         SET message_count = message_count + 1 
+         WHERE contact_id = ?1 AND session_id = ?2",
+        params![contact_id, session_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 返回新的计数
+    let count = conn
+        .query_row(
+            "SELECT message_count FROM character_states WHERE contact_id = ?1 AND session_id = ?2",
+            params![contact_id, session_id],
+            |row| row.get::<_, u32>(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(count)
+}
+
+/// 检查状态缓存是否有效
+#[tauri::command]
+pub fn is_state_cache_valid(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    session_id: i64,
+    cache_duration_min: i64,
+) -> Result<bool, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    let is_valid = conn
+        .query_row(
+            "SELECT 1 FROM character_states 
+             WHERE contact_id = ?1 AND session_id = ?2
+             AND datetime(last_analyzed, '+' || ?3 || ' minutes') > datetime('now')",
+            params![contact_id, session_id, cache_duration_min],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .unwrap_or(false);
+
+    Ok(is_valid)
+}
+
+/// 重置消息计数
+#[tauri::command]
+pub fn reset_message_count(
+    state: tauri::State<'_, SocialDbState>,
+    contact_id: i64,
+    session_id: i64,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "UPDATE character_states 
+         SET message_count = 0 
+         WHERE contact_id = ?1 AND session_id = ?2",
+        params![contact_id, session_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// 清理重复的消息
+/// 删除内容相同、session相同、role相同、时间相近（1分钟内）的重复消息
+/// 保留 ID 最小的那条
+#[tauri::command]
+pub fn cleanup_duplicate_messages(state: tauri::State<'_, SocialDbState>) -> Result<usize, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    // 删除重复消息，保留每组中 ID 最小的
+    let deleted = conn
+        .execute(
+            "DELETE FROM social_messages
+         WHERE id NOT IN (
+             SELECT MIN(id)
+             FROM social_messages
+             GROUP BY contact_id, session_id, role, content, datetime(created_at, 'start of minute')
+         )",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+
+    println!("🧹 清理了 {} 条重复消息", deleted);
+    Ok(deleted)
 }

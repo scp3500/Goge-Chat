@@ -117,6 +117,9 @@ export interface AppSettings {
     // Chat Mode Configuration
     chatMode: ChatModeConfig;
 
+    // Immersive Mode Configuration
+    immersiveMode: ImmersiveModeConfig;
+
     // UI Density / Scaling
     globalScale: number;
 
@@ -138,6 +141,26 @@ export interface ChatModeConfig {
     enableStream: boolean;      // Override global stream setting
     enableLoadingBar: boolean; // Show/Hide "Thinking..." or progress bar
     showSocialClock: boolean; // Show/Hide real-time clock in social sidebar
+}
+
+// 沉浸式模式配置
+export interface ImmersiveModeConfig {
+    enabled: boolean;
+    behaviors: {
+        replyDelay: [number, number] | null;  // [min, max] in ms
+        multiSegment: number | null;           // max segments
+        ignoreRate: number;                    // 0.0 - 1.0
+        typoCorrection: {
+            triggerRate: number;               // 0.0 - 1.0
+            fixDelayMs: number;                // delay before fixing typo
+        } | null;
+        proactiveInitiation: {
+            idleThresholdMin: number;          // minutes of idle before triggering
+            successRate: number;               // 0.0 - 1.0
+            cooldownMin: number;               // cooldown between proactive messages
+        } | null;
+        typingJitter: boolean;                 // add randomness to typing delays
+    };
 }
 
 // 默认的模型提供商配置
@@ -281,6 +304,24 @@ export const DEFAULT_SETTINGS: AppSettings = {
         enableStream: false,
         enableLoadingBar: false,
         showSocialClock: false
+    },
+    immersiveMode: {
+        enabled: false,
+        behaviors: {
+            replyDelay: [800, 3000],
+            multiSegment: 3,
+            ignoreRate: 0.0,
+            typoCorrection: {
+                triggerRate: 0.02,
+                fixDelayMs: 1500
+            },
+            proactiveInitiation: {
+                idleThresholdMin: 10,
+                successRate: 0.3,
+                cooldownMin: 30
+            },
+            typingJitter: true
+        }
     },
     globalScale: 1.0,
     userAvatarSize: 36,

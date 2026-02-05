@@ -1,7 +1,12 @@
 // Live2D logic moved to standalone project
 
+mod ai_utils;
+mod behavior_engine;
+mod behavior_scheduler;
+mod character_state;
 mod commands;
 mod db;
+mod immersive_settings;
 mod memory;
 mod memory_commands;
 mod models;
@@ -97,6 +102,11 @@ pub fn run() {
             });
             app.manage(memory_state);
 
+            // --- Immersive Mode Scheduler Setup ---
+            let scheduler = Arc::new(behavior_scheduler::MessageScheduler::new());
+            scheduler.start_idle_monitor(app_handle.clone());
+            app.manage(scheduler);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -170,6 +180,17 @@ pub fn run() {
             memory_commands::diagnose_database,
             memory_commands::force_cleanup_database,
             memory_commands::rebuild_database,
+            // 🎭 Immersive Mode Commands
+            commands::immersive_cmd::send_social_message_immersive,
+            commands::immersive_cmd::cancel_immersive_behaviors,
+            commands::immersive_cmd::cancel_all_immersive_behaviors,
+            // 🧠 Character State Commands
+            social_db::get_character_state,
+            social_db::upsert_character_state,
+            social_db::increment_message_count,
+            social_db::is_state_cache_valid,
+            social_db::reset_message_count,
+            social_db::cleanup_duplicate_messages,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 运行异常");

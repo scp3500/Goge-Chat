@@ -3506,6 +3506,7 @@ dependencies = [
  "futures-util",
  "half",
  "lancedb",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "rusqlite",
@@ -3520,6 +3521,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tokenizers",
  "tokio",
+ "tokio-util",
  "urlencoding",
  "uuid",
 ]

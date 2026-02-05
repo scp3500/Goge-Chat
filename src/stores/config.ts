@@ -136,6 +136,15 @@ export const useConfigStore = defineStore('config', () => {
                     chatMode: {
                         ...DEFAULT_SETTINGS.chatMode,
                         ...(saved.chatMode || {})
+                    },
+                    // 确保 immersiveMode 完整 (Deep Merge)
+                    immersiveMode: {
+                        ...DEFAULT_SETTINGS.immersiveMode,
+                        ...(saved.immersiveMode || {}),
+                        behaviors: {
+                            ...DEFAULT_SETTINGS.immersiveMode.behaviors,
+                            ...(saved.immersiveMode?.behaviors || {})
+                        }
                     }
                 };
 

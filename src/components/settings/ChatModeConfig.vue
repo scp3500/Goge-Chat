@@ -2,6 +2,33 @@
 import { useConfigStore } from '../../stores/config';
 
 const configStore = useConfigStore();
+
+// Toggle typo correction feature
+const toggleTypoCorrection = (e) => {
+  if (e.target.checked) {
+    configStore.settings.immersiveMode.behaviors.typoCorrection = {
+      triggerRate: 0.02,
+      fixDelayMs: 1500
+    };
+  } else {
+    configStore.settings.immersiveMode.behaviors.typoCorrection = null;
+  }
+  configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode });
+};
+
+// Toggle proactive initiation feature
+const toggleProactive = (e) => {
+  if (e.target.checked) {
+    configStore.settings.immersiveMode.behaviors.proactiveInitiation = {
+      idleThresholdMin: 10,
+      successRate: 0.3,
+      cooldownMin: 30
+    };
+  } else {
+    configStore.settings.immersiveMode.behaviors.proactiveInitiation = null;
+  }
+  configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode });
+};
 </script>
 
 <template>
@@ -82,8 +109,245 @@ const configStore = useConfigStore();
            </Transition>
         </div>
       </section>
-    </template>
-  </div>
+
+      <!-- 沉浸式行为模拟 (Immersive Behavior Simulation) -->
+      <section class="config-card" v-if="configStore.settings.chatMode && configStore.settings.chatMode.enabled">
+        <div class="card-header">
+           <div class="icon-wrap" style="background: var(--color-warning-alpha-10); color: var(--color-warning);">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+               <circle cx="12" cy="12" r="10"></circle>
+               <path d="M12 6v6l4 2"></path>
+             </svg>
+           </div>
+           <div class="title-wrap">
+             <label>沉浸式行为模拟</label>
+             <span class="hint">让 AI 的回复更加人性化和真实</span>
+           </div>
+        </div>
+        <div class="input-wrap">
+           <div class="row-between">
+              <span class="label-text">启用行为模拟</span>
+              <label class="toggle-switch">
+                <input type="checkbox" 
+                       v-model="configStore.settings.immersiveMode.enabled" 
+                       @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                <span class="slider"></span>
+              </label>
+           </div>
+
+           <!-- 详细设置 -->
+           <Transition name="expand-section">
+             <div v-if="configStore.settings.immersiveMode && configStore.settings.immersiveMode.enabled" class="sub-settings">
+               <div class="divider"></div>
+               
+               <!-- 回复延迟 -->
+               <div class="setting-item">
+                 <label class="setting-label">回复延迟 (毫秒)</label>
+                 <div class="range-inputs">
+                   <input type="number" 
+                          class="number-input"
+                          v-model.number="configStore.settings.immersiveMode.behaviors.replyDelay[0]"
+                          placeholder="最小"
+                          @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                   <span class="range-separator">-</span>
+                   <input type="number" 
+                          class="number-input"
+                          v-model.number="configStore.settings.immersiveMode.behaviors.replyDelay[1]"
+                          placeholder="最大"
+                          @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                 </div>
+               </div>
+                
+                <!-- 消息拆分 -->
+                <div class="setting-item">
+                  <label class="setting-label">最大拆分段数</label>
+                  <input type="number" 
+                         class="number-input full-width"
+                         v-model.number="configStore.settings.immersiveMode.behaviors.multiSegment"
+                         min="1" max="5"
+                         @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                </div>
+                
+                <!-- 段间延迟系数 -->
+                <div class="setting-item">
+                  <label class="setting-label">
+                    段间延迟系数 ({{ (configStore.settings.immersiveMode.behaviors.segmentDelayFactor * 100).toFixed(0) }}%)
+                  </label>
+                  <input type="range" 
+                         class="range-slider"
+                         v-model.number="configStore.settings.immersiveMode.behaviors.segmentDelayFactor"
+                         min="0" max="1" step="0.05"
+                         @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  <span class="hint-small">相对于主延迟的百分比</span>
+                </div>
+                
+               <!-- 已读不回概率 -->
+               <div class="setting-item">
+                 <label class="setting-label">
+                   已读不回概率 ({{ (configStore.settings.immersiveMode.behaviors.ignoreRate * 100).toFixed(0) }}%)
+                 </label>
+                 <input type="range" 
+                        class="range-slider"
+                        v-model.number="configStore.settings.immersiveMode.behaviors.ignoreRate"
+                        min="0" max="1" step="0.01"
+                        @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+               </div>
+               
+               <!-- 撤回修正 -->
+               <div class="row-between">
+                 <div class="col-info">
+                   <label>模拟"手滑"撤回</label>
+                   <span class="hint-small" v-if="configStore.settings.immersiveMode.behaviors.typoCorrection">
+                     触发概率: {{ (configStore.settings.immersiveMode.behaviors.typoCorrection.triggerRate * 100).toFixed(1) }}%
+                   </span>
+                   <span class="hint-small" v-else>已禁用</span>
+                 </div>
+                 <label class="toggle-switch small">
+                   <input type="checkbox" 
+                          :checked="!!configStore.settings.immersiveMode.behaviors.typoCorrection"
+                          @change="toggleTypoCorrection" />
+                   <span class="slider"></span>
+                 </label>
+               </div>
+               
+               <!-- 主动开启话题 -->
+               <div class="setting-group">
+                 <div class="row-between">
+                   <div class="col-info">
+                     <label>主动开启话题</label>
+                     <span class="hint-small" v-if="configStore.settings.immersiveMode.behaviors.proactiveInitiation">
+                       当前配置: {{ configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdMin }}分 / {{ (configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate * 100).toFixed(0) }}%
+                     </span>
+                     <span class="hint-small" v-else>已禁用</span>
+                   </div>
+                   <label class="toggle-switch small">
+                     <input type="checkbox" 
+                            :checked="!!configStore.settings.immersiveMode.behaviors.proactiveInitiation"
+                            @change="toggleProactive" />
+                     <span class="slider"></span>
+                   </label>
+                 </div>
+                 
+                 <Transition name="expand-section">
+                   <div v-if="configStore.settings.immersiveMode.behaviors.proactiveInitiation" class="nested-settings">
+                     <div class="setting-item">
+                       <label class="setting-label">
+                         空闲触发阈值 ({{ configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdMin }} 分钟)
+                       </label>
+                       <input type="range" 
+                              class="range-slider"
+                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdMin"
+                              min="1" max="120" step="1"
+                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                       <span class="hint-small">多长时间没说话后触发</span>
+                     </div>
+                     
+                     <div class="setting-item">
+                       <label class="setting-label">
+                         触发成功率 ({{ (configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate * 100).toFixed(0) }}%)
+                       </label>
+                       <input type="range" 
+                              class="range-slider"
+                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate"
+                              min="0" max="1" step="0.05"
+                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                       <span class="hint-small">满足空闲条件时发起话题的概率</span>
+                     </div>
+                     
+                     <div class="setting-item">
+                       <label class="setting-label">
+                         冷却时长 ({{ configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownMin }} 分钟)
+                       </label>
+                       <input type="range" 
+                              class="range-slider"
+                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownMin"
+                              min="5" max="240" step="5"
+                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                       <span class="hint-small">防止短时间连续主动打扰</span>
+                     </div>
+                     
+                     <div class="dynamic-badge" v-if="configStore.settings.immersiveMode.behaviors.character_state_config?.enabled">
+                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path></svg>
+                       <span>受角色心情动态调节: 兴趣高更积极, 忙碌时更安静</span>
+                     </div>
+                   </div>
+                 </Transition>
+               </div>
+                
+                <!-- 打字状态抖动 -->
+                <div class="row-between">
+                  <div class="col-info">
+                    <label>打字状态抖动</label>
+                    <span class="hint-small">模拟断断续续的输入</span>
+                  </div>
+                  <label class="toggle-switch small">
+                    <input type="checkbox" 
+                           v-model="configStore.settings.immersiveMode.behaviors.typingJitter"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <!-- 角色状态追踪 -->
+                <div v-if="configStore.settings.immersiveMode.behaviors.characterStateConfig" class="setting-group">
+                  <div class="row-between">
+                    <div class="col-info">
+                      <label>🧠 角色状态追踪</label>
+                      <span class="hint-small">通过AI分析角色心情和状态</span>
+                    </div>
+                    <label class="toggle-switch small">
+                      <input type="checkbox" 
+                             v-model="configStore.settings.immersiveMode.behaviors.characterStateConfig.enabled"
+                             @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <Transition name="expand-section">
+                    <div v-if="configStore.settings.immersiveMode.behaviors.characterStateConfig.enabled" class="nested-settings">
+                      <div class="setting-item">
+                        <label class="setting-label">状态分析频率 (每N条消息)</label>
+                        <input type="number" 
+                               class="number-input full-width"
+                               v-model.number="configStore.settings.immersiveMode.behaviors.characterStateConfig.analysisFrequency"
+                               min="1" max="100"
+                               @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                        <span class="hint-small">⚠️ 减少频次可降低API成本</span>
+                      </div>
+                      
+                      <div class="setting-item">
+                        <label class="setting-label">状态缓存时长 (分钟)</label>
+                        <input type="number" 
+                               class="number-input full-width"
+                               v-model.number="configStore.settings.immersiveMode.behaviors.characterStateConfig.cacheDurationMin"
+                               min="1" max="120"
+                               @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                        <span class="hint-small">避免短时间内重复分析</span>
+                      </div>
+                      
+                      <div class="row-between">
+                        <div class="col-info">
+                          <label>主动发言时分析状态</label>
+                          <span class="hint-small">空闲触发时是否分析</span>
+                        </div>
+                        <label class="toggle-switch small">
+                          <input type="checkbox" 
+                                 v-model="configStore.settings.immersiveMode.behaviors.characterStateConfig.analysisOnProactive"
+                                 @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+              </div>
+            </Transition>
+         </div>
+       </section>
+     </template>
+   </div>
 </template>
 
 <style scoped>
@@ -296,5 +560,132 @@ input:checked + .slider:before {
   max-height: 0;
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Immersive Mode Settings Styles */
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-label {
+  font-size: 13px;
+  color: var(--text-color-white);
+  font-weight: 500;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-separator {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.number-input {
+  background: var(--bg-input-dim);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-color-white);
+  font-size: 13px;
+  outline: none;
+  width: 100px;
+  transition: all 0.2s;
+}
+
+.number-input.full-width {
+  width: 100%;
+}
+
+.number-input:focus {
+  border-color: var(--color-primary);
+  background: var(--bg-input-focus);
+}
+
+.range-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-input-dim);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.range-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px var(--color-primary);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.range-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px var(--color-primary);
+}
+
+/* New Settings Styles */
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nested-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 16px;
+  margin-top: 8px;
+  border-left: 2px solid var(--border-glass);
+}
+
+.hint-small {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  display: block;
+  margin-top: 4px;
+}
+
+.dynamic-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-primary-alpha-10);
+  border: 1px solid var(--color-primary-alpha-20);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 12px;
+  color: var(--color-primary);
+  font-size: 11px;
+}
+
+.dynamic-badge svg {
+  width: 14px;
+  height: 14px;
 }
 </style>

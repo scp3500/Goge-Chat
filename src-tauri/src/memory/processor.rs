@@ -186,8 +186,8 @@ pub async fn extract_and_store_facts(
     let mode = mode.to_string();
 
     // 🧠 维度二：静默合成机制 (Automated Extraction)
-    // 异步复盘 (Async Task)：利用 Rust 的 tokio::spawn
-    tokio::spawn(async move {
+    // 异步复盘 (Async Task)：利用 Rust 的 tauri::async_runtime::spawn
+    tauri::async_runtime::spawn(async move {
         // println!("🧠 [记忆] 启动异步事实提取任务 (Session: {})", session_id);
         // println!("🧠 [记忆] 提取模式: {}, 角色: {}", mode, role_id);
 
