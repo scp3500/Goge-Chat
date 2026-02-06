@@ -115,6 +115,7 @@ pub fn run() {
             commands::config_cmd::save_config,
             // AI 交互
             commands::ai::ask_ai,
+            commands::ai::discover_models_raw,
             stop_ai_generation,
             reset_ai_generation,
             title_commands::generate_title,

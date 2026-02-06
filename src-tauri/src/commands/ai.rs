@@ -502,3 +502,46 @@ async fn handle_gemini_native(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn discover_models_raw(
+    url: String,
+    api_key: Option<String>,
+    headers_map: Option<std::collections::HashMap<String, String>>,
+    client: State<'_, reqwest::Client>,
+) -> Result<Value, String> {
+    println!("🔍 [ModelDiscovery] Backend fetching from: {}", url);
+
+    let mut request = client.get(&url);
+
+    if let Some(key) = api_key {
+        if !key.is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", key));
+        }
+    }
+
+    if let Some(h) = headers_map {
+        for (k, v) in h {
+            request = request.header(k, v);
+        }
+    }
+
+    println!("🔍 [ModelDiscovery] Sending request with Authorization header");
+
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let err_text = response.text().await.unwrap_or_default();
+        return Err(format!("API Error ({}): {}", status, err_text));
+    }
+
+    let data = response
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("JSON parse error: {}", e))?;
+    Ok(data)
+}

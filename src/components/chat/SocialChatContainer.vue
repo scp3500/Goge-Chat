@@ -467,14 +467,13 @@ const triggerAIRequest = async (targetMessage = null) => {
     msgInArray.content = aiFullContent;
 
     // 4. 🧠 Auto Summary Check
-    const validMsgCount = messages.value.filter(m => m.content !== "__LOADING__").length;
-    // Check if title is default. Weak check using string inclusion or exact match.
-    // Better to check against "默认会话" or "新对话"
-    const isDefaultTitle = ["默认会话", "新对话"].includes(activeSessionTitle.value);
-    const shouldReSummary = validMsgCount % 20 === 0; // 每20条重新总结一次
+    const validMsgCount = messages.value.filter(m => m.content && m.content !== "__LOADING__").length;
+    const isDefaultTitle = !activeSessionTitle.value || 
+                         ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSessionTitle.value);
     
-    if (chatStore.activeSocialSessionId && ( (validMsgCount >= 2 && isDefaultTitle) || shouldReSummary )) {
-        console.log("🧠 Triggering Adaptive Summary...");
+    // Check for summary after AI response
+    if (chatStore.activeSocialSessionId && (validMsgCount >= 2 && isDefaultTitle)) {
+        console.log(`[Social Title] Traditional Trigger: Count=${validMsgCount}, Title="${activeSessionTitle.value}"`);
         autoSummaryTitle(chatStore.activeSocialSessionId);
     }
 
@@ -483,8 +482,7 @@ const triggerAIRequest = async (targetMessage = null) => {
     msgInArray.content = "发生错误: " + e;
   } finally {
     isGenerating.value = false;
-    chatStore.isGenerating = false; // ⚡️ Sync state end
-    // ⚡️ FINAL SCROLL TO BOTTOM
+    chatStore.isGenerating = false; 
     triggerScroll('smooth');
   }
 };
@@ -509,36 +507,31 @@ const handleSend = async (text, fileMetadata = null) => {
     // 1. Save and add user message locally with ID
     const savedUserId = await invoke("save_social_message", { 
         contactId,
-        sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
+        sessionId: chatStore.activeSocialSessionId,
         role: "user", 
         content: userText,
-        fileMetadata // ✨ Support files
+        fileMetadata 
     });
     
     messages.value.push({ 
       id: savedUserId,
       role: "user", 
       content: userText,
-      fileMetadata, // ✨ Support files
+      fileMetadata,
       created_at: new Date().toISOString().replace('T', ' ').replace('Z', '') 
     });
-    hasNewMessages.value = true; // ✍️ 标记产生了新交互
-    triggerScroll('smooth'); // 🌊 Smooth scroll for user action
+    hasNewMessages.value = true;
+    triggerScroll('smooth');
 
     // 2. 🎭 Check if immersive mode is enabled
     if (configStore.settings.immersiveMode?.enabled) {
-        // 🎭 Immersive Mode: Generate AI response WITHOUT saving/displaying
-        // The backend will handle the immersive display through events
-        
         isGenerating.value = true;
         chatStore.isGenerating = true;
         
         try {
-            // Generate AI response (we need the content but won't save it)
             const onEvent = new Channel();
             let aiFullContent = "";
             
-            // Re-fetch contact info for latest prompt/model
             let currentContact = props.activeContact;
             try {
                 const contacts = await invoke("get_social_contacts");
@@ -554,7 +547,6 @@ const handleSend = async (text, fileMetadata = null) => {
                 }
             };
             
-            // Build message history
             const history = messages.value.map(m => ({
                 role: m.role,
                 content: m.content,
@@ -566,25 +558,32 @@ const handleSend = async (text, fileMetadata = null) => {
                 history.unshift({ role: "system", content: currentContact.prompt });
             }
             
-            // Generate AI response
             await invoke("ask_ai", {
                 msg: history,
                 onEvent,
                 explicitProviderId: currentContact.provider || configStore.settings.defaultProviderId,
                 explicitModelId: currentContact.model,
-                stream: false // Don't stream in immersive mode
+                stream: false
             });
             
-            // Now send through immersive mode (backend will handle display)
             await invoke("send_social_message_immersive", {
                 sessionId: chatStore.activeSocialSessionId,
                 contactId,
                 content: aiFullContent
             });
+
+            // ✨ Trigger Summary in Immersive Mode
+            const validMsgCount = messages.value.filter(m => m.content && m.content !== "__LOADING__").length;
+            const isDefaultTitle = !activeSessionTitle.value || 
+                                 ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSessionTitle.value);
+            
+            if (chatStore.activeSocialSessionId && (validMsgCount >= 2 && isDefaultTitle)) {
+                console.log(`[Social Title] Immersive Trigger: Count=${validMsgCount}, Title="${activeSessionTitle.value}"`);
+                autoSummaryTitle(chatStore.activeSocialSessionId);
+            }
             
         } catch (e) {
             console.error("Immersive AI generation failed:", e);
-            // Fallback: add error message
             messages.value.push({
                 role: "assistant",
                 content: "发生错误: " + e,
@@ -594,12 +593,10 @@ const handleSend = async (text, fileMetadata = null) => {
             isGenerating.value = false;
             chatStore.isGenerating = false;
         }
-        
     } else {
-        // Traditional mode: direct AI request with immediate display
+        // Traditional mode
         await triggerAIRequest();
     }
-
   } catch (e) {
     console.error("Social chat send error:", e);
   }
@@ -637,10 +634,15 @@ const autoSummaryTitle = async (sessionId) => {
             explicitModelId: props.activeContact.model
         });
         
-        let finalTitle = rawTitle.trim().replace(/["'“”]/g, '');
+        let finalTitle = rawTitle.trim()
+            .replace(/^["'“”«「]|["'“”»」]$/g, "")
+            .replace(/[。！!？?]$/, "")
+            .trim();
+            
         if (finalTitle.length > 30) finalTitle = finalTitle.substring(0, 30);
 
-        if (finalTitle && finalTitle.length > 0 && finalTitle !== "新对话") {
+        if (finalTitle && finalTitle.length > 0 && finalTitle !== activeSessionTitle.value && !["新对话", "默认会话", "New Chat"].includes(finalTitle)) {
+            console.log(`[Social Title] 标题更名: ${activeSessionTitle.value} -> ${finalTitle}`);
             // Update DB
             await invoke("update_social_session_title", { 
                 id: sessionId, 
@@ -651,6 +653,8 @@ const autoSummaryTitle = async (sessionId) => {
 
             // 🔄 Sync: Notify sidebar to reload
             chatStore.triggerSocialSessionRefresh();
+        } else {
+            console.log("[Social Title] 标题无实质变化或为默认值，跳过更新");
         }
     } catch (e) {
         console.error("Auto summary failed:", e);

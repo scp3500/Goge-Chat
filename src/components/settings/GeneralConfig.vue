@@ -64,7 +64,8 @@ const allModels = computed(() => {
           models.push({
             id: modelId,
             providerName: p.name,
-            displayName: `${p.name} - ${modelName}`
+            displayName: `${p.name} - ${modelName}`,
+            features: typeof m === 'string' ? [] : (m.features || [])
           });
         });
       }

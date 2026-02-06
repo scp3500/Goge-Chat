@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 import { useConfigStore } from '../../stores/config';
 import { 
   SEARCH_SVG, 
@@ -29,6 +30,11 @@ const showManageModal = ref(false);
 const fetchingModels = ref(false);
 const discoveredModels = ref<any[]>([]);
 const editingModel = ref<ModelInfo | null>(null);
+
+// Cache for discovered models (key: providerId, value: models array)
+const discoveryCache = new Map<string, { models: any[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const connectivityStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle');
 const connectivityError = ref('');
 const showApiKey = ref(false);
@@ -53,6 +59,9 @@ const filteredGroupedModels = computed(() => {
         else if (modelId.startsWith('gpt-3.5')) group = 'GPT-3.5 Series';
         else if (modelId.startsWith('claude-3')) group = 'Claude 3';
         else if (modelId.startsWith('gemini-1.5')) group = 'Gemini 1.5';
+        else if (modelId.startsWith('gemini-2.0')) group = 'Gemini 2.0';
+        else if (modelId.startsWith('gemini-3')) group = 'Gemini 3';
+        else if (modelId.startsWith('o1') || modelId.startsWith('o3')) group = 'OpenAI o-Series';
         
         return {
             id: modelId,
@@ -84,7 +93,11 @@ const filteredGroupedModels = computed(() => {
   }, {});
 });
 
-// CRUD Operations
+const handleAddNewModel = () => {
+    editingModel.value = null;
+    showAddModal.value = true;
+};
+
 const startEditModel = (model: ModelInfo) => {
     editingModel.value = model;
     showAddModal.value = true;
@@ -127,6 +140,15 @@ const fetchProviderModels = async () => {
         alert('请先配置 API Key');
         return;
     }
+
+    // Check cache first
+    const cached = discoveryCache.get(props.providerId);
+    if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+        console.log('[ModelDiscovery] Using cached data for', props.providerId);
+        discoveredModels.value = cached.models;
+        showManageModal.value = true;
+        return;
+    }
     
     fetchingModels.value = true;
     discoveredModels.value = [];
@@ -134,6 +156,9 @@ const fetchProviderModels = async () => {
         let baseUrl = providerConfig.value.baseUrl || '';
         let url = '';
         let headers: Record<string, string> = { 'Accept': 'application/json' };
+
+        console.log('[ModelDiscovery] Provider ID:', props.providerId);
+        console.log('[ModelDiscovery] Base URL:', baseUrl);
 
         if (props.providerId === 'gemini') {
             url = `${baseUrl}/v1beta/models?key=${providerConfig.value.apiKey}`;
@@ -147,7 +172,6 @@ const fetchProviderModels = async () => {
         } else {
             url = baseUrl;
             if (url.includes('siliconflow.cn') || !url.includes('/v1')) {
-                // For SiliconFlow and others without /v1, we need /v1/models
                 if (!url.endsWith('/v1')) {
                     if (!url.endsWith('/')) url += '/';
                     url += 'v1/models';
@@ -160,42 +184,71 @@ const fetchProviderModels = async () => {
                     url += 'models';
                 }
             }
-            headers['Authorization'] = `Bearer ${providerConfig.value.apiKey}`;
+            // Don't add Authorization here - it's handled by apiKey parameter
         }
         
-        const resp = await fetch(url, { headers });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        console.log('[ModelDiscovery] Constructed URL:', url);
+        console.log('[ModelDiscovery] Headers:', headers);
+        console.log('[ModelDiscovery] API Key (first 10 chars):', providerConfig.value.apiKey?.substring(0, 10));
+        console.log('[ModelDiscovery] Requesting via backend proxy...');
         
-        if (props.providerId === 'ollama') {
-            if (data.models) {
-                discoveredModels.value = data.models.map((m: any) => ({
-                    id: m.name,
-                    name: m.name,
-                    group: 'Ollama Local'
-                }));
+        const data = await invoke('discover_models_raw', {
+            url,
+            // Only pass apiKey for providers that use Authorization header (not Gemini/Ollama)
+            apiKey: (props.providerId === 'ollama' || props.providerId === 'gemini') ? null : providerConfig.value.apiKey,
+            headersMap: Object.keys(headers).length > 0 ? headers : null
+        }) as any;
+        
+        console.log('[ModelDiscovery] Received data from backend:', data);
+
+        let rawList: any[] = [];
+        if (Array.isArray(data)) {
+            rawList = data;
+        } else if (data.data && Array.isArray(data.data)) {
+            rawList = data.data;
+        } else if (data.models && Array.isArray(data.models)) {
+            rawList = data.models;
+        }
+
+        if (rawList.length > 0) {
+            discoveredModels.value = rawList.map((m: any) => {
+                const modelId = typeof m === 'string' ? m : (m.id || m.name || m.model || '');
+                const modelName = typeof m === 'string' ? m : (m.displayName || m.name || m.id || '');
+                
+                let group = 'API Discovery';
+                if (props.providerId === 'ollama') group = 'Ollama Local';
+                else if (props.providerId === 'gemini') group = 'Google Gemini';
+
+                return {
+                    id: modelId.includes('/') && props.providerId !== 'ollama' ? modelId.split('/').pop() : modelId,
+                    name: modelName.includes('/') && props.providerId !== 'ollama' ? modelName.split('/').pop() : modelName,
+                    group: group
+                };
+            }).filter(m => m.id); // Filter out empty IDs
+
+            if (discoveredModels.value.length > 0) {
+                // Cache the results
+                discoveryCache.set(props.providerId, {
+                    models: discoveredModels.value,
+                    timestamp: Date.now()
+                });
+                showManageModal.value = true;
+            } else {
+                alert('解析成功，但未发现有效模型 ID。');
             }
-        } else if (data.models) {
-            discoveredModels.value = data.models.map((m: any) => ({
-                id: m.name.includes('/') ? m.name.split('/').pop() : m.id || m.name,
-                name: m.displayName || m.name.split('/').pop(),
-                group: 'API Discovery'
-            }));
-        } else if (data.data) {
-            discoveredModels.value = data.data.map((m: any) => ({
-                id: m.id,
-                name: m.id,
-                group: 'API Discovery'
-            }));
-        }
-        
-        if (discoveredModels.value.length > 0) {
-            showManageModal.value = true;
         } else {
-            alert('获取成功，但未返回模型列表。');
+            alert('获取成功，但返回的模型列表为空。');
         }
     } catch (e: any) {
-        alert(`获取失败: ${e.message}`);
+        console.error('[ModelDiscovery] Failed:', e);
+        const errorMsg = typeof e === 'string' ? e : (e?.message || e?.toString() || 'Unknown error');
+        
+        // Check if it's a 400/401/403 error suggesting the API doesn't support model listing
+        if (errorMsg.includes('400') || errorMsg.includes('401') || errorMsg.includes('403')) {
+            alert(`自动发现失败：${errorMsg}\n\n该 API 可能不支持模型列表查询。\n请使用“手动新建”按钮添加您知道的模型 ID（如 gpt-4, gpt-3.5-turbo 等）。`);
+        } else {
+            alert(`获取失败: ${errorMsg}`);
+        }
     } finally {
         fetchingModels.value = false;
     }
@@ -213,6 +266,28 @@ const addFromDiscovery = (model: any) => {
         features: []
     });
     configStore.updateProvider(props.providerId, { models });
+};
+
+const addAllFromDiscovery = () => {
+    if (!providerConfig.value || !discoveredModels.value.length) return;
+    const models = [...providerConfig.value.models];
+    let addedCount = 0;
+    
+    discoveredModels.value.forEach(dm => {
+        if (!models.some(m => (typeof m === 'string' ? m : m.id) === dm.id)) {
+            models.push({
+                id: dm.id,
+                name: dm.name || dm.id,
+                group: dm.group || '',
+                features: []
+            });
+            addedCount++;
+        }
+    });
+
+    if (addedCount > 0) {
+        configStore.updateProvider(props.providerId, { models });
+    }
 };
 
 const isModelAdded = (id: string) => {
@@ -472,7 +547,7 @@ const confirmTest = () => {
       </div>
 
       <div class="header-actions">
-        <span class="action-icon" @click="showAddModal = true" v-html="PLUS_SVG" title="手动添加"></span>
+        <span class="action-icon" @click="handleAddNewModel" v-html="PLUS_SVG" title="手动添加"></span>
       </div>
     </div>
 
@@ -494,11 +569,11 @@ const confirmTest = () => {
     </div>
     
     <div class="footer-actions-v3">
-      <button class="manage-btn-v3" @click="fetchProviderModels" :disabled="fetchingModels">
-        {{ fetchingModels ? '正在获取...' : '管理' }}
+      <button class="manage-btn-v3" @click="fetchProviderModels" :disabled="fetchingModels" title="从接口自动获取可用列表">
+        {{ fetchingModels ? '正在获取...' : '自动发现' }}
       </button>
-      <button class="add-btn-v3" @click="showAddModal = true">
-        添加
+      <button class="add-btn-v3" @click="handleAddNewModel">
+        手动新建
       </button>
     </div>
 
@@ -517,6 +592,7 @@ const confirmTest = () => {
         :isModelAdded="isModelAdded"
         @close="showManageModal = false"
         @add="addFromDiscovery"
+        @add-all="addAllFromDiscovery"
     />
 
     <!-- User Requested Connectivity Test Modal -->

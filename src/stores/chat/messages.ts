@@ -240,37 +240,56 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
      */
     const autoSummaryTitle = async (sessionId: string) => {
         try {
-            // 1. 构造 Prompt
+            console.log(`[Title] 开始为会话 ${sessionId} 生成标题...`);
             const prompt = "请总结以上对话的标题(8-10字)。直接返回标题文字，不要代码，不要标点符号。";
 
-            const filteredMsgs = currentMessages.value.filter(m => m.content !== "__LOADING__");
-            // 取前几轮对话 + prompt
+            const filteredMsgs = currentMessages.value.filter(m => m.content && m.content !== "__LOADING__");
+            if (filteredMsgs.length < 2) {
+                console.log("[Title] 消息太少，跳过总结");
+                return;
+            }
+
+            // 确保包含用户消息。如果第一条是 system，则从第 1 条开始取；否则从第 0 条开始。
+            const startIdx = filteredMsgs[0]?.role === 'system' ? 1 : 0;
             const summaryMsgs = [
-                ...filteredMsgs.slice(1, 5),
+                ...filteredMsgs.slice(startIdx, startIdx + 4).map(m => ({
+                    role: m.role,
+                    content: m.content
+                })),
                 { role: "user", content: prompt }
             ];
 
-            console.log("=== [Blocking] 请求后端生成标题 ===");
-
             const rawTitle = await invoke<string>("generate_title", {
-                msg: summaryMsgs
+                msg: summaryMsgs,
+                explicitProviderId: configStore.settings.defaultProviderId,
+                explicitModelId: configStore.settings.selectedModelId
             });
 
-            console.log("✨ 后端返回原始标题:", rawTitle);
+            console.log("[Title] 后端返回原始标题:", rawTitle);
 
-            // 3. 简单的长度截断
-            let finalTitle = rawTitle.trim();
-            if (finalTitle.length > 10) {
-                finalTitle = finalTitle.substring(0, 10);
+            // 3. 清理标题（去除引号、换行、末尾标点）
+            let finalTitle = rawTitle.trim()
+                .replace(/^["'“”«「]|["'“”»」]$/g, "")
+                .replace(/[。！!？?]$/, "")
+                .trim();
+
+            if (finalTitle.length > 15) {
+                finalTitle = finalTitle.substring(0, 15);
             }
 
             // 5. 应用更新
-            if (finalTitle && finalTitle.length > 0 && finalTitle !== "新对话") {
+            const currentSession = activeSession.value;
+            const oldTitle = currentSession?.title || "";
+
+            if (finalTitle && finalTitle.length > 0 && finalTitle !== oldTitle && !["新对话", "默认会话", "New Chat"].includes(finalTitle)) {
+                console.log(`[Title] 标题变更: "${oldTitle}" -> "${finalTitle}"`);
                 await deps.renameSession(sessionId, finalTitle);
+            } else {
+                console.log("[Title] 标题无变化或 AI 返回了默认值，跳过更新");
             }
 
         } catch (e) {
-            console.error("自动总结标题失败 (请检查 Rust 后端是否实现了 generate_title):", e);
+            console.error("自动总结标题失败:", e);
         }
     };
 
@@ -565,8 +584,12 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             await saveAssistantResponse(sessionId, aiFullContent, finalReasoningContent, null, finalSearchMetadata);
 
             // 自动总结标题
-            const msgCount = currentMessages.value.filter(m => m.content !== "__LOADING__").length;
-            if (msgCount >= 5 && activeSession.value?.title === "新对话") {
+            const msgCount = currentMessages.value.filter(m => m.content && m.content !== "__LOADING__").length;
+            const isDefaultTitle = !activeSession.value?.title ||
+                ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSession.value?.title);
+
+            // 当消息数达到 2 条（一个回合）且标题还是默认值时，触发自动总结
+            if (msgCount >= 2 && isDefaultTitle) {
                 autoSummaryTitle(sessionId);
             }
             console.log("💾 [SAVE] === END SAVING ===");
