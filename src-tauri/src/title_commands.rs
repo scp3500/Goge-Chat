@@ -54,7 +54,6 @@ async fn generate_title_internal_with_params(
     client: &reqwest::Client,
 ) -> Result<String, String> {
     let start_total = std::time::Instant::now();
-    println!("🦀 Rust 后端: 正在请求 AI 处理任务 (接口复用)...");
 
     // 1. 【动态读取】加载配置
     let config = config_cmd::load_config(app).await?;
@@ -95,11 +94,17 @@ async fn generate_title_internal_with_params(
         return res;
     }
 
-    // 格式化 URL
-    let base_url = if base_url_raw.ends_with("/chat/completions") {
-        base_url_raw.clone()
-    } else {
-        format!("{}/chat/completions", base_url_raw.trim_end_matches('/'))
+    // 格式化 URL，复用 ai.rs 的强健逻辑
+    let base_url = {
+        let base = base_url_raw.trim_end_matches('/');
+        if base.ends_with("/chat/completions") {
+            base.to_string()
+        } else if base.ends_with("/v1") {
+            format!("{}/chat/completions", base)
+        } else {
+            // 如果不包含 v1，自动补全 /v1/chat/completions
+            format!("{}/v1/chat/completions", base)
+        }
     };
 
     let request_body = TitleChatRequest {

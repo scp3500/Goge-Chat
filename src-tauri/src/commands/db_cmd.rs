@@ -189,27 +189,7 @@ pub fn save_message(
     let conn = state.0.lock().unwrap();
     let numeric_id = parse_id(&session_id)?;
 
-    println!("💾 [DB CMD] === RECEIVED SAVE_MESSAGE COMMAND ===");
-    println!("💾 [DB CMD] Session ID: {}", session_id);
-    println!("💾 [DB CMD] Role: {}", role);
-    println!("💾 [DB CMD] Provider: {:?}", provider); // Log provider
-    println!("💾 [DB CMD] Content length: {}", content.len());
-    println!(
-        "💾 [DB CMD] Reasoning content: {:?}",
-        reasoning_content
-            .as_ref()
-            .map(|s| format!("length: {}", s.len()))
-    );
-
-    if let Some(ref rc) = reasoning_content {
-        println!(
-            "💾 [DB CMD] Reasoning content preview: {}...",
-            rc.chars().take(100).collect::<String>()
-        );
-    }
-
     // ✅ 调用 db_save_message 并获取返回的 ID
-    println!("💾 [DB CMD] Calling db_save_message...");
     let msg_id = db_save_message(
         &conn,
         numeric_id,

@@ -172,7 +172,7 @@ const handleCloseSettings = () => {
   width: 250px; /* One sidebar width */
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
   flex-shrink: 0;
-  border-right: 1px solid var(--border-glass);
+  border-right: 1px solid var(--border-color); /* 统一规格 */
   overflow: hidden; /* Important for width: 0 animation */
 }
 
@@ -187,7 +187,7 @@ const handleCloseSettings = () => {
   width: 0;
   transition: all 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
   flex-shrink: 0;
-  border-left: 1px solid var(--border-glass); /* Fixed: Should be left border */
+  border-left: 1px solid var(--border-color); /* 统一规格 */
   overflow: hidden;
 }
 

@@ -26,8 +26,11 @@ impl BehaviorEngine {
 
     /// 主决策方法:根据消息内容和上下文生成行为链
     pub fn decide(&self, message: &str, context: &SessionContext) -> Vec<BehaviorAction> {
+        // 🔧 修复:即使沉浸式模式未启用或行为模拟关闭,也要返回基本的 Speak 动作
+        // 这样可以保证一问一答的基本功能
         if !self.settings.enabled {
-            // 沉浸式模式未启用,直接发送
+            // 沉浸式模式未启用,直接发送(无延迟,无拆分)
+            println!("📢 [BehaviorEngine] 沉浸式模式关闭,直接发送消息");
             return vec![BehaviorAction::Speak(message.to_string())];
         }
 
@@ -81,7 +84,7 @@ impl BehaviorEngine {
         let mut adjusted_rate = reply_rate;
         if let Some(interest_level) = context.interest_level {
             // 兴趣度越高,回复概率越高
-            adjusted_rate = (reply_rate + interest_level * 0.3).min(1.0);
+            adjusted_rate = (reply_rate + interest_level * 0.2).min(1.0);
             println!(
                 "🤔 延迟决策: 兴趣度调整回复率 {:.2} -> {:.2}",
                 reply_rate, adjusted_rate
@@ -90,7 +93,8 @@ impl BehaviorEngine {
 
         // 根据忙碌程度降低回复概率
         if let Some(busy_level) = context.busy_level {
-            adjusted_rate = (adjusted_rate - busy_level * 0.3).max(0.0);
+            // 降低忙碌度的负面影响，确保即便忙碌也有较高概率回复
+            adjusted_rate = (adjusted_rate - busy_level * 0.15).max(0.1);
             println!("🤔 延迟决策: 忙碌度调整回复率 {:.2}", adjusted_rate);
         }
 
@@ -116,10 +120,8 @@ impl BehaviorEngine {
         // 根据兴趣度动态调整忽略率
         if let Some(interest_level) = context.interest_level {
             // 兴趣度越高,忽略率越低
-            // interest_level: 0.0 -> ignore_rate * 2.0
-            // interest_level: 0.5 -> ignore_rate * 1.0
-            // interest_level: 1.0 -> ignore_rate * 0.0
-            let interest_factor = 2.0 - (interest_level * 2.0);
+            // 降低兴趣度对忽略率的影响幅度
+            let interest_factor = 2.0 - (interest_level * 1.2);
             ignore_rate = (ignore_rate * interest_factor).min(1.0);
             println!(
                 "📊 兴趣度调整忽略率: {:.2} -> {:.2} (interest: {:.2})",
@@ -129,10 +131,10 @@ impl BehaviorEngine {
 
         // 根据忙碌程度增加忽略率
         if let Some(busy_level) = context.busy_level {
-            // busy_level: 0.0 -> +0%
-            // busy_level: 0.5 -> +25%
-            // busy_level: 1.0 -> +50%
-            ignore_rate = (ignore_rate + busy_level * 0.5).min(1.0);
+            // 进一步降低忙碌度导致的忽略概率
+            // busy_level: 1.0 -> +10% (最高只增加 10% 的不回概率)
+            let busy_contribution = (busy_level * 0.1).min(0.1);
+            ignore_rate = (ignore_rate + busy_contribution).min(1.0);
             println!(
                 "📊 忙碌度调整忽略率: {:.2} (busy: {:.2})",
                 ignore_rate, busy_level
@@ -244,15 +246,25 @@ impl BehaviorEngine {
                 || ch == '？';
 
             if is_delimiter && segments.len() < actual_max - 1 {
-                // 2. 增加随机拆分概率 (80% 几率在此处拆分)
-                // 3. 如果当前段落太短 (比如小于 10 个字符), 降低拆分概率，避免太碎点
+                // 2. 优化：不再是逢标点就拆，而是看长度
+                // 只有当前累积的片段足够长时，才考虑拆分
                 let current_len = current.chars().count();
-                let split_prob = if current_len < 10 { 0.3 } else { 0.8 };
 
-                if rng.gen::<f32>() < split_prob {
-                    if !current.trim().is_empty() {
-                        segments.push(current.trim().to_string());
-                        current.clear();
+                // 动态生成拆分阈值 (默认 40 ~ 100)，增加不可预测性
+                let (min_t, max_t) = self
+                    .settings
+                    .behaviors
+                    .segmentation_threshold_range
+                    .unwrap_or((40, 100));
+                let split_threshold = rng.gen_range(min_t..=max_t) as usize;
+
+                if current_len >= split_threshold {
+                    // 3. 概率降低到 30%，即使长句子也可能不拆
+                    if rng.gen::<f32>() < 0.3 {
+                        if !current.trim().is_empty() {
+                            segments.push(current.trim().to_string());
+                            current.clear();
+                        }
                     }
                 }
             }
@@ -277,16 +289,19 @@ impl BehaviorEngine {
         // 添加初始延迟
         chain.push(BehaviorAction::Wait(delay));
 
-        // 获取段间延迟系数
-        let segment_delay_factor = self.settings.behaviors.segment_delay_factor;
+        // 获取段间延迟系数范围
+        let (min_f, max_f) = self.settings.behaviors.segment_delay_factor;
 
         // 发送每个分段
+        let mut rng = rand::thread_rng();
         for (i, segment) in segments.iter().enumerate() {
             chain.push(BehaviorAction::Speak(segment.clone()));
 
             // 分段之间添加短暂延迟 (除了最后一个)
             if i < segments.len() - 1 {
-                let segment_delay = (delay as f32 * segment_delay_factor) as u32;
+                // 随机生成段间延迟系数
+                let factor = rng.gen_range(min_f..max_f);
+                let segment_delay = (delay as f32 * factor) as u32;
                 chain.push(BehaviorAction::Wait(segment_delay));
             }
         }
@@ -346,7 +361,7 @@ impl BehaviorEngine {
     }
 
     /// 获取动态主动发言参数
-    /// 返回 (空闲阈值分钟, 成功率, 冷却分钟)
+    /// 返回 (空闲阈值秒, 成功率, 冷却秒)
     pub fn get_proactive_parameters(&self, context: &SessionContext) -> (u32, f32, u32) {
         let default_config = crate::immersive_settings::ProactiveConfig::default();
         let config = self
@@ -356,50 +371,87 @@ impl BehaviorEngine {
             .as_ref()
             .unwrap_or(&default_config);
 
-        let mut threshold = config.idle_threshold_min as f32;
+        let (threshold_min, threshold_max) = config.idle_threshold_range;
         let mut success_rate = config.success_rate;
-        let cooldown = config.cooldown_min;
+        let (cooldown_min, cooldown_max) = config.cooldown_range;
+
+        // Covert to f32 for calculation
+        let mut t_min = threshold_min as f32;
+        let mut t_max = threshold_max as f32;
+        let c_min = cooldown_min as f32;
+        let mut c_max = cooldown_max as f32;
 
         // 1. 兴趣度影响 (兴趣度高 -> 阈值减小, 成功率提高)
         if let Some(interest) = context.interest_level {
             // 阈值调整: 0.5->1.0x, 1.0->0.5x, 0.0->1.5x
-            let threshold_factor = 1.5 - interest;
-            threshold *= threshold_factor;
+            // 减缓对阈值的调整幅度
+            let threshold_factor = 1.25 - (interest * 0.5);
+            t_min *= threshold_factor;
+            t_max *= threshold_factor;
 
-            // 成功率调整: 0.5->+0, 1.0->+0.3, 0.0->-0.3
-            success_rate = (success_rate + (interest - 0.5) * 0.6).clamp(0.0, 1.0);
+            // 成功率调整: 0.5->+0, 1.0->+0.2, 0.0->-0.2
+            success_rate = (success_rate + (interest - 0.5) * 0.4).clamp(0.0, 1.0);
+        } else {
+            // 默认情况下如果没有interest数据，稍微提升一点成功率，避免太冷淡
+            success_rate = (success_rate + 0.1).min(1.0);
         }
 
         // 2. 忙碌度影响 (忙碌度高 -> 阈值增加, 成功率降低)
         if let Some(busy) = context.busy_level {
-            // 阈值调整: 0.0->1.0x, 1.0->2.0x
-            let busy_factor = 1.0 + busy;
-            threshold *= busy_factor;
+            // 阈值调整: 0.0->1.0x, 1.0->1.5x
+            let busy_factor = 1.0 + (busy * 0.5);
+            t_min *= busy_factor;
+            t_max *= busy_factor;
 
-            // 成功率调整: 0.0->-0, 1.0->-0.4
-            success_rate = (success_rate - busy * 0.4).clamp(0.0, 1.0);
+            // 成功率调整: 0.0->-0, 1.0->-0.2
+            success_rate = (success_rate - busy * 0.2).clamp(0.0, 1.0);
         }
 
         // 3. 心情影响
         if let Some(ref mood) = context.mood {
             match mood.as_str() {
                 "happy" => {
-                    threshold *= 0.8;
+                    t_min *= 0.8;
+                    t_max *= 0.8;
                     success_rate = (success_rate + 0.1).min(1.0);
                 }
                 "annoyed" | "tired" => {
-                    threshold *= 1.5;
-                    success_rate = (success_rate - 0.2).max(0.0);
+                    t_min *= 1.2;
+                    t_max *= 1.2;
+                    success_rate = (success_rate - 0.1).max(0.0);
                 }
                 "busy" => {
-                    threshold *= 1.3;
+                    t_min *= 1.2;
+                    t_max *= 1.2;
                     success_rate = (success_rate - 0.1).max(0.0);
                 }
                 _ => {}
             }
         }
 
-        (threshold.max(1.0) as u32, success_rate, cooldown)
+        // 4. 在最终范围内随机选择
+        let mut rng = rand::thread_rng();
+        // 确保 min <= max
+        if t_min > t_max {
+            t_max = t_min;
+        }
+        if c_min > c_max {
+            c_max = c_min;
+        }
+
+        let final_threshold = rng.gen_range(t_min..=t_max);
+        let final_cooldown = rng.gen_range(c_min..=c_max);
+
+        println!(
+            "🎲 主动发言计算: 阈值范围 {:.0}-{:.0}s -> {:.0}s, 冷却范围 {:.0}-{:.0}s -> {:.0}s",
+            t_min, t_max, final_threshold, c_min, c_max, final_cooldown
+        );
+
+        (
+            final_threshold.max(10.0) as u32,
+            success_rate,
+            final_cooldown as u32,
+        )
     }
 }
 

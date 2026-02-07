@@ -4,11 +4,26 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
+use std::sync::Arc;
+use tauri::{AppHandle, Manager};
+use tokio::sync::RwLock;
 
 // ==================================================================================
 // core data structures
 // ==================================================================================
+
+pub struct ConfigState(pub Arc<RwLock<AppConfig>>);
+
+impl ConfigState {
+    pub async fn get_config(&self) -> AppConfig {
+        self.0.read().await.clone()
+    }
+
+    pub async fn update_config(&self, new_config: AppConfig) {
+        let mut w = self.0.write().await;
+        *w = new_config;
+    }
+}
 
 // The full configuration object (merged from parts)
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -445,7 +460,14 @@ fn decode_key(encoded: &str) -> String {
 
 #[tauri::command]
 pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
-    let config_dir = resolve_config_dir(&app);
+    // 🚀 优先从内存缓存读取，实现 0 延迟响应
+    let state = app.state::<ConfigState>();
+    Ok(state.get_config().await)
+}
+
+/// 内部加载函数，用于 setup 阶段从磁盘加载初始化
+pub async fn load_config_internal(app: &AppHandle) -> Result<AppConfig, String> {
+    let config_dir = resolve_config_dir(app);
     let settings_path = config_dir.join("settings.json");
     let providers_path = config_dir.join("providers.json");
     let presets_path = config_dir.join("presets.json");
@@ -579,6 +601,11 @@ pub async fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub async fn save_config(app: AppHandle, mut config: AppConfig) -> Result<(), String> {
+    // 1. 立即更新内存缓存，确保后续 AI 请求能立即看到最新配置
+    let state = app.state::<ConfigState>();
+    state.update_config(config.clone()).await;
+
+    // 2. 持久化到磁盘
     let config_dir = resolve_config_dir(&app);
     // ensure_config_dir is redundant now since resolve_config_dir/create_dir_all handles it
     // but we can add a check if we want to be safe

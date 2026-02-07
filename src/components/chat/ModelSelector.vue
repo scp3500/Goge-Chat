@@ -160,9 +160,18 @@ const filteredProviders = computed(() => {
   }).filter(p => p.matchedModels.length > 0);
 });
 
+const emit = defineEmits(['select']);
+
 // 选择模型
 const selectModel = (providerId, model) => {
   const modelId = typeof model === 'string' ? model : model.id;
+  
+  if (props.menuId === 'at-menu') {
+    emit('select', { providerId, model });
+    closeDropdown();
+    return;
+  }
+
   configStore.updateConfig({
     defaultProviderId: providerId,
     selectedModelId: modelId
@@ -216,24 +225,26 @@ const getPanelStyle = computed(() => {
 <template>
   <div class="model-selector" :class="{ 'full-width': fullWidth }" ref="selectorRef">
     <!-- 选择器按钮 -->
-    <button 
-      class="selector-btn" 
-      :class="{ 'active': isOpen, 'minimal-mode': minimal }"
-      @click.stop="toggleDropdown" 
-      @mousedown.stop 
-      :title="minimal ? (currentModel?.id || '选择模型') : ''"
-    >
-      <span class="provider-icon">
-        <template v-if="minimal">
-          <span v-html="AI_EVO_SVG" class="ai-logo-white"></span>
-        </template>
-        <template v-else>
-          <span v-html="getProviderIcon(currentModel?.provider?.icon || 'default')" class="provider-icon-inner"></span>
-        </template>
-      </span>
-      <span v-if="!minimal" class="model-name">{{ currentModel?.id || '选择模型' }}</span>
-      <span class="chevron" v-html="CHEVRON_DOWN_SVG"></span>
-    </button>
+    <slot name="trigger" :toggle="toggleDropdown" :isOpen="isOpen">
+      <button 
+        class="selector-btn" 
+        :class="{ 'active': isOpen, 'minimal-mode': minimal }"
+        @click.stop="toggleDropdown" 
+        @mousedown.stop 
+        :title="minimal ? (currentModel?.id || '选择模型') : ''"
+      >
+        <span class="provider-icon">
+          <template v-if="minimal">
+            <span v-html="AI_EVO_SVG" class="ai-logo-white"></span>
+          </template>
+          <template v-else>
+            <span v-html="getProviderIcon(currentModel?.provider?.icon || 'default')" class="provider-icon-inner"></span>
+          </template>
+        </span>
+        <span v-if="!minimal" class="model-name">{{ currentModel?.id || '选择模型' }}</span>
+        <span class="chevron" v-html="CHEVRON_DOWN_SVG"></span>
+      </button>
+    </slot>
 
     <!-- 下拉面板 -->
     <Teleport to="body">

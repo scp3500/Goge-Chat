@@ -1,9 +1,11 @@
 use crate::immersive_settings::BehaviorAction;
 use crate::social_db::SocialDbState;
+use rand::Rng;
+
 use rusqlite;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration, Instant};
 use tokio_util::sync::CancellationToken;
@@ -43,7 +45,6 @@ impl MessageScheduler {
         context: crate::behavior_engine::SessionContext,
         settings: crate::immersive_settings::ImmersiveSettings,
         app: AppHandle,
-        window: WebviewWindow,
     ) -> Result<(), String> {
         // 1. 更新会话活动时间
         self.touch_session(session_id).await;
@@ -69,7 +70,6 @@ impl MessageScheduler {
                 settings,
                 token.clone(),
                 app,
-                window,
             ))
             .await;
 
@@ -96,7 +96,6 @@ impl MessageScheduler {
         settings: crate::immersive_settings::ImmersiveSettings,
         token: CancellationToken,
         app: AppHandle,
-        window: WebviewWindow,
     ) -> Result<(), String> {
         let mut last_message_id: Option<i64> = None;
 
@@ -105,7 +104,7 @@ impl MessageScheduler {
             if token.is_cancelled() {
                 println!("🛑 行为链被取消 (session_id: {})", session_id);
                 // 清除打字状态
-                let _ = window.emit(
+                let _ = app.emit(
                     "typing-status",
                     serde_json::json!({
                         "contactId": contact_id,
@@ -118,7 +117,7 @@ impl MessageScheduler {
             match action {
                 BehaviorAction::Wait(ms) => {
                     // 显示"正在输入"
-                    let _ = window.emit(
+                    let _ = app.emit(
                         "typing-status",
                         serde_json::json!({
                             "contactId": contact_id,
@@ -130,7 +129,7 @@ impl MessageScheduler {
                     tokio::select! {
                         _ = sleep(Duration::from_millis(ms as u64)) => {},
                         _ = token.cancelled() => {
-                            let _ = window.emit(
+                            let _ = app.emit(
                                 "typing-status",
                                 serde_json::json!({
                                     "contactId": contact_id,
@@ -144,7 +143,7 @@ impl MessageScheduler {
 
                 BehaviorAction::Speak(content) => {
                     // 清除打字状态
-                    let _ = window.emit(
+                    let _ = app.emit(
                         "typing-status",
                         serde_json::json!({
                             "contactId": contact_id,
@@ -172,7 +171,7 @@ impl MessageScheduler {
                     last_message_id = Some(message_id);
 
                     // 发送消息事件到前端
-                    let _ = window.emit(
+                    let _ = app.emit(
                         "new-social-message",
                         serde_json::json!({
                             "messageId": message_id,
@@ -209,7 +208,7 @@ impl MessageScheduler {
                     .map_err(|e| e.to_string())?;
 
                     // 发送撤回事件到前端
-                    let _ = window.emit(
+                    let _ = app.emit(
                         "message-retracted",
                         serde_json::json!({
                             "messageId": target_id,
@@ -252,7 +251,6 @@ impl MessageScheduler {
                                 settings.clone(),
                                 token.clone(),
                                 app.clone(),
-                                window.clone(),
                             )).await?;
                         }
                         _ = token.cancelled() => {
@@ -265,7 +263,7 @@ impl MessageScheduler {
         }
 
         // 确保最后清除打字状态
-        let _ = window.emit(
+        let _ = app.emit(
             "typing-status",
             serde_json::json!({
                 "contactId": contact_id,
@@ -320,9 +318,27 @@ impl MessageScheduler {
 
         tauri::async_runtime::spawn(async move {
             loop {
-                // 每 60 秒检查一次
+                // 获取配置的检查间隔范围
+                let (min_interval, max_interval) = {
+                    match crate::commands::config_cmd::load_config(app.clone()).await {
+                        Ok(config) => config
+                            .immersive_mode
+                            .behaviors
+                            .proactive_initiation
+                            .as_ref()
+                            .and_then(|c| c.idle_check_interval_range)
+                            .unwrap_or((30, 90)),
+                        Err(_) => (30, 90),
+                    }
+                };
+
+                let interval = {
+                    let mut rng = rand::thread_rng();
+                    rng.gen_range(min_interval..=max_interval)
+                };
+
                 tokio::select! {
-                    _ = sleep(Duration::from_secs(60)) => {
+                    _ = sleep(Duration::from_secs(interval as u64)) => {
                         // 执行空闲检查
                         Self::check_idle_sessions(app.clone(), activities.clone()).await;
                     }
@@ -436,7 +452,7 @@ impl MessageScheduler {
                     engine.get_proactive_parameters(&context);
 
                 println!(
-                    "📊 [IdleMonitor] 会话 {} 空闲 {}秒 (阈值: {}分钟, 成功率: {:.1}%, 冷却: {}分钟)",
+                    "📊 [IdleMonitor] 会话 {} 空闲 {}秒 (阈值: {}秒, 成功率: {:.1}%, 冷却: {}秒)",
                     session_id,
                     idle_duration.as_secs(),
                     idle_threshold,
@@ -444,11 +460,11 @@ impl MessageScheduler {
                     cooldown
                 );
 
-                // 检查是否超过空闲阈值
-                if idle_duration.as_secs() >= (idle_threshold as u64 * 60) {
+                // 检查是否超过空闲阈值 (都是秒)
+                if idle_duration.as_secs() >= (idle_threshold as u64) {
                     // 检查冷却时间
                     let is_cooled_down = if let Some(last_proactive) = activity.last_proactive {
-                        now.duration_since(last_proactive).as_secs() >= (cooldown as u64 * 60)
+                        now.duration_since(last_proactive).as_secs() >= (cooldown as u64)
                     } else {
                         true
                     };
@@ -456,7 +472,7 @@ impl MessageScheduler {
                     if is_cooled_down {
                         // 4. 随机判定
                         let mut rng = rand::thread_rng();
-                        use rand::Rng;
+
                         let roll = rng.gen::<f32>();
                         println!(
                             "🎲 [IdleMonitor] 会话 {} 随机判定: {:.3} < {:.3} = {}",
@@ -613,20 +629,17 @@ impl MessageScheduler {
                         let chain = engine.decide(&content, &context_clone);
 
                         // 获取主窗口执行
-                        if let Some(window) = app_clone.get_webview_window("main") {
-                            let scheduler = app_clone.state::<Arc<MessageScheduler>>();
-                            let _ = scheduler
-                                .execute_behavior_chain(
-                                    session_id,
-                                    context_clone.contact_id,
-                                    chain,
-                                    context_clone,
-                                    settings_clone,
-                                    app_clone.clone(),
-                                    window,
-                                )
-                                .await;
-                        }
+                        let scheduler = app_clone.state::<Arc<MessageScheduler>>();
+                        let _ = scheduler
+                            .execute_behavior_chain(
+                                session_id,
+                                context_clone.contact_id,
+                                chain,
+                                context_clone,
+                                settings_clone,
+                                app_clone.clone(),
+                            )
+                            .await;
                     }
                 });
             }

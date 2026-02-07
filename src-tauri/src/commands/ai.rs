@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::{ipc::Channel, AppHandle, Emitter, State, Window};
+use tauri::{ipc::Channel, AppHandle, Emitter, State};
 use tokio::sync::RwLock;
 
 #[tauri::command]
@@ -16,7 +16,6 @@ pub async fn ask_ai(
     memory_state: State<'_, Arc<RwLock<MemoryState>>>,
     msg: Vec<Message>,
     on_event: Channel<String>,
-    window: Window,
     temperature: Option<f32>,
     max_tokens: Option<u32>,
     stream: Option<bool>,
@@ -25,8 +24,10 @@ pub async fn ask_ai(
     explicit_model_id: Option<String>,
     client: State<'_, reqwest::Client>,
 ) -> Result<(), String> {
-    // 1. 加载配置
-    let config = config_cmd::load_config(app).await?;
+    // --- 🚀 核心优化：并行执行预处理任务 ---
+    let start_total = std::time::Instant::now(); // ⏱️ 开始计时
+    let config = config_cmd::load_config(app.clone()).await?;
+    let config_load_time = start_total.elapsed();
 
     // 2. 确定当前使用的模型和提供商
     // 优先使用显式传入的参数，如果没有（旧版前端），则回退到全局配置
@@ -74,132 +75,53 @@ pub async fn ask_ai(
         selected_model
     };
 
-    // 预处理消息
-    let mut clean_msgs = messages.clone();
+    // --- 🚀 核心优化：并行执行[搜索]和[记忆]任务 ---
+    let messages_for_search = messages.clone();
+    let search_instance_url = config.search_instance_url.clone();
 
-    if let Some(m) = clean_msgs.last_mut() {
-        if m.role == "user" && m.content.contains("[REASON]") {
-            m.content = m.content.replace("[REASON]", "");
-        }
-        if m.role == "user" && m.content.contains("[SEARCH]") {
-            let (original_query, provider) = if m.content.contains("[SEARCH:") {
-                let start = m.content.find("[SEARCH:").unwrap();
-                let end = m.content[start..].find(']').unwrap() + start;
-                let provider = &m.content[start + 8..end];
-                let clean = m.content.replace(&m.content[start..=end], "");
-                (clean, provider.to_string())
-            } else {
-                (m.content.replace("[SEARCH]", ""), "all".to_string())
-            };
+    // 提取记忆检索参数
+    let last_user_msg = messages.iter().rev().find(|m| m.role == "user");
+    let query = last_user_msg.map(|m| m.content.clone()).unwrap_or_default();
+    let mode = last_user_msg
+        .and_then(|m| m.mode.as_deref())
+        .unwrap_or("Standard")
+        .to_string();
+    let role_id = last_user_msg
+        .and_then(|m| m.role_id.as_deref())
+        .unwrap_or("default")
+        .to_string();
 
-            println!("🔍 正在执行网络搜索 (源: {}): {}", provider, original_query);
+    // 创建并发任务
+    let memory_state_inner = memory_state.inner().clone();
+    let memory_task =
+        get_relevant_context_parallel(app.clone(), memory_state_inner, query, mode, role_id);
+    let search_task = handle_search_parallel(app.clone(), messages_for_search, search_instance_url);
+    // 并行等待
+    let (search_res, memory_res): (Result<Vec<Message>, String>, Result<Option<String>, String>) =
+        tokio::join!(search_task, memory_task);
 
-            // 发送搜索开始事件
-            let _ = window.emit(
-                "search-status",
-                json!({ "status": "searching", "query": original_query }),
-            );
+    // 处理搜索结果
+    let mut clean_msgs = search_res?;
 
-            match crate::commands::search::perform_search(
-                &config.search_instance_url,
-                &original_query,
-                &provider,
-            )
-            .await
-            {
-                Ok(results) => {
-                    println!("✅ 搜索成功，获取到 {} 条结果", results.len());
-
-                    // 发送搜索结果事件
-                    let _ = window.emit(
-                        "search-status",
-                        json!({ "status": "done", "results": results }),
-                    );
-
-                    let mut context = String::from("【联网搜索参考资料】\n");
-                    for (i, res) in results.iter().enumerate() {
-                        context.push_str(&format!(
-                            "{}. {}\n   链接: {}\n   内容: {}\n\n",
-                            i + 1,
-                            res.title,
-                            res.url,
-                            res.snippet
-                        ));
-                    }
-
-                    m.content = format!(
-                        "用户原始问题: {}\n\n{}\n请分析以上搜索结果，结合你的知识，为用户提供准确且最新的回答。",
-                        original_query, context
-                    );
-                }
-                Err(e) => {
-                    println!("❌ 搜索失败: {}", e);
-                    let _ =
-                        window.emit("search-status", json!({ "status": "error", "message": e }));
-                }
-            }
-        }
-    }
-
-    // --- 🧠 Alice Memory Integration ---
-    if let Some(last_user_msg) = messages.iter().rev().find(|m| m.role == "user") {
-        let mode = last_user_msg.mode.as_deref().unwrap_or("Standard");
-        let role_id = last_user_msg.role_id.as_deref().unwrap_or("default");
-
-        let query = last_user_msg.content.clone();
-
-        // 发送记忆检索开始事件
-        let _ = window.emit(
-            "memory-status",
-            json!({ "status": "searching", "query": query }),
-        );
-        let start_time = std::time::Instant::now();
-
-        let context =
-            get_relevant_context(memory_state.inner().clone(), &query, mode, role_id).await?;
-
-        let duration = start_time.elapsed().as_millis();
-
-        if !context.is_empty() {
-            println!(
-                "🧠 [记忆注入] 模式: {}, 角色: {}, 耗时: {}ms (注入 {} 字符)",
-                mode,
-                role_id,
-                duration,
-                context.len()
-            );
-
-            // 发送记忆检索完成事件
-            let _ = window.emit(
-                "memory-status",
-                json!({ "status": "done", "duration": duration, "has_context": true }),
-            );
-            // 找到系统提示词并注入
-            if let Some(sys_msg) = clean_msgs.iter_mut().find(|m| m.role == "system") {
-                sys_msg.content = format!("{}\n\n{}", context, sys_msg.content);
-            } else {
-                // 如果没有系统提示词，在最前面插入一个
-                clean_msgs.insert(
-                    0,
-                    Message {
-                        id: None,
-                        model: None,
-                        role: "system".to_string(),
-                        content: context,
-                        reasoning_content: None,
-                        file_metadata: None,
-                        search_metadata: None,
-                        provider: None,
-                        mode: None,
-                        role_id: None,
-                    },
-                );
-            }
+    // 处理记忆结果并注入
+    if let Ok(Some(context)) = memory_res {
+        if let Some(sys_msg) = clean_msgs.iter_mut().find(|m| m.role == "system") {
+            sys_msg.content = format!("{}\n\n{}", context, sys_msg.content);
         } else {
-            // 发送记忆检索完成事件 (无结果)
-            let _ = window.emit(
-                "memory-status",
-                json!({ "status": "done", "duration": duration, "has_context": false }),
+            clean_msgs.insert(
+                0,
+                Message {
+                    id: None,
+                    model: None,
+                    role: "system".to_string(),
+                    content: context,
+                    reasoning_content: None,
+                    file_metadata: None,
+                    search_metadata: None,
+                    provider: None,
+                    mode: None,
+                    role_id: None,
+                },
             );
         }
     }
@@ -219,6 +141,7 @@ pub async fn ask_ai(
             on_event,
             stream.unwrap_or(true),
             &client,
+            start_total,
         )
         .await;
     }
@@ -259,15 +182,10 @@ pub async fn ask_ai(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| {
-            println!("❌ 请求失败: {}", e);
-            e.to_string()
-        })?;
+        .map_err(|e| e.to_string())?;
 
     if !response.status().is_success() {
-        let status = response.status();
         let err_body = response.text().await.unwrap_or_default();
-        println!("❌ API 返回错误 ({}): {}", status, err_body);
         return Err(format!("API Error: {}", err_body));
     }
 
@@ -287,11 +205,9 @@ pub async fn ask_ai(
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
     let mut ttft_logged = false;
-    let start_gen = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
-            println!("⚡ [后端信号] 用户打断了生成");
             break;
         }
 
@@ -321,7 +237,13 @@ pub async fn ask_ai(
 
                         if let Some(content) = delta["content"].as_str() {
                             if !ttft_logged {
-                                println!("⏱️ [性能] AI 响应 TTFT: {:?}", start_gen.elapsed());
+                                // 🟢 监测：总耗时（包含加载配置、检索记忆、网路往返）
+                                println!(
+                                    "⏱️ [性能] 首字总响应 (配置加载 {}ms + 其他 {}ms): {:?}",
+                                    config_load_time.as_millis(),
+                                    (start_total.elapsed() - config_load_time).as_millis(),
+                                    start_total.elapsed()
+                                );
                                 ttft_logged = true;
                             }
                             on_event
@@ -329,13 +251,16 @@ pub async fn ask_ai(
                                 .map_err(|e| e.to_string())?;
                         }
 
-                        if let Some(reasoning) = delta["reasoning_content"].as_str() {
+                        if let Some(reasoning) = delta["reasoning_content"]
+                            .as_str()
+                            .or_else(|| delta["reasoning"].as_str())
+                            .or_else(|| delta["thought"].as_str())
+                        {
                             on_event
                                 .send(format!("r:{}", reasoning))
                                 .map_err(|e| e.to_string())?;
                         }
                     } else if let Some(err) = json["error"].as_object() {
-                        println!("❌ 流中发现错误: {:?}", err);
                         return Err(format!("Stream Error: {:?}", err));
                     }
                 }
@@ -374,6 +299,7 @@ async fn handle_gemini_native(
     on_event: Channel<String>,
     stream: bool,
     client: &reqwest::Client,
+    start_total: std::time::Instant,
 ) -> Result<(), String> {
     if !stream {
         // --- 🛑 非流式处理 ---
@@ -421,8 +347,6 @@ async fn handle_gemini_native(
         api_key
     );
 
-    println!("🚀 [Native Gemini] 请求地址 (stream: true): {}", url);
-
     let response = client
         .post(&url)
         .header("Content-Type", "application/json")
@@ -441,7 +365,6 @@ async fn handle_gemini_native(
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
     let mut ttft_logged = false;
-    let start_gen = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
@@ -480,9 +403,10 @@ async fn handle_gemini_native(
                         for part in parts {
                             if let Some(text) = part["text"].as_str() {
                                 if !ttft_logged {
+                                    // 🟢 监测：从用户输入到流式输出首字的性能耗时 (Gemini)
                                     println!(
-                                        "⏱️ [性能] AI (Gemini) 响应 TTFT: {:?}",
-                                        start_gen.elapsed()
+                                        "⏱️ [性能] Gemini 模式首字总耗时 (从输入): {:?}",
+                                        start_total.elapsed()
                                     );
                                     ttft_logged = true;
                                 }
@@ -510,8 +434,6 @@ pub async fn discover_models_raw(
     headers_map: Option<std::collections::HashMap<String, String>>,
     client: State<'_, reqwest::Client>,
 ) -> Result<Value, String> {
-    println!("🔍 [ModelDiscovery] Backend fetching from: {}", url);
-
     let mut request = client.get(&url);
 
     if let Some(key) = api_key {
@@ -525,8 +447,6 @@ pub async fn discover_models_raw(
             request = request.header(k, v);
         }
     }
-
-    println!("🔍 [ModelDiscovery] Sending request with Authorization header");
 
     let response = request
         .send()
@@ -544,4 +464,112 @@ pub async fn discover_models_raw(
         .await
         .map_err(|e| format!("JSON parse error: {}", e))?;
     Ok(data)
+}
+
+// --- 🚀 助手函数：并行处理搜索逻辑 ---
+async fn handle_search_parallel(
+    app: AppHandle,
+    messages: Vec<Message>,
+    search_instance_url: String,
+) -> Result<Vec<Message>, String> {
+    let mut clean_msgs = messages.clone();
+
+    // 检查最后一条消息是否有 [SEARCH]
+    if let Some(m) = clean_msgs.last_mut() {
+        if m.role == "user" && m.content.contains("[SEARCH]") {
+            let (original_query, provider) = if m.content.contains("[SEARCH:") {
+                let start = m.content.find("[SEARCH:").unwrap();
+                let end = m.content[start..].find(']').unwrap() + start;
+                let provider = &m.content[start + 8..end];
+                let clean = m.content.replace(&m.content[start..=end], "");
+                (clean, provider.to_string())
+            } else {
+                (m.content.replace("[SEARCH]", ""), "all".to_string())
+            };
+
+            // 发送搜索开始事件
+            let _ = app.emit(
+                "search-status",
+                json!({ "status": "searching", "query": original_query }),
+            );
+
+            match crate::commands::search::perform_search(
+                &search_instance_url,
+                &original_query,
+                &provider,
+            )
+            .await
+            {
+                Ok(results) => {
+                    // 发送搜索结果事件
+                    let _ = app.emit(
+                        "search-status",
+                        json!({ "status": "done", "results": results }),
+                    );
+
+                    let mut context = String::from("【联网搜索参考资料】\n");
+                    for (i, res) in results.iter().enumerate() {
+                        context.push_str(&format!(
+                            "{}. {}\n   链接: {}\n   内容: {}\n\n",
+                            i + 1,
+                            res.title,
+                            res.url,
+                            res.snippet
+                        ));
+                    }
+
+                    m.content = format!(
+                        "用户原始问题: {}\n\n{}\n请分析以上搜索结果，结合你的知识，为用户提供准确且最新的回答。",
+                        original_query, context
+                    );
+                }
+                Err(e) => {
+                    let _ = app.emit("search-status", json!({ "status": "error", "message": e }));
+                }
+            }
+        }
+    }
+
+    Ok(clean_msgs)
+}
+
+// --- 🚀 助手函数：并行处理记忆检索逻辑 ---
+async fn get_relevant_context_parallel(
+    app: AppHandle,
+    memory_state: Arc<RwLock<MemoryState>>,
+    query: String,
+    mode: String,
+    role_id: String,
+) -> Result<Option<String>, String> {
+    if query.is_empty() {
+        return Ok(None);
+    }
+
+    // 发送记忆检索开始事件
+    let _ = app.emit(
+        "memory-status",
+        json!({ "status": "searching", "query": query }),
+    );
+    let start_time = std::time::Instant::now();
+
+    // 执行记忆检索
+    let context = get_relevant_context(memory_state, &query, &mode, &role_id).await?;
+
+    let duration = start_time.elapsed().as_millis();
+
+    if !context.is_empty() {
+        // 发送记忆检索完成事件
+        let _ = app.emit(
+            "memory-status",
+            json!({ "status": "done", "duration": duration, "has_context": true }),
+        );
+        Ok(Some(context))
+    } else {
+        // 发送记忆检索完成事件 (无结果)
+        let _ = app.emit(
+            "memory-status",
+            json!({ "status": "done", "duration": duration, "has_context": false }),
+        );
+        Ok(None)
+    }
 }

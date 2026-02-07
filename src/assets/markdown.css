@@ -73,10 +73,10 @@ pre,
 .code-block-wrapper {
     background-color: var(--bg-code) !important;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    /* VS Code 的圆角比较小 */
-    padding: 1rem;
-    margin: 1rem 0;
+    /* 统一 1px 分割线 */
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin: 1.5rem 0;
 
     /* 🚩 字体栈更新：Cascadia Code 优先，其次 Consolas */
     font-family: 'Consolas', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace !important;
@@ -135,8 +135,8 @@ code {
 
 /* 行内代码样式 `code` */
 :not(pre)>code {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: #e3e3e3;
+    background-color: var(--bg-inline-code);
+    color: var(--color-inline-code);
     padding: 0.1em 0.4em;
     border-radius: 4px;
 }

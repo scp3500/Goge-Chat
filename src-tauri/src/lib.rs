@@ -35,7 +35,6 @@ pub struct GoleState {
 #[tauri::command]
 async fn stop_ai_generation(state: State<'_, GoleState>) -> Result<(), String> {
     state.stop_flag.store(true, Ordering::Relaxed);
-    println!("🛑 后端已收到中断信号，红灯亮起");
     Ok(())
 }
 
@@ -43,7 +42,6 @@ async fn stop_ai_generation(state: State<'_, GoleState>) -> Result<(), String> {
 #[tauri::command]
 async fn reset_ai_generation(state: State<'_, GoleState>) -> Result<(), String> {
     state.stop_flag.store(false, Ordering::Relaxed);
-    println!("🟢 状态已重置，绿灯亮起");
     Ok(())
 }
 
@@ -86,6 +84,15 @@ pub fn run() {
             app.manage(GoleState {
                 stop_flag: Arc::new(AtomicBool::new(false)),
             });
+
+            // --- Config State Setup (Cache) ---
+            let initial_config = tauri::async_runtime::block_on(async {
+                commands::config_cmd::load_config_internal(app_handle).await
+            })?;
+            let config_state = commands::config_cmd::ConfigState(Arc::new(
+                tokio::sync::RwLock::new(initial_config),
+            ));
+            app.manage(config_state);
 
             // --- HTTP Client Setup ---
             app.manage(reqwest::Client::new());

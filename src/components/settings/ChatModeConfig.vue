@@ -20,9 +20,10 @@ const toggleTypoCorrection = (e) => {
 const toggleProactive = (e) => {
   if (e.target.checked) {
     configStore.settings.immersiveMode.behaviors.proactiveInitiation = {
-      idleThresholdMin: 10,
-      successRate: 0.3,
-      cooldownMin: 30
+      idleThresholdRange: [120, 600], // 2m - 10m
+      successRate: 0.7,
+      cooldownRange: [600, 3600],     // 10m - 60m
+      idleCheckIntervalRange: [30, 90]
     };
   } else {
     configStore.settings.immersiveMode.behaviors.proactiveInitiation = null;
@@ -159,25 +160,58 @@ const toggleProactive = (e) => {
                </div>
                 
                 <!-- 消息拆分 -->
+                <div class="row-pair">
+                  <div class="setting-item half">
+                    <label class="setting-label">最大拆分段数</label>
+                    <input type="number" 
+                           class="number-input full-width"
+                           v-model.number="configStore.settings.immersiveMode.behaviors.multiSegment"
+                           min="1" max="10"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  </div>
+                  
+                  <div class="setting-item half">
+                     <label class="setting-label">拆分阈值 (字符范围)</label>
+                     <div class="range-inputs">
+                       <input type="number" class="number-input" placeholder="Min"
+                              v-model.number="configStore.settings.immersiveMode.behaviors.segmentationThresholdRange[0]"
+                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                       <span class="range-separator">-</span>
+                       <input type="number" class="number-input" placeholder="Max"
+                              v-model.number="configStore.settings.immersiveMode.behaviors.segmentationThresholdRange[1]"
+                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                     </div>
+                  </div>
+                </div>
+
+                <!-- 模拟输入速度 -->
                 <div class="setting-item">
-                  <label class="setting-label">最大拆分段数</label>
-                  <input type="number" 
-                         class="number-input full-width"
-                         v-model.number="configStore.settings.immersiveMode.behaviors.multiSegment"
-                         min="1" max="5"
-                         @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  <label class="setting-label">模拟输入速度 (字符/秒)</label>
+                  <div class="range-inputs">
+                    <input type="number" class="number-input" placeholder="Min"
+                           v-model.number="configStore.settings.immersiveMode.behaviors.typingSpeedRange[0]"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                    <span class="range-separator">-</span>
+                    <input type="number" class="number-input" placeholder="Max"
+                           v-model.number="configStore.settings.immersiveMode.behaviors.typingSpeedRange[1]"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  </div>
                 </div>
                 
                 <!-- 段间延迟系数 -->
                 <div class="setting-item">
-                  <label class="setting-label">
-                    段间延迟系数 ({{ (configStore.settings.immersiveMode.behaviors.segmentDelayFactor * 100).toFixed(0) }}%)
-                  </label>
-                  <input type="range" 
-                         class="range-slider"
-                         v-model.number="configStore.settings.immersiveMode.behaviors.segmentDelayFactor"
-                         min="0" max="1" step="0.05"
-                         @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  <label class="setting-label">段间延迟系数范围 (0.0 - 1.0)</label>
+                  <div class="range-inputs">
+                    <input type="number" class="number-input" placeholder="Min"
+                           v-model.number="configStore.settings.immersiveMode.behaviors.segmentDelayFactor[0]"
+                           step="0.05" min="0" max="1"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                    <span class="range-separator">-</span>
+                    <input type="number" class="number-input" placeholder="Max"
+                           v-model.number="configStore.settings.immersiveMode.behaviors.segmentDelayFactor[1]"
+                           step="0.05" min="0" max="1"
+                           @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                  </div>
                   <span class="hint-small">相对于主延迟的百分比</span>
                 </div>
                 
@@ -230,41 +264,67 @@ const toggleProactive = (e) => {
                  
                  <Transition name="expand-section">
                    <div v-if="configStore.settings.immersiveMode.behaviors.proactiveInitiation" class="nested-settings">
-                     <div class="setting-item">
-                       <label class="setting-label">
-                         空闲触发阈值 ({{ configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdMin }} 分钟)
-                       </label>
-                       <input type="range" 
-                              class="range-slider"
-                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdMin"
-                              min="1" max="120" step="1"
-                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
-                       <span class="hint-small">多长时间没说话后触发</span>
-                     </div>
-                     
-                     <div class="setting-item">
-                       <label class="setting-label">
-                         触发成功率 ({{ (configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate * 100).toFixed(0) }}%)
-                       </label>
-                       <input type="range" 
-                              class="range-slider"
-                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate"
-                              min="0" max="1" step="0.05"
-                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
-                       <span class="hint-small">满足空闲条件时发起话题的概率</span>
-                     </div>
-                     
-                     <div class="setting-item">
-                       <label class="setting-label">
-                         冷却时长 ({{ configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownMin }} 分钟)
-                       </label>
-                       <input type="range" 
-                              class="range-slider"
-                              v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownMin"
-                              min="5" max="240" step="5"
-                              @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
-                       <span class="hint-small">防止短时间连续主动打扰</span>
-                     </div>
+                      <!-- 空闲阈值范围 -->
+                      <div class="setting-item">
+                        <label class="setting-label">
+                          空闲触发阈值范围 (秒)
+                        </label>
+                        <div class="range-inputs">
+                          <input type="number" class="number-input" placeholder="Min"
+                                 v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdRange[0]"
+                                 @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                          <span class="range-separator">-</span>
+                          <input type="number" class="number-input" placeholder="Max"
+                                 v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleThresholdRange[1]"
+                                 @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                        </div>
+                        <span class="hint-small">多长时间没说话后触发 (秒)</span>
+                      </div>
+                      
+                      <!-- 冷却范围 -->
+                      <div class="setting-item">
+                        <label class="setting-label">
+                          冷却时长范围 (秒)
+                        </label>
+                        <div class="range-inputs">
+                          <input type="number" class="number-input" placeholder="Min"
+                                 v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownRange[0]"
+                                 @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                          <span class="range-separator">-</span>
+                          <input type="number" class="number-input" placeholder="Max"
+                                 v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.cooldownRange[1]"
+                                 @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                        </div>
+                        <span class="hint-small">防止短时间连续主动打扰 (秒)</span>
+                      </div>
+
+                      <!-- 检查间隔 -->
+                      <div class="setting-item">
+                        <label class="setting-label">后台检查间隔 (秒)</label>
+                        <div class="range-inputs">
+                           <input type="number" class="number-input" placeholder="Min"
+                                  v-if="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleCheckIntervalRange"
+                                  v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleCheckIntervalRange[0]"
+                                  @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                           <span class="range-separator">-</span>
+                           <input type="number" class="number-input" placeholder="Max"
+                                  v-if="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleCheckIntervalRange"
+                                  v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.idleCheckIntervalRange[1]"
+                                  @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                        </div>
+                         <span class="hint-small">后台线程多久醒来检查一次 (影响响应及时性)</span>
+                      </div>
+
+                      <div class="setting-item">
+                        <label class="setting-label">
+                          触发成功率 ({{ (configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate * 100).toFixed(0) }}%)
+                        </label>
+                        <input type="range" 
+                               class="range-slider"
+                               v-model.number="configStore.settings.immersiveMode.behaviors.proactiveInitiation.successRate"
+                               min="0" max="1" step="0.05"
+                               @change="configStore.updateConfig({ immersiveMode: configStore.settings.immersiveMode })" />
+                      </div>
                      
                      <div class="dynamic-badge" v-if="configStore.settings.immersiveMode.behaviors.character_state_config?.enabled">
                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path></svg>
@@ -605,6 +665,16 @@ input:checked + .slider:before {
 .number-input:focus {
   border-color: var(--color-primary);
   background: var(--bg-input-focus);
+}
+
+.row-pair {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.half {
+  flex: 1;
 }
 
 .range-slider {

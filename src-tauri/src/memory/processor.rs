@@ -100,12 +100,24 @@ pub async fn get_relevant_context(
     }
 
     let start_total = Instant::now();
-    let state_read = state.read().await;
-
     let start_vec = Instant::now();
     let query_with_prefix = format!("为查询编写一个表征：{}", query);
-    let vector = state_read.engine.get_vector(&query_with_prefix)?;
+
+    // 🧠 核心优化：将计算密集的特征提取移至阻塞线程池
+    // 💡 改进：先克隆 Engine 并立即释放锁，避免阻塞整个 MemoryState
+    let engine = {
+        let state_read = state.read().await;
+        state_read.engine.clone()
+    };
+
+    let vector = tokio::task::spawn_blocking(move || engine.get_vector(&query_with_prefix))
+        .await
+        .map_err(|e| e.to_string())??;
+
     let duration_vec = start_vec.elapsed();
+
+    // 重新获取读锁以进行数据库搜索
+    let state_read = state.read().await;
 
     // 🛡️ 维度一：物理隔绝 (Memory Isolation)
     let filter = if mode == "Social" {

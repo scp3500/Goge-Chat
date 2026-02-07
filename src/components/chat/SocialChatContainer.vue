@@ -264,12 +264,14 @@ onMounted(async () => {
                 const exists = messages.value.find(m => m.id === messageId);
                 if (!exists) {
                     console.log(`✅ [new-social-message] 添加消息到当前会话 (role: ${role})`);
-                    messages.value.push({
+                    // 🔄 强制触发 Vue 响应式更新 - 使用数组解构而不是 push
+                    messages.value = [...messages.value, {
                         id: messageId,
                         role,
                         content,
                         created_at: createdAt
-                    });
+                    }];
+                    console.log(`📊 [new-social-message] 消息已添加,当前消息数: ${messages.value.length}`);
                     
                     // Auto-scroll to new message
                     nextTick(() => {
@@ -368,7 +370,7 @@ watch(
 // 🚀 Software Init Sync removed to prevent ghost memory resurrection
 // Only sync on actual deliberate 'leave' actions now.
 
-const triggerAIRequest = async (targetMessage = null) => {
+const triggerAIRequest = async (targetMessage = null, mentions = []) => {
   if (isGenerating.value) return;
 
   const contactId = props.activeContact.id;
@@ -395,91 +397,121 @@ const triggerAIRequest = async (targetMessage = null) => {
   triggerScroll('smooth'); // 🌊 Smooth scroll for AI start
 
   try {
-  // 2. Prepare AI request
-    const onEvent = new Channel();
-    let aiFullContent = "";
+    // Determine models to call
+    let modelsToCall = mentions && mentions.length > 0 
+      ? mentions 
+      : [{ id: props.activeContact.model, providerId: props.activeContact.provider }];
 
-    // 🔄 RE-FETCH CONTACT INFO TO GET LATEST PROMPT/MODEL
-    let currentContact = props.activeContact;
-    try {
-        const contacts = await invoke("get_social_contacts");
-        const updated = contacts.find(c => c.id === props.activeContact.id);
-        if (updated) currentContact = updated;
-    } catch (e) {
-        console.warn("Failed to refresh contact info, using prop data:", e);
-    }
+    // Sequential generation
+    for (const modelInfo of modelsToCall) {
+        const currentModelId = modelInfo.id;
+        const currentProviderId = modelInfo.providerId;
 
-    const isStreamEnabled = configStore.settings.chatMode?.enabled
-      ? configStore.settings.chatMode.enableStream
-      : configStore.settings.enableStream;
-
-    onEvent.onmessage = (data) => {
-      if (data.startsWith("c:")) {
-        const content = data.substring(2);
-        aiFullContent += content;
-        
-        if (msgInArray.content === "__LOADING__") msgInArray.content = "";
-        msgInArray.content += content;
-        
-        // ⚡️ FORCE SCROLL TO BOTTOM ON CHUNK (Social Mode Exclusive)
-        if (messageListRef.value?.scrollToBottom) {
-             messageListRef.value.scrollToBottom();
+        // 1. Prepare/Add assistant message locally
+        let assistantMsg;
+        if (targetMessage) {
+            assistantMsg = targetMessage;
+            assistantMsg.content = "__LOADING__";
+        } else {
+            assistantMsg = {
+                role: "assistant",
+                content: "__LOADING__",
+                model: currentModelId,
+                created_at: new Date().toISOString().replace('T', ' ').replace('Z', '')
+            };
+            messages.value.push(assistantMsg);
         }
-      }
-    };
+        
+        const msgInArray = assistantMsg;
+        
+        isGenerating.value = true;
+        chatStore.isGenerating = true; 
+        triggerScroll('smooth');
 
-    // Construct message history for AI
-    // If regenerating, we context up to BUT NOT INCLUDING the regenerating message
-    const msgIndex = messages.value.indexOf(assistantMsg);
-    const history = messages.value.slice(0, msgIndex).map(m => ({
-        role: m.role,
-        content: m.content,
-        mode: "Social",
-        role_id: m.role === 'assistant' ? String(props.activeContact.id) : undefined
-    }));
+        try {
+            const onEvent = new Channel();
+            let aiFullContent = "";
 
-    // Add system prompt using REFRESHED data
-    if (currentContact.prompt) {
-        history.unshift({ role: "system", content: currentContact.prompt });
+            const isStreamEnabled = configStore.settings.chatMode?.enabled
+              ? configStore.settings.chatMode.enableStream
+              : configStore.settings.enableStream;
+
+            onEvent.onmessage = (data) => {
+              if (data.startsWith("c:")) {
+                const content = data.substring(2);
+                aiFullContent += content;
+                
+                // 🔄 修复响应式: 找到当前消息并替换整个对象/数组
+                const index = messages.value.indexOf(msgInArray);
+                if (index !== -1) {
+                    if (messages.value[index].content === "__LOADING__") {
+                        messages.value[index].content = "";
+                    }
+                    messages.value[index].content += content;
+                    // 强制触发更新
+                    messages.value = [...messages.value];
+                }
+
+                if (messageListRef.value?.scrollToBottom) {
+                    messageListRef.value.scrollToBottom();
+                }
+              }
+            };
+
+            const msgIndex = messages.value.indexOf(assistantMsg);
+            const history = messages.value.slice(0, msgIndex).map(m => ({
+                role: m.role,
+                content: m.content,
+                mode: "Social",
+                role_id: m.role === 'assistant' ? String(props.activeContact.id) : undefined
+            }));
+
+            // Add system prompt
+            if (props.activeContact.prompt) {
+                history.unshift({ role: "system", content: props.activeContact.prompt });
+            }
+
+            await invoke("ask_ai", {
+              msg: history,
+              onEvent,
+              explicitProviderId: currentProviderId || configStore.settings.defaultProviderId, 
+              explicitModelId: currentModelId,
+              stream: isStreamEnabled
+            });
+
+            // 3. Save/Update assistant response in database
+            if (msgInArray.id) {
+                await invoke("update_social_message", { id: msgInArray.id, content: aiFullContent });
+            } else {
+                const savedId = await invoke("save_social_message", {
+                    contactId,
+                    sessionId: chatStore.activeSocialSessionId,
+                    role: "assistant",
+                    content: aiFullContent,
+                    fileMetadata: null
+                });
+                msgInArray.id = savedId;
+            }
+            msgInArray.content = aiFullContent;
+
+            // 4. 🧠 Auto Summary Check
+            const validMsgCount = messages.value.filter(m => m.content && m.content !== "__LOADING__").length;
+            const isDefaultTitle = !activeSessionTitle.value || 
+                                ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSessionTitle.value);
+            
+            if (chatStore.activeSocialSessionId && (validMsgCount >= 2 && isDefaultTitle)) {
+                autoSummaryTitle(chatStore.activeSocialSessionId);
+            }
+        } catch (innerError) {
+            console.error("Single model generation failed:", innerError);
+            msgInArray.content = "错误: " + innerError;
+        }
+        
+        // If stopped by user, break the loop
+        if (!chatStore.isGenerating) break;
     }
-
-    await invoke("ask_ai", {
-      msg: history,
-      onEvent,
-      explicitProviderId: currentContact.provider || configStore.settings.defaultProviderId, 
-      explicitModelId: currentContact.model,
-      stream: isStreamEnabled
-    });
-
-    // 3. Save/Update assistant response in database
-    if (msgInArray.id) {
-        await invoke("update_social_message", { id: msgInArray.id, content: aiFullContent });
-    } else {
-        const savedId = await invoke("save_social_message", {
-            contactId,
-            sessionId: chatStore.activeSocialSessionId, // ✨ Pass Session ID
-            role: "assistant",
-            content: aiFullContent,
-            fileMetadata: null
-        });
-        msgInArray.id = savedId;
-    }
-    msgInArray.content = aiFullContent;
-
-    // 4. 🧠 Auto Summary Check
-    const validMsgCount = messages.value.filter(m => m.content && m.content !== "__LOADING__").length;
-    const isDefaultTitle = !activeSessionTitle.value || 
-                         ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSessionTitle.value);
-    
-    // Check for summary after AI response
-    if (chatStore.activeSocialSessionId && (validMsgCount >= 2 && isDefaultTitle)) {
-        console.log(`[Social Title] Traditional Trigger: Count=${validMsgCount}, Title="${activeSessionTitle.value}"`);
-        autoSummaryTitle(chatStore.activeSocialSessionId);
-    }
-
   } catch (e) {
-    console.error("Social chat AI error:", e);
-    msgInArray.content = "发生错误: " + e;
+    console.error("Social chat AI sequence error:", e);
   } finally {
     isGenerating.value = false;
     chatStore.isGenerating = false; 
@@ -487,7 +519,7 @@ const triggerAIRequest = async (targetMessage = null) => {
   }
 };
 
-const handleSend = async (text, fileMetadata = null) => {
+const handleSend = async (text, fileMetadata = null, mentions = []) => {
   if (!text.trim() && !fileMetadata) return;
   if (isGenerating.value) return;
 
@@ -523,53 +555,17 @@ const handleSend = async (text, fileMetadata = null) => {
     hasNewMessages.value = true;
     triggerScroll('smooth');
 
-    // 2. 🎭 Check if immersive mode is enabled
-    if (configStore.settings.immersiveMode?.enabled) {
+    // 2. 🎭 Check if immersive chat mode is enabled
+    if (configStore.settings.chatMode?.enabled) {
         isGenerating.value = true;
         chatStore.isGenerating = true;
         
         try {
-            const onEvent = new Channel();
-            let aiFullContent = "";
-            
-            let currentContact = props.activeContact;
-            try {
-                const contacts = await invoke("get_social_contacts");
-                const updated = contacts.find(c => c.id === props.activeContact.id);
-                if (updated) currentContact = updated;
-            } catch (e) {
-                console.warn("Failed to refresh contact info:", e);
-            }
-            
-            onEvent.onmessage = (data) => {
-                if (data.startsWith("c:")) {
-                    aiFullContent += data.substring(2);
-                }
-            };
-            
-            const history = messages.value.map(m => ({
-                role: m.role,
-                content: m.content,
-                mode: "Social",
-                role_id: m.role === 'assistant' ? String(contactId) : undefined
-            }));
-            
-            if (currentContact.prompt) {
-                history.unshift({ role: "system", content: currentContact.prompt });
-            }
-            
-            await invoke("ask_ai", {
-                msg: history,
-                onEvent,
-                explicitProviderId: currentContact.provider || configStore.settings.defaultProviderId,
-                explicitModelId: currentContact.model,
-                stream: false
-            });
-            
+            // 🎯 直接调用沉浸式命令,让后端处理 AI 调用和行为链
             await invoke("send_social_message_immersive", {
                 sessionId: chatStore.activeSocialSessionId,
                 contactId,
-                content: aiFullContent
+                content: userText  // 传入用户消息,不是 AI 响应
             });
 
             // ✨ Trigger Summary in Immersive Mode
@@ -595,7 +591,7 @@ const handleSend = async (text, fileMetadata = null) => {
         }
     } else {
         // Traditional mode
-        await triggerAIRequest();
+        await triggerAIRequest(null, mentions);
     }
   } catch (e) {
     console.error("Social chat send error:", e);
@@ -788,7 +784,7 @@ const handleAvatarClick = () => {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid var(--border-color); /* Use variable */
+    border-bottom: 1px solid var(--border-color); /* 统一规格 */
     background: var(--bg-chat-island);
     z-index: 10;
 }

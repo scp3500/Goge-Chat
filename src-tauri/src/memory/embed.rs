@@ -5,9 +5,12 @@ use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager};
 use tokenizers::Tokenizer;
 
+use std::sync::Arc;
+
+#[derive(Clone)]
 pub struct EmbeddingEngine {
-    model: BertModel,
-    tokenizer: Tokenizer,
+    model: Arc<BertModel>,
+    tokenizer: Arc<Tokenizer>,
     device: Device,
 }
 
@@ -49,8 +52,8 @@ impl EmbeddingEngine {
         let model = BertModel::load(vb, &config).map_err(|e| format!("初始化 BERT 失败: {}", e))?;
 
         Ok(Self {
-            model,
-            tokenizer,
+            model: Arc::new(model),
+            tokenizer: Arc::new(tokenizer),
             device,
         })
     }

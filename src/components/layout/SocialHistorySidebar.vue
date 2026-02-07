@@ -235,7 +235,7 @@ onUnmounted(() => {
   width: 260px; /* Slightly wider for actions */
   height: 100%;
   background: var(--bg-sidebar); /* Use standard sidebar bg */
-  border-left: 1px solid var(--border-color); /* Fixed: Should be left border */
+  border-left: none; /* 彻底移除分割线，实现无缝衔接 */
   display: flex;
   flex-direction: column;
   flex-shrink: 0;

@@ -8,12 +8,31 @@ body,
     width: 100%;
     background-color: transparent !important;
     background: transparent !important;
-    color: #cccccc;
-    /* 更柔和的护眼颜色 */
+    color: var(--text-color);
+    /* 继承主题文本颜色 */
     overflow: hidden;
     font-size: var(--font-size-base);
     line-height: var(--font-ratio);
     font-family: var(--font-family-en, "Segoe UI"), var(--font-family-zh, "Microsoft YaHei UI"), sans-serif;
+
+    /* 💡 KBD 键盘按键样式 */
+    kbd {
+        display: inline-block;
+        padding: 2px 6px;
+        font-size: 0.82em;
+        font-family: var(--font-family-en);
+        line-height: 1.1;
+        color: #111827;
+        /* 沉稳的黑灰色 */
+        vertical-align: baseline;
+        background-color: #FCFCFD;
+        border: 1px solid #767C85;
+        /* 再次加深边框色 */
+        border-radius: 5px;
+        box-shadow: 0 2px 0 #5A6068, inset 0 1px 1px #fff;
+        margin: 0 2px;
+    }
+
     user-select: text;
     -webkit-user-select: text;
 

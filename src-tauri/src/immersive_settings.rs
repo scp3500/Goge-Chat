@@ -18,9 +18,14 @@ pub struct BehaviorToggles {
     #[serde(rename = "multiSegment")]
     pub multi_segment: Option<u8>,
 
-    /// 段间延迟系数 (相对于主延迟的百分比, 0.0-1.0)
+    /// 段间延迟系数范围 (相对于主延迟的百分比, min-max)
     #[serde(rename = "segmentDelayFactor")]
-    pub segment_delay_factor: f32,
+    pub segment_delay_factor: (f32, f32),
+
+    /// 消息拆分阈值范围 (min_chars, max_chars)
+    /// 每次判断拆分时，会在此范围内随机生成一个阈值
+    #[serde(rename = "segmentationThresholdRange")]
+    pub segmentation_threshold_range: Option<(u32, u32)>,
 
     /// 已读不回概率 [0.0-1.0]
     #[serde(rename = "ignoreRate")]
@@ -62,23 +67,29 @@ pub struct TypoConfig {
 /// 主动发言配置
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProactiveConfig {
-    /// 空闲阈值 (分钟)
-    #[serde(rename = "idleThresholdMin")]
-    pub idle_threshold_min: u32,
+    /// 空闲阈值范围 (最小秒, 最大秒)
+    /// AI 在此时间段内随机选择一个点作为判定时刻
+    #[serde(rename = "idleThresholdRange")]
+    pub idle_threshold_range: (u32, u32),
     /// 成功概率 [0.0-1.0]
     #[serde(rename = "successRate")]
     pub success_rate: f32,
-    /// 冷却时长 (分钟)
-    #[serde(rename = "cooldownMin")]
-    pub cooldown_min: u32,
+    /// 冷却时长范围 (最小秒, 最大秒)
+    #[serde(rename = "cooldownRange")]
+    pub cooldown_range: (u32, u32),
+    /// 空闲检查循环间隔范围 (秒, 秒)
+    /// 控制后台检查线程的唤醒频率
+    #[serde(rename = "idleCheckIntervalRange")]
+    pub idle_check_interval_range: Option<(u64, u64)>,
 }
 
 impl Default for ProactiveConfig {
     fn default() -> Self {
         Self {
-            idle_threshold_min: 10,
-            success_rate: 0.3,
-            cooldown_min: 30,
+            idle_threshold_range: (120, 600), // 2分钟 ~ 10分钟
+            success_rate: 0.7,
+            cooldown_range: (600, 3600), // 10分钟 ~ 60分钟
+            idle_check_interval_range: Some((30, 90)),
         }
     }
 }
@@ -150,7 +161,8 @@ impl Default for BehaviorToggles {
         Self {
             reply_delay: Some((800, 3000)),
             multi_segment: Some(3),
-            segment_delay_factor: 0.3,
+            segment_delay_factor: (0.2, 0.5),
+            segmentation_threshold_range: Some((40, 100)),
             ignore_rate: 0.0,
             idle_delay_config: Some(IdleDelayConfig {
                 delay_range_ms: (60000, 300000), // 1-5分钟
@@ -161,9 +173,10 @@ impl Default for BehaviorToggles {
                 fix_delay_ms: 1500,
             }),
             proactive_initiation: Some(ProactiveConfig {
-                idle_threshold_min: 10,
-                success_rate: 0.3,
-                cooldown_min: 30,
+                idle_threshold_range: (120, 600),
+                success_rate: 0.7,
+                cooldown_range: (600, 3600),
+                idle_check_interval_range: Some((30, 90)),
             }),
             character_state_config: Some(CharacterStateConfig {
                 enabled: false, // 默认关闭,避免意外API调用

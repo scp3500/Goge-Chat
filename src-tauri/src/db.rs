@@ -387,39 +387,20 @@ pub(crate) fn save_message(
     file_metadata: Option<&str>,
     search_metadata: Option<&str>,
 ) -> Result<i64> {
-    println!("💾 [DB] === DB_SAVE_MESSAGE ===");
-    println!("💾 [DB] Session ID: {}", session_id);
-    println!("💾 [DB] Role: {}", role);
-    println!("💾 [DB] Content length: {}", content.len());
-    println!(
-        "💾 [DB] Reasoning content received: {:?}",
-        reasoning_content.map(|s| format!("length: {}", s.len()))
-    );
-
-    println!("💾 [DB] Executing INSERT statement...");
     let result = conn.execute(
         "INSERT INTO messages (session_id, model, provider, role, content, reasoning_content, file_metadata, search_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![session_id, model, provider, role, content, reasoning_content, file_metadata, search_metadata],
     );
 
     match result {
-        Ok(rows) => {
-            println!("💾 [DB] INSERT successful, {} rows affected", rows);
-            println!("💾 [DB] Updating session timestamp...");
-            let update_result = conn.execute(
+        Ok(_) => {
+            let _ = conn.execute(
                 "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
                 params![session_id],
             );
-            match update_result {
-                Ok(_) => println!("💾 [DB] Session update successful"),
-                Err(e) => println!("💾 [DB] Session update failed: {}", e),
-            }
             Ok(conn.last_insert_rowid())
         }
-        Err(e) => {
-            println!("💾 [DB] INSERT FAILED: {}", e);
-            Err(e)
-        }
+        Err(e) => Err(e),
     }
 }
 

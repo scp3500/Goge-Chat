@@ -30,8 +30,8 @@ const handleStop = async () => {
   await chatStore.stopGeneration();
 };
 
-const handleSend = async (text) => {
-  await chatStore.sendMessage(text);
+const handleSend = async (text, fileMetadata = null, mentions = []) => {
+  await chatStore.sendMessage(text, fileMetadata, chatStore.searchProvider, mentions);
   triggerScroll();
 };
 

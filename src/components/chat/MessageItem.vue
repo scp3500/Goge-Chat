@@ -118,26 +118,41 @@ const modelIcon = computed(() => {
 // 💡 获取显示的模型名称
 const displayModelName = computed(() => {
     if (props.assistantName) return props.assistantName;
-    if (props.m.model) return props.m.model;
-    return "Gemini";
+    
+    const modelId = props.m.model;
+    if (!modelId) return "Gemini";
+
+    // Try to find the friendly name in configStore
+    for (const provider of configStore.settings.providers) {
+        const found = (provider.models || []).find(m => (typeof m === 'string' ? m : m.id) === modelId);
+        if (found) {
+            return typeof found === 'string' ? found : (found.name || found.id);
+        }
+    }
+
+    return modelId;
 });
 
 const displayProviderName = computed(() => {
     if (props.assistantName) return ""; // Hide provider in social mode
-    // 1. Prefer explicit providerId stored in message (for new messages)
-    if (props.m.providerId) {
-        const provider = configStore.settings.providers.find(p => p.id === props.m.providerId);
-        return provider ? provider.name : props.m.providerId;
+    
+    // Target model and providerId from message
+    const modelId = props.m.model;
+    const pId = props.m.providerId;
+
+    // 1. Prefer explicit lookup in store
+    if (pId) {
+        const provider = configStore.settings.providers.find(p => p.id === pId);
+        if (provider) return provider.name;
     }
 
-    // 2. Fallback: Guess based on model ID (for history)
-    const modelId = props.m.model;
+    // 2. Fallback: Guess based on model ID
     const provider = findProviderByModelId(modelId);
-    if (provider) {
-        return provider.name;
-    }
+    if (provider) return provider.name;
+    
     if (modelId?.includes('deepseek')) return "DeepSeek";
-    return "Google";
+    if (modelId?.includes('gemini')) return "Google";
+    return "";
 });
 
 // 💡 展开/折叠推理过程
@@ -582,7 +597,7 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
   justify-content: center;
   background: transparent;
   border: none;
-  color: #c4c7c5;
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
@@ -593,7 +608,7 @@ onUnmounted(() => { // Ensure onUnmounted is imported if not already, or just ad
 
 :deep(.code-copy-btn:hover) {
   background-color: var(--bg-glass-hover);
-  color: #e3e3e3;
+  color: var(--text-color);
 }
 
 :deep(.code-copy-btn svg) {

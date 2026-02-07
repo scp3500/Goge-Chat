@@ -2,7 +2,7 @@
 import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
-import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG } from '../../constants/icons';
+import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG, AT_SVG } from '../../constants/icons';
 import ModelSelector from './ModelSelector.vue';
 import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -14,7 +14,16 @@ import SystemPromptWidget from './SystemPromptWidget.vue';
 
 
 const chatStore = useChatStore();
-const { isGenerating, useReasoning, useSearch, searchProvider } = storeToRefs(chatStore);
+const { isGenerating: isStoreGenerating, useReasoning, useSearch, searchProvider } = storeToRefs(chatStore);
+const uiStore = useUIStore();
+const settingsStore = useSettingsStore();
+const configStore = useConfigStore();
+
+const inputMsg = ref("");
+const textareaRef = ref(null);
+const selectedFiles = ref([]); 
+const selectedMentions = ref([]); 
+const showNameModal = ref(false);
 
 const searchProviders = [
   { id: 'all', name: '全网搜索', icon: GLOBE_SVG },
@@ -23,20 +32,53 @@ const searchProviders = [
   { id: 'baidu', name: 'Baidu', icon: GLOBE_SVG },
 ];
 
-const uiStore = useUIStore();
-const settingsStore = useSettingsStore();
-const configStore = useConfigStore();
-
 const showSearchMenu = computed(() => uiStore.isMenuOpen('search-menu'));
 const showPresetMenu = computed(() => uiStore.isMenuOpen('preset-menu'));
 const activeSearchProvider = computed(() => searchProviders.find(p => p.id === searchProvider.value) || searchProviders[0]);
 
-const showNameModal = ref(false);
+const handleMentionSelect = ({ providerId, model }) => {
+    console.log('Mention selected:', { providerId, model });
+    const modelId = typeof model === 'string' ? model : model.id;
+    const modelName = typeof model === 'string' ? model : (model.name || model.id);
+    
+    // Insert text like WeChat
+    const textToInsert = `@${modelName} `;
+    const textArea = textareaRef.value;
+    let start, end;
+    
+    if (textArea) {
+        start = textArea.selectionStart;
+        end = textArea.selectionEnd;
+    } else {
+        start = inputMsg.value.length;
+        end = inputMsg.value.length;
+    }
+    
+    const currentVal = inputMsg.value || "";
+    inputMsg.value = currentVal.substring(0, start) + textToInsert + currentVal.substring(end);
+    
+    // Update local metadata for later parsing
+    if (!selectedMentions.value.find(m => m.id === modelId)) {
+        selectedMentions.value.push({
+            id: modelId,
+            providerId: providerId,
+            name: modelName
+        });
+    }
 
+    nextTick(() => {
+        if (textareaRef.value) {
+            textareaRef.value.focus();
+            const newPos = start + textToInsert.length;
+            textareaRef.value.setSelectionRange(newPos, newPos);
+            autoResize(); // Extra call to ensure height updates
+        }
+    });
+};
 
-const inputMsg = ref("");
-const textareaRef = ref(null);
-const selectedFiles = ref([]); // { name, path, icon }
+const removeMention = (index) => {
+    selectedMentions.value.splice(index, 1);
+};
 
 // --- 🔧 高度自动伸缩逻辑 ---
 const autoResize = () => {
@@ -60,7 +102,7 @@ const props = defineProps({
 const emit = defineEmits(['send', 'stop', 'pick-file']);
 
 const handleAction = async () => {
-  if (isGenerating.value) {
+  if (props.isGenerating) {
     if (props.overrideSend) {
         emit('stop');
     } else {
@@ -101,14 +143,70 @@ const handleAction = async () => {
         }
     });
 
+    // --- Parse mentions BEFORE sending ---
+    const finalMentions = [];
+    
+    // Strategy: First check our explicit metadata in selectedMentions
+    for (const mention of selectedMentions.value) {
+        if (msgToProcess.includes(`@${mention.name}`)) {
+            if (!finalMentions.find(m => m.id === mention.id)) {
+                finalMentions.push(mention);
+            }
+        }
+    }
+    
+    // Fallback: simple regex for any other @-text
+    const mentionRegex = /@([^\s@]+)/g;
+    let match;
+    while ((match = mentionRegex.exec(msgToProcess)) !== null) {
+        const rawName = match[1];
+        const name = rawName.toLowerCase();
+        
+        // Skip if already in finalMentions (by name OR by partial name matching if metadata handles it)
+        if (finalMentions.find(m => 
+            m.name.toLowerCase() === name || 
+            m.id.toLowerCase() === name
+        )) continue;
+        
+        // Search in ALL providers for model name (even disabled ones if explicitly mentioned)
+        outer: for (const provider of configStore.settings.providers) {
+            for (const model of (provider.models || [])) {
+                const modelId = typeof model === 'string' ? model : model.id;
+                const modelName = typeof model === 'string' ? model : (model.name || model.id);
+                
+                // Check exact ID match or exact Name match (ignoring case)
+                if (modelId.toLowerCase() === name || modelName.toLowerCase() === name) {
+                    finalMentions.push({
+                        id: modelId,
+                        providerId: provider.id,
+                        name: modelName
+                    });
+                    break outer;
+                }
+            }
+        }
+    }
+    
+    // 🛡️ Final cleanup: if multiple mentions of same model, keep only one
+    const uniqueMentions = [];
+    const seenIds = new Set();
+    for (const m of finalMentions) {
+        if (!seenIds.has(m.id)) {
+            uniqueMentions.push(m);
+            seenIds.add(m.id);
+        }
+    }
+    const mentionsToUse = uniqueMentions;
+
     // 💡 Decoupled Send Logic
     if (props.overrideSend) {
-        emit('send', msgToProcess, filesMetadata);
+        emit('send', msgToProcess, filesMetadata, mentionsToUse);
+        selectedMentions.value = []; // Clear here too for consistency
     } else {
-        // Standard chat store usage
-        await chatStore.sendMessage(msgToProcess, filesMetadata, searchProvider.value);
+        await chatStore.sendMessage(msgToProcess, filesMetadata, chatStore.searchProvider, mentionsToUse);
+        selectedMentions.value = []; // Clear temporary metadata
     }
-  }
+}
 };
 
 const onKeydown = (e) => {
@@ -280,14 +378,33 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="tools-right">
+        <div class="tools-right" style="display: flex; align-items: center; gap: 4px;">
+          <ModelSelector 
+            minimal 
+            direction="up" 
+            fullWidth
+            menuId="at-menu" 
+            @select="handleMentionSelect"
+          >
+            <template #trigger="{ toggle, isOpen }">
+              <button
+                class="icon-btn at-btn"
+                @click.stop="toggle"
+                title="提及 AI 交流 (@)"
+                style="pointer-events: auto;"
+              >
+                <span v-html="AT_SVG"></span>
+              </button>
+            </template>
+          </ModelSelector>
+
           <button
             class="icon-btn action-btn"
             @click="handleAction"
-            :class="{ 'is-stop': isGenerating }"
-            :disabled="!isGenerating && !inputMsg.trim() && selectedFiles.length === 0"
+            :class="{ 'is-stop': props.isGenerating }"
+            :disabled="!props.isGenerating && !inputMsg.trim() && selectedFiles.length === 0"
           >
-            <template v-if="isGenerating">
+            <template v-if="props.isGenerating">
               <span v-html="STOP_SVG"></span>
             </template>
             <template v-else>
@@ -297,7 +414,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 全局搜索源选择菜单 (移到内部以相对于 input-wrapper 绝对定位) -->
+      <!-- 全局搜索源选择菜单 -->
       <Transition name="fade-slide">
         <div v-if="showSearchMenu" class="search-menu-popup-global modern-scroll" @click.stop>
           <div class="menu-list">
@@ -366,7 +483,70 @@ onMounted(() => {
 .text-input-section {
   width: 100%;
   display: flex;
+  flex-direction: column;
   padding: 0 2px; 
+  gap: 8px;
+}
+
+.mention-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 4px;
+}
+
+.mention-tag {
+    display: flex;
+    align-items: center;
+    background: var(--bg-glass-active);
+    color: var(--color-primary);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--color-primary-border);
+}
+
+.at-symbol {
+    margin-right: 2px;
+    opacity: 0.8;
+}
+
+.remove-mention {
+    background: transparent;
+    border: none;
+    color: currentColor;
+    margin-left: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    opacity: 0.6;
+}
+
+.remove-mention:hover {
+    opacity: 1;
+}
+
+.at-btn.active-at {
+    color: var(--color-primary);
+    opacity: 1;
+}
+
+.menu-header-mini {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.at-menu-popup {
+    max-height: 300px;
 }
 
 .chat-input {

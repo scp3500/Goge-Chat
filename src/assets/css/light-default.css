@@ -1,5 +1,6 @@
 /* Ensure this applies to ANY light mode scenario */
-[data-theme='light'], .light-mode {
+[data-theme='light'],
+.light-mode {
     --bg-main: #FFFFFF;
 
 
@@ -12,12 +13,17 @@
     --bg-input-dim: #F5F7F9;
     --bg-card: #FFFFFF;
     --border-card: #E3E5E8;
-    --bg-code-header: #E3E5E8;
+    --bg-code: #F8F9FA;
+    --bg-code-header: #EDEFF2;
+    --bg-inline-code: #F4F5F7;
+    --color-inline-code: #374151;
+    /* 沉稳的深炭灰色 */
 
     /* 文本颜色 */
     --text-color: #2E3338;
     --text-color-white: #060607;
-    --border-color: #DCDFE4;
+    --border-color: rgba(0, 0, 0, 0.06);
+    /* 全局统一浅色分割线 */
 
     /* 玻璃/边框系统 (浅色) */
     --bg-glass: rgba(0, 0, 0, 0.05);

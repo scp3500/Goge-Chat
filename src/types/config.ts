@@ -144,22 +144,45 @@ export interface ChatModeConfig {
 }
 
 // 沉浸式模式配置
+// 沉浸式模式配置
 export interface ImmersiveModeConfig {
     enabled: boolean;
     behaviors: {
-        replyDelay: [number, number] | null;  // [min, max] in ms
+        // Core delays & behavior
+        responseDelayRange?: [number, number]; // [min, max] ms, replaces replyDelay
+        replyDelay?: [number, number];         // Legacy alias
+
+        segmentationThresholdRange?: [number, number]; // [min, max] chars
+        typingSpeedRange?: [number, number];           // [min, max] chars/sec
+
         multiSegment: number | null;           // max segments
-        ignoreRate: number;                    // 0.0 - 1.0
+        ignoreRate: number;                    // 0.0 - 1.0 (legacy simple field, or keep as is)
+        segmentDelayFactor?: [number, number]; // [min, max] range
+
         typoCorrection: {
             triggerRate: number;               // 0.0 - 1.0
             fixDelayMs: number;                // delay before fixing typo
         } | null;
+
         proactiveInitiation: {
-            idleThresholdMin: number;          // minutes of idle before triggering
-            successRate: number;               // 0.0 - 1.0
-            cooldownMin: number;               // cooldown between proactive messages
+            idleThresholdRange: [number, number];   // [min, max] seconds
+            successRate: number;                    // 0.0 - 1.0
+            cooldownRange: [number, number];        // [min, max] seconds
+            idleCheckIntervalRange?: [number, number]; // [min, max] seconds
+
+            // Legacy/Compat fields (optional if frontend logic needs migration)
+            idleThresholdMin?: number;
+            cooldownMin?: number;
         } | null;
+
         typingJitter: boolean;                 // add randomness to typing delays
+
+        characterStateConfig?: {               // Added missing definition
+            enabled: boolean;
+            analysisFrequency: number;
+            cacheDurationMin: number;
+            analysisOnProactive?: boolean;
+        };
     };
 }
 
@@ -308,17 +331,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
     immersiveMode: {
         enabled: false,
         behaviors: {
-            replyDelay: [800, 3000],
+            replyDelay: [800, 3000],          // legacy/alias
+            responseDelayRange: [800, 3000],  // alias
+
+            segmentationThresholdRange: [40, 100],
+            typingSpeedRange: [2, 8],
+
             multiSegment: 3,
             ignoreRate: 0.0,
+            segmentDelayFactor: [0.2, 0.5], // Initialize as range
+
             typoCorrection: {
                 triggerRate: 0.02,
                 fixDelayMs: 1500
             },
             proactiveInitiation: {
-                idleThresholdMin: 10,
+                idleThresholdRange: [120, 600],
                 successRate: 0.3,
-                cooldownMin: 30
+                cooldownRange: [600, 3600],
+                idleCheckIntervalRange: [30, 90]
             },
             typingJitter: true
         }

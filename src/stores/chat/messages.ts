@@ -63,8 +63,17 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 const isCurrentSession = activeId.value === generatingSessionId.value;
                 const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-                // ⚡️ Adaptive Speed Control
-                const charsPerFrame = Math.max(1, Math.floor(streamQueue.value.length / 4));
+                // ⚡️ 优化：更激进的批量处理策略
+                // 当队列较长时,一次性处理更多字符,减少渲染次数
+                let charsPerFrame;
+                if (streamQueue.value.length > 100) {
+                    charsPerFrame = Math.min(50, Math.floor(streamQueue.value.length / 2)); // 大量积压时快速消化
+                } else if (streamQueue.value.length > 20) {
+                    charsPerFrame = Math.min(20, Math.floor(streamQueue.value.length / 3)); // 中等积压
+                } else {
+                    charsPerFrame = Math.max(3, Math.floor(streamQueue.value.length / 2)); // 少量时保持流畅感
+                }
+
                 const chunk = streamQueue.value.splice(0, charsPerFrame).join('');
 
                 if (isCurrentSession) {
@@ -201,7 +210,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         }
     };
 
-    const saveAssistantResponse = async (sessionId: string, content: string, reasoningContent: string | null, fileMetadata: string | null = null, searchMetadata: string | null = null) => {
+    const saveAssistantResponse = async (sessionId: string, content: string, reasoningContent: string | null, fileMetadata: string | null = null, searchMetadata: string | null = null, explicitModelId?: string, explicitProviderId?: string) => {
         /*
         console.log("💾 [SAVE] === START SAVING ===");
         console.log("💾 [SAVE] Content length:", content.length);
@@ -210,11 +219,14 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         console.log("💾 [SAVE] Search metadata:", searchMetadata);
         */
 
+        const targetModel = explicitModelId || configStore.settings.selectedModelId;
+        const targetProvider = explicitProviderId || configStore.settings.defaultProviderId;
+
         const saveParams = {
             sessionId,
             role: "assistant",
-            model: configStore.settings.selectedModelId,
-            provider: configStore.settings.defaultProviderId, // 🟢 Fix: Pass provider to backend
+            model: targetModel,
+            provider: targetProvider, // 🟢 Fix: Pass provider to backend
             content,
             reasoningContent,
             fileMetadata,
@@ -229,7 +241,8 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         const lastMsg = currentMessages.value[currentMessages.value.length - 1];
         if (lastMsg && lastMsg.role === 'assistant') {
             lastMsg.id = msgId;
-            lastMsg.model = configStore.settings.selectedModelId;
+            lastMsg.model = targetModel;
+            lastMsg.providerId = targetProvider;
         }
         // console.log("💾 [SAVE] save_message completed");
         // console.log("💾 [SAVE] === END SAVING ===");
@@ -293,7 +306,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
         }
     };
 
-    const sendMessage = async (text: string, fileMetadata: string | null = null, provider: string = 'all') => {
+    const sendMessage = async (text: string, fileMetadata: string | null = null, provider: string = 'all', mentions: any[] = []) => {
         // 如果 text 为空，则表示“基于当前历史重新生成”，此时要求必须有历史消息
         const isRegeneratingFromHistory = text.trim() === "" && currentMessages.value.length > 0;
 
@@ -305,17 +318,6 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
 
         const sessionId = activeId.value;
         const currentMode = configStore.settings.chatMode?.enabled ? "Social" : "Standard";
-
-        // Log Context
-        Logger.context({
-            'Session ID': sessionId,
-            'Mode': currentMode,
-            'Model': configStore.settings.selectedModelId,
-            'Provider': configStore.settings.defaultProviderId,
-            'Reasoning': useReasoning.value,
-            'Search': useSearch.value,
-            'Regenerating': isRegeneratingFromHistory
-        });
 
         isGenerating.value = true;
 
@@ -329,7 +331,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
             : configStore.settings.enableStream;
 
         try {
-            await invoke("reset_ai_generation");
+            // await invoke("reset_ai_generation"); // Moved inside loop
 
             if (!isRegeneratingFromHistory) {
                 const msgId = await invoke<number>("save_message", {
@@ -352,283 +354,239 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 });
             }
 
-            // 添加加载中的助手消息
-            currentMessages.value.push({
-                role: "assistant",
-                model: configStore.settings.selectedModelId,
-                providerId: configStore.settings.defaultProviderId,
-                content: '__LOADING__',
-                reasoningContent: '',
-                fileMetadata: null,
-                searchMetadata: null
-            });
+            // --- 确定要调用的模型列表 ---
+            let modelsToCall = mentions && mentions.length > 0
+                ? mentions
+                : [{ id: configStore.settings.selectedModelId, providerId: configStore.settings.defaultProviderId }];
 
-            Logger.info('Step: User message saved and UI updated');
+            // 🛡️ Safety filter
+            modelsToCall = modelsToCall.filter(m => m && m.id);
 
-            const onEvent = new Channel<string>();
-            let aiFullContent = '';
-            let ttft = 0; // Time to first token
-            let searchStartTime = 0;
-            let memoryStartTime = 0;
-
-            // 监听搜索状态事件
-            const unlistenSearch = await listen('search-status', (event: any) => {
-                const payload = event.payload;
-                const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
-                if (payload.status === 'searching') {
-                    searchStartTime = Date.now();
-                    Logger.info(`Searching: ${payload.query}`);
-                    lastMsg.searchStatus = 'searching';
-                    lastMsg.searchQuery = payload.query;
-                } else if (payload.status === 'done') {
-                    const searchDuration = Date.now() - searchStartTime;
-                    Logger.success('Search completed', searchDuration, { results: payload.results?.length });
-                    lastMsg.searchStatus = 'done';
-                    lastMsg.searchMetadata = JSON.stringify(payload.results);
-                } else if (payload.status === 'error') {
-                    Logger.error('Search failed', payload.message);
-                    lastMsg.searchStatus = 'error';
-                }
-            });
-
-            // 监听记忆检索事件
-            const unlistenMemory = await listen('memory-status', (event: any) => {
-                const payload = event.payload;
-                if (payload.status === 'searching') {
-                    memoryStartTime = Date.now();
-                    Logger.info('Retrieving memory context...');
-                } else if (payload.status === 'done') {
-                    const memoryDuration = Date.now() - memoryStartTime;
-                    Logger.success('Memory retrieval completed', memoryDuration, { hasContext: payload.has_context });
-                }
-            });
-
-            onEvent.onmessage = (data) => {
-                if (!isGenerating.value) return;
-
-                if (ttft === 0 && (data.startsWith("c:") || data.startsWith("r:"))) {
-                    ttft = Date.now() - startTime;
-                    Logger.timing('Time to First Token (TTFT)', ttft);
-                }
-
-                // 只要是当前会话就更新（不管视图是否隐藏）
-                const isCurrentSession = activeId.value === generatingSessionId.value;
-                const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
-                // 处理内容流
-                if (data.startsWith("c:")) {
-                    const content = data.substring(2);
-                    aiFullContent += content;
-
-                    // 🌊 Streaming Control
-                    if (isStreamEnabled) {
-                        for (const char of content) {
-                            streamQueue.value.push(char);
-                        }
-                        // Kickstart the processor if idle
-                        processStreamQueue();
-                    }
-                }
-                // 处理推理流
-                else if (data.startsWith("r:")) {
-                    const content = data.substring(2);
-
-                    // 同步更新 tempGeneratedMessage
-                    if (tempGeneratedMessage.value) {
-                        tempGeneratedMessage.value.reasoning += content;
-                    }
-
-                    if (isCurrentSession) {
-                        if (!lastMsg.reasoningContent) lastMsg.reasoningContent = "";
-                        lastMsg.reasoningContent += content;
-                    }
-                } else if (data.startsWith("data: ")) {
-                    // console.log(`🧠 [DEBUG] Raw data event: ${data.substring(0, 50)}...`);
-                } else {
-                    // console.log(`🧠 [DEBUG] Unknown event prefix: ${data.substring(0, 10)}`);
-                }
-            };
-
-            // 准备发送的消息列表（排除加载中的消息）
-            let msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
-                role: m.role,
-                content: m.content,
-                reasoningContent: m.reasoningContent,
-                fileMetadata: m.fileMetadata,
-                searchMetadata: m.searchMetadata,
-                mode: currentMode,
-                roleId: "default"
-            }));
-
-            // 获取当前预设
-            const activePreset = configStore.settings.presets.find(p => p.id === configStore.settings.defaultPresetId);
-
-            // 注入系统提示词
-            // 策略：如果第一条不是系统提示词，则插入；如果是，则按需更新内容
-
-            let presetPrompt = activePreset?.systemPrompt;
-
-            // 🟢 Fix: 如果使用的是“默认预设”（default_preset），则强制忽略预设内部可能保存的旧提示词，
-            // 直接使用用户在全局设置中配置的“默认系统提示词”。
-            // 这响应了用户的需求：“不要让别的（旧预设值）影响它，直接用设置里的那个”。
-            if (activePreset?.id === 'default_preset') {
-                presetPrompt = "";
+            if (modelsToCall.length === 0) {
+                modelsToCall = [{ id: configStore.settings.selectedModelId, providerId: configStore.settings.defaultProviderId }];
             }
 
-            const finalSystemPrompt = presetPrompt || configStore.settings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+            Logger.info(`Models to call (Count ${mentions?.length || 0}): ${modelsToCall.map(m => m.id).join(', ')}`);
 
-            if (msgsToSend.length > 0 && msgsToSend[0].role !== 'system') {
-                msgsToSend.unshift({
-                    role: 'system',
-                    content: finalSystemPrompt,
-                    reasoningContent: null,
+            for (const modelInfo of modelsToCall) {
+                // 🔄 Reset generation state before each model call
+                await invoke("reset_ai_generation");
+
+                const currentModelId = modelInfo.id;
+                const currentProviderId = modelInfo.providerId;
+
+                // 添加加载中的助手消息
+                currentMessages.value.push({
+                    role: "assistant",
+                    model: currentModelId,
+                    providerId: currentProviderId,
+                    content: '__LOADING__',
+                    reasoningContent: '',
                     fileMetadata: null,
-                    searchMetadata: null,
+                    searchMetadata: null
+                });
+
+                const onEvent = new Channel<string>();
+                let aiFullContent = '';
+                let ttft = 0; // Time to first token
+                let searchStartTime = 0;
+                let memoryStartTime = 0;
+
+                // 监听搜索状态事件
+                const unlistenSearch = await listen('search-status', (event: any) => {
+                    const payload = event.payload;
+                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+
+                    if (payload.status === 'searching') {
+                        searchStartTime = Date.now();
+                        Logger.info(`Searching: ${payload.query}`);
+                        lastMsg.searchStatus = 'searching';
+                        lastMsg.searchQuery = payload.query;
+                    } else if (payload.status === 'done') {
+                        const searchDuration = Date.now() - searchStartTime;
+                        Logger.success('Search completed', searchDuration, { results: payload.results?.length });
+                        lastMsg.searchStatus = 'done';
+                        lastMsg.searchMetadata = JSON.stringify(payload.results);
+                    } else if (payload.status === 'error') {
+                        Logger.error('Search failed', payload.message);
+                        lastMsg.searchStatus = 'error';
+                    }
+                });
+
+                // 监听记忆检索事件
+                const unlistenMemory = await listen('memory-status', (event: any) => {
+                    const payload = event.payload;
+                    if (payload.status === 'searching') {
+                        memoryStartTime = Date.now();
+                        Logger.info('Retrieving memory context...');
+                    } else if (payload.status === 'done') {
+                        const memoryDuration = Date.now() - memoryStartTime;
+                        Logger.success('Memory retrieval completed', memoryDuration, { hasContext: payload.has_context });
+                    }
+                });
+
+                onEvent.onmessage = (data) => {
+                    if (!isGenerating.value) return;
+
+                    if (ttft === 0 && (data.startsWith("c:") || data.startsWith("r:"))) {
+                        ttft = Date.now() - startTime;
+                        Logger.timing('Time to First Token (TTFT)', ttft);
+                    }
+
+                    // 只要是当前会话就更新（不管视图是否隐藏）
+                    const isCurrentSession = activeId.value === generatingSessionId.value;
+                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+
+                    // 处理内容流
+                    if (data.startsWith("c:")) {
+                        const content = data.substring(2);
+                        aiFullContent += content;
+
+                        // 🌊 Streaming Control
+                        if (isStreamEnabled) {
+                            streamQueue.value.push(...content.split(''));
+                            if (!isProcessingQueue.value) {
+                                processStreamQueue();
+                            }
+                        } else {
+                            if (isCurrentSession && lastMsg) {
+                                if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                                lastMsg.content += content;
+                            }
+                        }
+                    }
+                    // 处理推理流
+                    else if (data.startsWith("r:")) {
+                        const content = data.substring(2);
+                        if (isCurrentSession) {
+                            if (!lastMsg.reasoningContent) lastMsg.reasoningContent = "";
+                            lastMsg.reasoningContent += content;
+                        }
+                    }
+                };
+
+                // 准备发送的消息列表（排除当前的加载中消息）
+                let msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
+                    role: m.role,
+                    content: m.content,
+                    reasoningContent: m.reasoningContent,
+                    fileMetadata: m.fileMetadata,
+                    searchMetadata: m.searchMetadata,
                     mode: currentMode,
                     roleId: "default"
-                });
-            } else if (msgsToSend.length > 0 && msgsToSend[0].role === 'system') {
-                msgsToSend[0].content = finalSystemPrompt;
-            }
+                }));
 
-            // 注入会话特定的系统提示词（覆盖预设提示词，如果存在）
-            const sessionSpecificPrompt = activeSession.value?.system_prompt;
-            if (sessionSpecificPrompt) {
-                if (msgsToSend.length === 0 || msgsToSend[0].role !== 'system') {
-                    console.log('🧠 [DEBUG] Injecting session specific system prompt:', sessionSpecificPrompt);
+                // 获取并注入系统提示词
+                const activePreset = configStore.settings.presets.find(p => p.id === configStore.settings.defaultPresetId);
+                let presetPrompt = activePreset?.id === 'default_preset' ? "" : activePreset?.systemPrompt;
+                const finalSystemPrompt = presetPrompt || configStore.settings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+                if (msgsToSend.length > 0 && msgsToSend[0].role !== 'system') {
                     msgsToSend.unshift({
                         role: 'system',
-                        content: sessionSpecificPrompt,
+                        content: finalSystemPrompt,
                         reasoningContent: null,
                         fileMetadata: null,
                         searchMetadata: null,
                         mode: currentMode,
                         roleId: "default"
                     });
-                } else {
-                    console.log('🧠 [DEBUG] Updating existing system prompt with session specific:', sessionSpecificPrompt);
-                    msgsToSend[0].content = sessionSpecificPrompt;
+                } else if (msgsToSend.length > 0 && msgsToSend[0].role === 'system') {
+                    msgsToSend[0].content = finalSystemPrompt;
                 }
-            }
 
-            console.log("📤 Final messages to send:", {
-                count: msgsToSend.length,
-                preset: activePreset?.name,
-                temperature: activePreset?.temperature,
-                maxTokens: activePreset?.maxTokens
-            });
+                // 注入会话特定的系统提示词
+                const sessionSpecificPrompt = activeSession.value?.system_prompt;
+                if (sessionSpecificPrompt) {
+                    if (msgsToSend[0].role === 'system') msgsToSend[0].content = sessionSpecificPrompt;
+                    else msgsToSend.unshift({ role: 'system', content: sessionSpecificPrompt, reasoningContent: null, fileMetadata: null, searchMetadata: null, mode: currentMode, roleId: "default" });
+                }
 
-            // 如果启用推理，在最后一条用户消息前添加标记
-            if (useReasoning.value || useSearch.value) {
-                for (let i = msgsToSend.length - 1; i >= 0; i--) {
-                    if (msgsToSend[i].role === "user") {
-                        if (useReasoning.value) msgsToSend[i].content = `[REASON]${msgsToSend[i].content}`;
-                        if (useSearch.value) {
-                            const tag = provider === 'all' ? '[SEARCH]' : `[SEARCH:${provider}]`;
-                            msgsToSend[i].content = `${tag}${msgsToSend[i].content}`;
+                // 添加推理/搜索标记
+                if (useReasoning.value || useSearch.value) {
+                    for (let i = msgsToSend.length - 1; i >= 0; i--) {
+                        if (msgsToSend[i].role === "user") {
+                            if (useReasoning.value) msgsToSend[i].content = `[REASON]${msgsToSend[i].content}`;
+                            if (useSearch.value) {
+                                const tag = provider === 'all' ? '[SEARCH]' : `[SEARCH:${provider}]`;
+                                msgsToSend[i].content = `${tag}${msgsToSend[i].content}`;
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
-            }
 
-            // 调用 AI
-            try {
-                // 🛡️ 修复：增加 60 秒超时保护，防止后端无响应导致一直转圈
-                // Create a timeout promise
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error("Request timed out")), 60000);
-                });
+                // 调用 AI
+                try {
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error("Request timed out")), 60000);
+                    });
 
-                await Promise.race([
-                    invoke("ask_ai", {
-                        msg: msgsToSend,
-                        onEvent,
-                        temperature: activePreset?.temperature,
-                        max_tokens: activePreset?.maxTokens,
-                        // 🟢 Fix: Explicitly pass the resolved provider and model to the backend
-                        // This prevents the backend from falling back to the potentially stale global config
-                        explicitProviderId: configStore.settings.defaultProviderId,
-                        explicitModelId: configStore.settings.selectedModelId,
-                        stream: isStreamEnabled
-                    }),
-                    timeoutPromise
-                ]);
+                    await Promise.race([
+                        invoke("ask_ai", {
+                            msg: msgsToSend,
+                            onEvent,
+                            temperature: activePreset?.temperature,
+                            max_tokens: activePreset?.maxTokens,
+                            explicitProviderId: currentProviderId,
+                            explicitModelId: currentModelId,
+                            stream: isStreamEnabled
+                        }),
+                        timeoutPromise
+                    ]);
 
-                // 🛑 Non-Streaming Mode: Final Update
-                // If streaming is disabled, we need to manually update the UI with the full content once generation completes.
-                if (!isStreamEnabled) {
-                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        // Replace __LOADING__ with actual content
-                        if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                    if (!isStreamEnabled) {
+                        const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+                        if (lastMsg && lastMsg.role === 'assistant') {
+                            if (lastMsg.content === "__LOADING__") lastMsg.content = "";
+                            lastMsg.content = aiFullContent;
+                        }
+                    }
+                } finally {
+                    unlistenSearch();
+                    unlistenMemory();
+                }
+
+                // 🛡️ Fix bug: Ensure loading state is cleared even if AI returns no content
+                const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+                if (lastMsg.content === '__LOADING__') {
+                    if (aiFullContent) {
                         lastMsg.content = aiFullContent;
+                    } else {
+                        console.warn(`[sendMessage] Model ${currentModelId} returned no content.`);
+                        lastMsg.content = ""; // Clear loading state
                     }
                 }
-            } finally {
-                unlistenSearch();
-                unlistenMemory();
+
+                // 保存助手回复
+                await saveAssistantResponse(sessionId, aiFullContent, lastMsg.reasoningContent || null, null, lastMsg.searchMetadata || null, currentModelId, currentProviderId);
+
+                // 如果用户停止了，跳过后续模型
+                if (!isGenerating.value) break;
             }
-
-            const totalDuration = Date.now() - startTime;
-            Logger.success('AI generation completed', totalDuration);
-
-            // 获取最后一条消息的深度思考内容
-            const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
-            const finalReasoningContent = lastMsg.reasoningContent || null;
-            const finalSearchMetadata = lastMsg.searchMetadata || null;
-
-            // 保存助手回复 - 只在生成完成后保存完整的 AI 回复
-            await saveAssistantResponse(sessionId, aiFullContent, finalReasoningContent, null, finalSearchMetadata);
 
             // 自动总结标题
             const msgCount = currentMessages.value.filter(m => m.content && m.content !== "__LOADING__").length;
             const isDefaultTitle = !activeSession.value?.title ||
                 ["新对话", "默认会话", "New Chat", "默认对话"].includes(activeSession.value?.title);
 
-            // 当消息数达到 2 条（一个回合）且标题还是默认值时，触发自动总结
             if (msgCount >= 2 && isDefaultTitle) {
                 autoSummaryTitle(sessionId);
             }
-            console.log("💾 [SAVE] === END SAVING ===");
         } catch (error: any) {
             console.error("对话失败:", error);
-
-            // 🚨 Error Handling UI
             const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-            if (lastMsg.role === 'assistant' && lastMsg.content === '__LOADING__') {
-                // Determine error type based on message
-                let errorType = 'unknown';
+            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === '__LOADING__') {
                 let errorMsg = error.message || String(error);
-                let details = '';
+                if (errorMsg.includes('timed out')) errorMsg = '请求超时 (60s)，请检查网络或稍后重试。';
+                else if (errorMsg.includes('quota') || errorMsg.includes('429')) errorMsg = '请求速率超过限制或配额不足。';
 
-                if (errorMsg.includes('timed out')) {
-                    errorType = 'timeout';
-                    errorMsg = '请求超时 (60s)，请检查网络或稍后重试。';
-                } else if (errorMsg.includes('quota') || errorMsg.includes('429')) {
-                    errorType = 'quota';
-                    errorMsg = '请求速率超过限制或配额不足。';
-                    details = 'https://ai.google.dev/gemini-api/docs/rate-limits';
-                }
-
-                // Replace loading message with error state
                 lastMsg.content = '';
-                lastMsg.error = {
-                    message: errorMsg,
-                    type: errorType,
-                    details: details,
-                    originalError: String(error)
-                };
+                lastMsg.error = { message: errorMsg, type: 'error' };
             }
-
         } finally {
             isGenerating.value = false;
-            // 清空生成会话状态和缓存
-            // generatingSessionId.value = null; // DO NOT clear here. It breaks the "isCurrentSession" check in the queue loop for the last few chars.
             pausedChunks.value = { content: [], reasoning: [] };
-            // streamQueue.value = []; // DO NOT clear queue here, let it drain naturally
         }
     };
 
