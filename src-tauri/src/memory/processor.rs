@@ -8,15 +8,45 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub struct MemoryState {
-    pub engine: EmbeddingEngine,
+    pub app_handle: AppHandle,
+    pub engine: RwLock<Option<EmbeddingEngine>>, // Use RwLock for interior mutability of the Option
     pub db: LanceDbManager,
 }
 
 impl MemoryState {
     pub fn new(app_handle: &AppHandle) -> Result<Self, String> {
-        let engine = EmbeddingEngine::new(app_handle)?;
+        // Lazy load: Don't init engine here
         let db = LanceDbManager::new(app_handle)?;
-        Ok(Self { engine, db })
+        Ok(Self {
+            app_handle: app_handle.clone(),
+            engine: RwLock::new(None),
+            db,
+        })
+    }
+
+    pub async fn get_engine(&self) -> Result<EmbeddingEngine, String> {
+        // 1. Fast path: Read lock
+        {
+            let guard = self.engine.read().await;
+            if let Some(engine) = &*guard {
+                return Ok(engine.clone());
+            }
+        }
+
+        // 2. Slow path: Write lock
+        let mut guard = self.engine.write().await;
+        // Double check
+        if let Some(engine) = &*guard {
+            return Ok(engine.clone());
+        }
+
+        println!("🧠 [Memory] Initializing Embedding Engine (Lazy Load)...");
+        let start = Instant::now();
+        let engine = EmbeddingEngine::new(&self.app_handle)?;
+        println!("🧠 [Memory] Engine loaded in {:?}", start.elapsed());
+
+        *guard = Some(engine.clone());
+        Ok(engine)
     }
 }
 
@@ -32,7 +62,9 @@ pub async fn upsert_fact(
 
     // 1. 向量化
     let start_vec = Instant::now();
-    let doc_vector = state_read.engine.get_vector(content)?;
+    // Lazy load the engine
+    let engine = state_read.get_engine().await?;
+    let doc_vector = engine.get_vector(content)?;
     let duration_vec = start_vec.elapsed();
 
     // 2. 去重搜索
@@ -105,9 +137,10 @@ pub async fn get_relevant_context(
 
     // 🧠 核心优化：将计算密集的特征提取移至阻塞线程池
     // 💡 改进：先克隆 Engine 并立即释放锁，避免阻塞整个 MemoryState
+    // Lazy Load
     let engine = {
         let state_read = state.read().await;
-        state_read.engine.clone()
+        state_read.get_engine().await?
     };
 
     let vector = tokio::task::spawn_blocking(move || engine.get_vector(&query_with_prefix))

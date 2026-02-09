@@ -7,12 +7,37 @@ export class AudioRecorder {
     private sampleRate: number = 16000; // Sherpa-onnx typically uses 16k
 
     async start() {
+        console.log("[AudioRecorder] Requesting microphone access...");
         this.samples = [];
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-            sampleRate: this.sampleRate,
+
+        // 1. Request access first to get the stream and see what the browser gives us
+        // enhancing with constraints for better speech recognition
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 16000 // Try to request 16k, but browser might ignore
+            }
         });
 
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const track = this.mediaStream.getAudioTracks()[0];
+        const settings = track.getSettings();
+        console.log(`[AudioRecorder] Microphone access granted. Label: ${track.label}, SampleRate: ${settings.sampleRate}, Channels: ${settings.channelCount}`);
+
+        // 2. Create AudioContext
+        // We try to force 16k, but if the browser/hardware doesn't support it, 
+        // we must accept what comes and report it correctly.
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        this.audioContext = new AudioContextClass({
+            sampleRate: 16000,
+        });
+
+        // Update our internal tracker to the *actual* rate the context is running at
+        this.sampleRate = this.audioContext.sampleRate;
+        console.log(`[AudioRecorder] AudioContext created. Actual SampleRate: ${this.sampleRate}Hz`);
+
         this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
         // ScriptProcessor is deprecated but widely supported in browsers. 
@@ -21,11 +46,16 @@ export class AudioRecorder {
 
         this.processor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
+            // Only log once in a while to avoid flooding
+            if (this.samples.length % 50 === 0) {
+                console.log(`[AudioRecorder] Capturing chunks... (current count: ${this.samples.length})`);
+            }
             this.samples.push(new Float32Array(inputData));
         };
 
         this.source.connect(this.processor);
         this.processor.connect(this.audioContext.destination);
+        console.log("[AudioRecorder] Processing graph started.");
     }
 
     async stop(): Promise<{ samples: number[], sampleRate: number }> {
@@ -54,7 +84,7 @@ export class AudioRecorder {
 
         return {
             samples: Array.from(flattened),
-            sampleRate: this.sampleRate
+            sampleRate: this.sampleRate // This is now updated in start() to be audioContext.sampleRate
         };
     }
 }

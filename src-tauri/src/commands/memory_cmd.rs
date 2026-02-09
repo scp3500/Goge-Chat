@@ -15,7 +15,8 @@ pub async fn get_memories(
     let mode = mode.unwrap_or_else(|| "Standard".to_string());
     let role_id = role_id.unwrap_or_else(|| "default".to_string());
     if let Some(q) = query {
-        let vector = state_read.engine.get_vector(&q)?;
+        let engine = state_read.get_engine().await?;
+        let vector = engine.get_vector(&q)?;
         let filter = format!("mode = '{}' AND role_id = '{}'", mode, role_id);
         let results = state_read
             .db

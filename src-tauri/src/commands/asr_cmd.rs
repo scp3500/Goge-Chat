@@ -1,5 +1,5 @@
 use once_cell::sync::OnceCell;
-use sherpa_rs::paraformer::{ParaformerConfig, ParaformerRecognizer};
+use sherpa_rs::sense_voice::{SenseVoiceConfig, SenseVoiceRecognizer};
 use std::sync::Mutex;
 use std::time::Instant;
 use tauri::{AppHandle, Manager};
@@ -7,10 +7,10 @@ use tauri::{AppHandle, Manager};
 // --- 1. 定义全局状态 ---
 
 // 使用 OnceCell 确保模型只加载一次
-static RECOGNIZER: OnceCell<Mutex<ParaformerRecognizer>> = OnceCell::new();
+static RECOGNIZER: OnceCell<Mutex<SenseVoiceRecognizer>> = OnceCell::new();
 
 // --- 2. 内部帮助函数：获取或初始化模型 ---
-fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<ParaformerRecognizer>, String> {
+fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<SenseVoiceRecognizer>, String> {
     RECOGNIZER.get_or_try_init(|| {
         println!("[ASR] Initializing Sherpa-Onnx Paraformer model...");
         let start_time = Instant::now();
@@ -22,6 +22,8 @@ fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<ParaformerRec
             .map_err(|e| format!("Failed to get resource dir: {}", e))?
             .join("resources")
             .join("asr_model");
+
+        println!("[ASR] Looking for model resources at: {:?}", resource_path);
 
         // 2. 检查关键文件是否存在
         let encoder_path = resource_path.join("model.int8.onnx");
@@ -36,18 +38,53 @@ fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<ParaformerRec
 
         println!("[ASR] Found model files at: {:?}", resource_path);
 
-        // 3. 配置模型 (适配 sherpa-rs 0.6.8)
-        let config = ParaformerConfig {
-            model: encoder_path.to_string_lossy().to_string(),
-            tokens: tokens_path.to_string_lossy().to_string(),
+        // 3. 配置模型 (适配 SenseVoice)
+        // fix: Windows paths starting with \\?\ can crash C++ libs
+        // Also normalize keys to forward slashes for C++ compatibility
+        let encoder_path_str = encoder_path
+            .to_string_lossy()
+            .to_string()
+            .replace("\\\\?\\", "")
+            .replace("\\", "/");
+        let tokens_path_str = tokens_path
+            .to_string_lossy()
+            .to_string()
+            .replace("\\\\?\\", "")
+            .replace("\\", "/");
+
+        // Verify file integrity (basic check)
+        let encoder_meta = std::fs::metadata(&encoder_path_str)
+            .map_err(|e| format!("Failed to read model metadata: {}", e))?;
+        if encoder_meta.len() < 10 * 1024 * 1024 {
+            // < 10MB
+            return Err(format!(
+                "Model file seems too small ({:?} bytes). Please check if it downloaded correctly.",
+                encoder_meta.len()
+            ));
+        }
+
+        println!("[ASR] Initializing SenseVoice with normalized paths:");
+        println!(
+            "[ASR]   Model:  '{}' (Size: {} bytes)",
+            encoder_path_str,
+            encoder_meta.len()
+        );
+        println!("[ASR]   Tokens: '{}'", tokens_path_str);
+
+        let config = SenseVoiceConfig {
+            model: encoder_path_str,
+            tokens: tokens_path_str,
             num_threads: Some(4),
-            debug: false,
+            debug: true,
+            use_itn: true,
+            language: "zh".to_string(), // Explicitly set language to avoid empty string issues
             provider: None,
         };
 
+        println!("[ASR] Calling SenseVoiceRecognizer::new()...");
         // 4. 加载模型
-        let recognizer = ParaformerRecognizer::new(config)
-            .map_err(|e| format!("Failed to create recognizer: {}", e))?;
+        let recognizer = SenseVoiceRecognizer::new(config)
+            .map_err(|e| format!("Sherpa-Onnx Crash/Error: {}", e))?;
 
         let elapsed = start_time.elapsed();
         println!("[ASR] Model loaded successfully in {:.2?}", elapsed);
@@ -70,6 +107,23 @@ pub async fn transcribe_pcm(
         samples.len(),
         sample_rate
     );
+
+    // --- Check Audio Signal Quality ---
+    if samples.is_empty() {
+        return Err("Received empty audio samples".to_string());
+    }
+
+    let max_amp = samples.iter().fold(0.0f32, |max, &x| max.max(x.abs()));
+    let avg_amp = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
+    println!(
+        "[ASR] Audio Stats: Max Amp: {:.4}, Avg Amp: {:.4}",
+        max_amp, avg_amp
+    );
+
+    if max_amp < 0.001 {
+        println!("[ASR] ⚠️ WARNING: Audio seems silent!");
+    }
+    // ----------------------------------
 
     let result = tokio::task::spawn_blocking(move || {
         let recognizer_mutex = get_recognizer(&app_handle)?;

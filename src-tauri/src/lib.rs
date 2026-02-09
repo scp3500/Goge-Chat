@@ -97,7 +97,7 @@ pub fn run() {
             // --- HTTP Client Setup ---
             app.manage(reqwest::Client::new());
 
-            // --- Alice Memory Engine Setup ---
+            // --- Alice Memory Engine Setup (Lazy Loaded) ---
             let memory_state = memory::processor::MemoryState::new(app_handle)?;
             // 确保表存在 (1536 是 BGE-Small 的维度，如果是其它模型请调整)
             // 实际上 bge-small-zh-v1.5 的维度是 512

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted, watch, computed } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
 import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG, AT_SVG, VOICE_SVG } from '../../constants/icons';
@@ -32,41 +32,80 @@ const isRecording = ref(false);
 const isTranscribing = ref(false);
 const recorder = new AudioRecorder();
 
-const handleVoiceToggle = async () => {
-  if (isRecording.value) {
-    // 停止录音并识别
+// --- Explicit Start/Stop Methods ---
+const startRecording = async () => {
+    if (isRecording.value || isTranscribing.value) return;
+    
+    console.log("[Voice] Starting recorder...");
+    try {
+      await recorder.start();
+      isRecording.value = true;
+      console.log("[Voice] Recording started.");
+    } catch (e) {
+      console.error("[Voice] Failed to start recording:", e);
+      await message("无法开启录音，请检查：\n1. 浏览器是否允许麦克风访问\n2. 设备是否有录音权限\n3. 麦克风连接是否正常", { title: "录音启动失败", type: "error" });
+    }
+};
+
+const stopRecording = async () => {
+    if (!isRecording.value) return;
+
+    console.log("[Voice] Stopping recorder...");
     isRecording.value = false;
     isTranscribing.value = true;
     try {
       const { samples, sampleRate } = await recorder.stop();
+      console.log(`[Voice] Recorded ${samples.length} samples at ${sampleRate}Hz`);
+      
       if (samples.length === 0) {
+        console.warn("[Voice] No audio samples captured.");
         isTranscribing.value = false;
         return;
       }
       
+      console.log("[Voice] Invoking transcribe_pcm...");
       const text = await invoke('transcribe_pcm', { samples, sampleRate });
-      if (text) {
-        // 将识别出的文字追加到输入框
+      console.log(`[Voice] Transcription result: "${text}"`);
+      
+      if (text && text.trim()) {
         inputMsg.value = (inputMsg.value.trim() + " " + text).trim();
         nextTick(() => autoResize());
+      } else {
+        console.warn("[Voice] Transcription returned empty text.");
       }
     } catch (e) {
-      console.error("语音识别失败:", e);
-      // 可选：展示一个提示
+      console.error("[Voice] Transcription error:", e);
+      await message(`识别失败: ${e}`, { title: "错误", type: "error" });
     } finally {
       isTranscribing.value = false;
     }
+};
+
+const handleVoiceToggle = () => {
+  if (isRecording.value) {
+    stopRecording();
   } else {
-    // 开始录音
-    try {
-      await recorder.start();
-      isRecording.value = true;
-    } catch (e) {
-      console.error("启动录音失败:", e);
-      // 检查权限等
-      await message("无法启动录音，请检查麦克风权限或设备连接。", { title: "录音失败", type: "error" });
-    }
+    startRecording();
   }
+};
+
+// --- PTT (Push-to-Talk) Logic ---
+const handleGlobalKeyDown = (e) => {
+    // Alt + V to Start
+    if (e.altKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault(); // Prevent pasting if focus is somewhere else
+        startRecording();
+    }
+};
+
+const handleGlobalKeyUp = (e) => {
+    // Release V (or Alt) to Stop
+    // Note: checking 'v' is usually enough, but checking Alt release is also good UX
+    if (e.key === 'v' || e.key === 'V' || e.key === 'Alt') {
+        if (isRecording.value) {
+            stopRecording();
+        }
+    }
 };
 
 const searchProviders = [
@@ -333,6 +372,14 @@ onMounted(() => {
     window.addEventListener('click', () => {
         uiStore.setActiveMenu(null);
     });
+    // Add PTT listeners
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keyup', handleGlobalKeyUp);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.removeEventListener('keyup', handleGlobalKeyUp);
 });
 
 const handleThinkClick = () => {
