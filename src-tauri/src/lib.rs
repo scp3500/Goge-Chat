@@ -153,6 +153,7 @@ pub fn run() {
             commands::file_cmd::read_file_base64,
             commands::file_cmd::upload_user_avatar,
             // 社交数据库指令
+            commands::asr_cmd::transcribe_pcm,
             social_db::get_social_profile,
             social_db::get_social_contacts,
             social_db::get_social_groups,

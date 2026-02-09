@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod asr_cmd;
 pub mod config_cmd; // 【新增】
 pub mod db_cmd;
 pub mod file_cmd;

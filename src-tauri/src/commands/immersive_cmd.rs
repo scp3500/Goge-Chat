@@ -17,7 +17,7 @@ pub async fn send_social_message_immersive(
     scheduler: State<'_, Arc<MessageScheduler>>,
     session_id: i64,
     contact_id: i64,
-    content: String,
+    _content: String,
 ) -> Result<(), String> {
     // 1. 更新会话活动时间 (用于 IdleMonitor 追踪)
     scheduler.touch_session(session_id).await;

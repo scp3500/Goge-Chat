@@ -14,6 +14,8 @@ const TARGET_WINDOW_HEIGHT = 600 * SIZE;
 // 内部默认配置 (不需要改)
 const ALICE_ZOOM = 1;  // 默认全身展示
 const Y_OFFSET = 0.5;     // 默认居中
+let isSpeaking = false;   // 是否正在说话
+let currentLipValue = 0;  // 当前嘴巴开合度 (用于平滑过渡)
 
 // @ts-ignore
 config.cubism4.maskSize = 4096;
@@ -25,12 +27,14 @@ if (Live2DModel.config) {
     Live2DModel.config.maxMasks = 128;
 }
 
-// 提高着色器精度
+// 性能模式：使用中等精度着色器 (通常肉眼难辨区别，由于您之前反馈过白边问题，降低精度有时反而能“模糊”掉瑕疵)
 // @ts-ignore
-PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.HIGH;
-PIXI.Ticker.shared.maxFPS = 165;
+PIXI.Program.defaultFragmentPrecision = PIXI.PRECISION.MEDIUM;
+// 保持高流畅度：继续跟随屏幕高刷 (240fps上限)
+PIXI.Ticker.shared.maxFPS = 240;
+// 性能模式：使用原生分辨率 (不强制2倍超采样)，大幅降低显卡负载
 // @ts-ignore
-PIXI.settings.FILTER_RESOLUTION = Math.max(window.devicePixelRatio || 1, 2);
+PIXI.Filter.defaultResolution = window.devicePixelRatio || 1;
 
 (window as any).PIXI = PIXI;
 
@@ -53,8 +57,10 @@ async function init() {
             backgroundAlpha: 0,
             resizeTo: window,
             antialias: true,
-            powerPreference: 'high-performance',
-            resolution: Math.max(window.devicePixelRatio || 1, 2),
+            // 恢复标准混合模式
+            premultipliedAlpha: true,
+            powerPreference: 'default', // 允许系统自动调度显卡 (省电)
+            resolution: window.devicePixelRatio || 1, // 恢复原生分辨率
             autoDensity: true,
             hello: false
         });
@@ -93,9 +99,9 @@ async function init() {
                 /**
                  * 🎮 [1. 手柄与手部控制] 🎮
                  */
-                set('Param66', 0.0);       // 手柄显示开关 (1.0 显示, 0.0 隐藏)
-                set('Param61', 1.0);       // 手型：伸展 (0~1)
-                set('Param62', 0.0);       // 手型：收缩 (0~1)
+                set('Param66', 1.0);       // 手柄显示开关 (1.0 显示, 0.0 隐藏)
+                set('Param61', 0.0);       // 手型：伸展 (0~1)
+                set('Param62', 1.0);       // 手型：收缩 (0~1)
 
                 // 摇杆微动：模拟手指不断操作的感觉
                 const stickX = Math.sin(now * 3) * 0.2; // 0.2 是幅度，改大摇杆动得更猛
@@ -115,25 +121,6 @@ async function init() {
                 const breath = Math.sin(now * 1.5) * 0.5 + 0.5;
                 set('ParamBreath', breath);     // 基础呼吸参数
 
-                // 手臂摇摆：随着呼吸节奏摆动
-                const armSwing = Math.sin(now * 1.2) * 0.25;
-                set('Param33', armSwing);       // 左臂摇摆
-                set('Param67', -armSwing);      // 右臂摇摆
-
-                // 身体微转：让站姿不那么僵硬
-                set('ParamBodyAngleX', Math.sin(now * 0.5) * 2); // 身体轻微左右转
-                set('ParamBodyAngleZ', Math.sin(now * 0.7) * 1); // 身体轻微晃动
-
-                /**
-                 * 👀 [3. 头部与表情] 👀
-                 */
-                // set('ParamAngleX', Math.sin(now * 0.3) * 10); // 头部左右摇头 (-30 ~ 30)
-                // set('ParamAngleY', Math.sin(now * 0.4) * 5);  // 头部上下点头 (-30 ~ 30)
-                // set('ParamAngleZ', Math.sin(now * 0.2) * 5);  // 头部左右歪头 (-30 ~ 30)
-
-                // 眼睛跟随（如果有鼠标交互会自动覆盖这里，这里是待机时的默认值）
-                // set('ParamEyeBallX', Math.sin(now) * 0.5); // 眼珠左右移动 (-1 ~ 1)
-
                 /**
                  * ✨ [4. 特效与灯光] ✨
                  */
@@ -145,8 +132,42 @@ async function init() {
                  * 👗 [5. 物理摆动 (裙子/头发)] 👗
                  * 通常由 physics 物理引擎自动计算，但你也可以手动干预
                  */
-                // set('Param17', Math.sin(now * 2) * 0.5); // 裙子 X1 摆动
-                // set('Param29', Math.sin(now * 3) * 0.3); // 领带飘动
+
+                // 🟢 平滑口型逻辑
+                if (isSpeaking) {
+                    // 模拟自然说话的随机张合
+                    const speed = 8;
+                    const noise = Math.sin(now * speed) * Math.sin(now * speed * 0.5);
+
+                    let targetOpenness = (noise + 1) / 2;
+                    targetOpenness = targetOpenness * 0.8 + 0.2;
+                    if (Math.random() > 0.95) targetOpenness = 0;
+                    currentLipValue += (targetOpenness - currentLipValue) * 0.1;
+
+                    // 🎀 说话时只增加一点点身体活力，但不要干扰鼠标跟随
+                    // 我们给身体角度叠加一个很小的随机偏移，而不是覆盖它
+                    // 注意：set函数的第三个参数是权重，为了不覆盖鼠标追踪，我们需要更高级的操作
+                    // 但这里 pixi-live2d-display 的 setParameterValueById 设置权重 1.0 会覆盖
+                    // 所以为了保证鼠标跟随，我们 *不要* 在这里 set 身体和头的角度
+                    // 让原生的 autoInteract 去控制它们
+
+                } else {
+                    currentLipValue += (0 - currentLipValue) * 0.1;
+                }
+                set('ParamMouthOpenY', currentLipValue);
+            }
+
+        });
+
+        // 点击切换说话状态 (测试用)
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                // 左键拖拽
+                getCurrentWindow().startDragging().catch(() => { });
+            } else if (e.button === 2) {
+                // 右键切换说话
+                isSpeaking = !isSpeaking;
+                console.log(isSpeaking ? "开始说话..." : "停止说话");
             }
         });
 
@@ -179,12 +200,6 @@ async function init() {
             model.x = width * 0.5;
             model.y = height * Y_OFFSET;
         };
-
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) {
-                getCurrentWindow().startDragging().catch(() => { });
-            }
-        });
 
         window.onresize = updateLayout;
         updateLayout();
