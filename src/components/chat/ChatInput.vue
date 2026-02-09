@@ -2,7 +2,9 @@
 import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
-import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG, AT_SVG } from '../../constants/icons';
+import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG, AT_SVG, VOICE_SVG } from '../../constants/icons';
+import { AudioRecorder } from '../../utils/audioRecorder';
+import { message } from '@tauri-apps/plugin-dialog';
 import ModelSelector from './ModelSelector.vue';
 import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -24,6 +26,48 @@ const textareaRef = ref(null);
 const selectedFiles = ref([]); 
 const selectedMentions = ref([]); 
 const showNameModal = ref(false);
+
+// --- 🎤 语音录入逻辑 ---
+const isRecording = ref(false);
+const isTranscribing = ref(false);
+const recorder = new AudioRecorder();
+
+const handleVoiceToggle = async () => {
+  if (isRecording.value) {
+    // 停止录音并识别
+    isRecording.value = false;
+    isTranscribing.value = true;
+    try {
+      const { samples, sampleRate } = await recorder.stop();
+      if (samples.length === 0) {
+        isTranscribing.value = false;
+        return;
+      }
+      
+      const text = await invoke('transcribe_pcm', { samples, sampleRate });
+      if (text) {
+        // 将识别出的文字追加到输入框
+        inputMsg.value = (inputMsg.value.trim() + " " + text).trim();
+        nextTick(() => autoResize());
+      }
+    } catch (e) {
+      console.error("语音识别失败:", e);
+      // 可选：展示一个提示
+    } finally {
+      isTranscribing.value = false;
+    }
+  } else {
+    // 开始录音
+    try {
+      await recorder.start();
+      isRecording.value = true;
+    } catch (e) {
+      console.error("启动录音失败:", e);
+      // 检查权限等
+      await message("无法启动录音，请检查麦克风权限或设备连接。", { title: "录音失败", type: "error" });
+    }
+  }
+};
 
 const searchProviders = [
   { id: 'all', name: '全网搜索', icon: GLOBE_SVG },
@@ -110,7 +154,11 @@ const handleAction = async () => {
     }
   } else {
     // Basic validation
-    if (!inputMsg.value.trim() && selectedFiles.value.length === 0) return;
+    if (!inputMsg.value.trim() && selectedFiles.value.length === 0) {
+        // 如果是空的，且我们要点击这个按钮，那它现在是语音按钮
+        handleVoiceToggle();
+        return;
+    }
     
     let msgToProcess = inputMsg.value;
     
@@ -401,11 +449,17 @@ onMounted(() => {
           <button
             class="icon-btn action-btn"
             @click="handleAction"
-            :class="{ 'is-stop': props.isGenerating }"
-            :disabled="!props.isGenerating && !inputMsg.trim() && selectedFiles.length === 0"
+            :class="{ 
+              'is-stop': props.isGenerating || isRecording,
+              'is-transcribing': isTranscribing
+            }"
+            :disabled="isTranscribing"
           >
-            <template v-if="props.isGenerating">
+            <template v-if="props.isGenerating || isRecording">
               <span v-html="STOP_SVG"></span>
+            </template>
+            <template v-else-if="!inputMsg.trim() && selectedFiles.length === 0">
+              <span v-html="VOICE_SVG"></span>
             </template>
             <template v-else>
               <span v-html="SEND_SVG"></span>
@@ -747,6 +801,23 @@ onMounted(() => {
   /* 关键修改：默认显示蓝紫色背景，而不是透明 */
   background-color: var(--bg-button-active); 
   opacity: 1; 
+  animation: pulse-recording 1.5s infinite;
+}
+
+@keyframes pulse-recording {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(167, 139, 250, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
+}
+
+.action-btn.is-transcribing {
+    opacity: 0.6;
+    animation: rotate-loading 1s linear infinite;
+}
+
+@keyframes rotate-loading {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .action-btn.is-stop:hover {
