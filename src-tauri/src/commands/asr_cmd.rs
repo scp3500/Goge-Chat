@@ -5,42 +5,45 @@ use std::time::Instant;
 use tauri::{AppHandle, Manager};
 
 // --- 1. 定义全局状态 ---
-
-// 使用 OnceCell 确保模型只加载一次
 static RECOGNIZER: OnceCell<Mutex<SenseVoiceRecognizer>> = OnceCell::new();
 
 // --- 2. 内部帮助函数：获取或初始化模型 ---
 fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<SenseVoiceRecognizer>, String> {
     RECOGNIZER.get_or_try_init(|| {
-        println!("[ASR] Initializing Sherpa-Onnx Paraformer model...");
+        println!("[ASR] Initializing SenseVoice Small model...");
         let start_time = Instant::now();
 
-        // 1. 获取资源路径
-        let resource_path = app_handle
-            .path()
-            .resource_dir()
-            .map_err(|e| format!("Failed to get resource dir: {}", e))?
-            .join("resources")
-            .join("asr_model");
+        // 1. 智能获取资源路径
+        let resource_path = {
+            let res_dir = app_handle
+                .path()
+                .resource_dir()
+                .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-        println!("[ASR] Looking for model resources at: {:?}", resource_path);
+            let prod_path = res_dir.join("asr_model");
+            if prod_path.exists() {
+                prod_path
+            } else {
+                let nested_path = res_dir.join("resources").join("asr_model");
+                if nested_path.exists() {
+                    nested_path
+                } else {
+                    let exe_path = std::env::current_exe().unwrap_or_default();
+                    let dev_path = exe_path
+                        .parent()
+                        .and_then(|p| p.parent())
+                        .and_then(|p| p.parent())
+                        .map(|p| p.join("resources").join("asr_model"))
+                        .unwrap_or_else(|| prod_path.clone());
+                    dev_path
+                }
+            }
+        };
 
         // 2. 检查关键文件是否存在
         let encoder_path = resource_path.join("model.int8.onnx");
         let tokens_path = resource_path.join("tokens.txt");
 
-        if !encoder_path.exists() {
-            return Err(format!("Model file not found at: {:?}", encoder_path));
-        }
-        if !tokens_path.exists() {
-            return Err(format!("Tokens file not found at: {:?}", tokens_path));
-        }
-
-        println!("[ASR] Found model files at: {:?}", resource_path);
-
-        // 3. 配置模型 (适配 SenseVoice)
-        // fix: Windows paths starting with \\?\ can crash C++ libs
-        // Also normalize keys to forward slashes for C++ compatibility
         let encoder_path_str = encoder_path
             .to_string_lossy()
             .to_string()
@@ -52,42 +55,21 @@ fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<SenseVoiceRec
             .replace("\\\\?\\", "")
             .replace("\\", "/");
 
-        // Verify file integrity (basic check)
-        let encoder_meta = std::fs::metadata(&encoder_path_str)
-            .map_err(|e| format!("Failed to read model metadata: {}", e))?;
-        if encoder_meta.len() < 10 * 1024 * 1024 {
-            // < 10MB
-            return Err(format!(
-                "Model file seems too small ({:?} bytes). Please check if it downloaded correctly.",
-                encoder_meta.len()
-            ));
-        }
-
-        println!("[ASR] Initializing SenseVoice with normalized paths:");
-        println!(
-            "[ASR]   Model:  '{}' (Size: {} bytes)",
-            encoder_path_str,
-            encoder_meta.len()
-        );
-        println!("[ASR]   Tokens: '{}'", tokens_path_str);
-
         let config = SenseVoiceConfig {
             model: encoder_path_str,
             tokens: tokens_path_str,
             num_threads: Some(4),
             debug: true,
             use_itn: true,
-            language: "zh".to_string(), // Explicitly set language to avoid empty string issues
+            language: "zh".to_string(),
             provider: None,
         };
 
-        println!("[ASR] Calling SenseVoiceRecognizer::new()...");
-        // 4. 加载模型
         let recognizer = SenseVoiceRecognizer::new(config)
-            .map_err(|e| format!("Sherpa-Onnx Crash/Error: {}", e))?;
+            .map_err(|e| format!("SenseVoice Load Error: {}", e))?;
 
         let elapsed = start_time.elapsed();
-        println!("[ASR] Model loaded successfully in {:.2?}", elapsed);
+        println!("[ASR] SenseVoice loaded in {:.2?}", elapsed);
 
         Ok(Mutex::new(recognizer))
     })

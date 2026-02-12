@@ -53,26 +53,40 @@ pub async fn call_gemini_backend(
     }
     #[derive(serde::Serialize)]
     struct GeminiContent {
-        role: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
         parts: Vec<GeminiPart>,
     }
     #[derive(serde::Serialize)]
     struct GeminiRequest {
         contents: Vec<GeminiContent>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "systemInstruction")]
+        system_instruction: Option<GeminiContent>,
     }
 
-    let contents: Vec<GeminiContent> = messages
-        .into_iter()
-        .map(|m| {
-            let role = if m.role == "user" { "user" } else { "model" };
-            GeminiContent {
-                role: role.to_string(),
-                parts: vec![GeminiPart { text: m.content }],
-            }
-        })
-        .collect();
+    let mut system_instruction = None;
+    let mut contents = Vec::new();
 
-    let payload = GeminiRequest { contents };
+    for m in messages {
+        if m.role == "system" {
+            system_instruction = Some(GeminiContent {
+                role: None,
+                parts: vec![GeminiPart { text: m.content }],
+            });
+        } else {
+            let role = if m.role == "user" { "user" } else { "model" };
+            contents.push(GeminiContent {
+                role: Some(role.to_string()),
+                parts: vec![GeminiPart { text: m.content }],
+            });
+        }
+    }
+
+    let payload = GeminiRequest {
+        contents,
+        system_instruction,
+    };
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
         base_url.trim_end_matches('/'),
@@ -94,7 +108,7 @@ pub async fn call_gemini_backend(
         return Err(format!("Gemini API Error ({}): {}", status, err_text));
     }
 
-    let json: Value = response.json().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
     let content = json["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
         .ok_or("无法解析 Gemini 响应内容")?;

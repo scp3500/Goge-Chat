@@ -82,9 +82,34 @@ export class AudioRecorder {
             offset += s.length;
         }
 
+        // --- ✨ 【核心修复】：手动重采样到 16000Hz ---
+        const targetRate = 16000;
+        let finalSamples: Float32Array;
+
+        if (this.sampleRate !== targetRate) {
+            console.log(`[AudioRecorder] Resampling from ${this.sampleRate}Hz to ${targetRate}Hz...`);
+            finalSamples = this.resampleTo16k(flattened, this.sampleRate, targetRate);
+        } else {
+            finalSamples = flattened;
+        }
+
         return {
-            samples: Array.from(flattened),
-            sampleRate: this.sampleRate // This is now updated in start() to be audioContext.sampleRate
+            samples: Array.from(finalSamples),
+            sampleRate: targetRate
         };
+    }
+
+    private resampleTo16k(audioData: Float32Array, originRate: number, targetRate: number): Float32Array {
+        if (originRate === targetRate) return audioData;
+
+        const ratio = originRate / targetRate;
+        const newLength = Math.round(audioData.length / ratio);
+        const result = new Float32Array(newLength);
+
+        for (let i = 0; i < newLength; i++) {
+            const nextIndex = Math.floor(i * ratio);
+            result[i] = audioData[nextIndex];
+        }
+        return result;
     }
 }

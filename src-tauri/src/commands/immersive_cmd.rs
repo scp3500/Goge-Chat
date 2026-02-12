@@ -139,7 +139,7 @@ pub async fn send_social_message_immersive(
     println!("🤖 [Social] 正在请求 AI 响应...");
 
     // A. 获取对话历史 (20条)
-    let history = {
+    let mut history = {
         let conn = db_state.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
@@ -173,9 +173,80 @@ pub async fn send_social_message_immersive(
         history
     };
 
-    // B. 获取配置
-    let provider_id = config.default_provider_id.clone();
-    let model = config.selected_model_id.clone();
+    // A.2 注入系统提示词 (System Prompt)
+    // 社交模式下必须注入角色的设定,否则 AI 不知道自己是谁
+    let mut contact_provider = None;
+    let mut contact_model = None;
+
+    {
+        let conn = db_state.0.lock().map_err(|e| e.to_string())?;
+        let contact_info: Result<(Option<String>, Option<String>, Option<String>), _> = conn
+            .query_row(
+                "SELECT prompt, provider, model FROM contacts WHERE id = ?1",
+                rusqlite::params![contact_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            );
+
+        if let Ok((prompt, provider, model)) = contact_info {
+            contact_provider = provider;
+            contact_model = model;
+
+            let final_prompt = if let Some(p) = prompt {
+                if !p.trim().is_empty() {
+                    Some(p)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            // 如果联系人没有提示词, 尝试从全局预设中获取
+            let prompt_to_inject = if let Some(p) = final_prompt {
+                Some(p)
+            } else {
+                // 读取全局预设
+                let global_preset_id = &config.global_preset_id;
+                let presets = config.presets.as_array();
+                presets
+                    .and_then(|arr| {
+                        arr.iter()
+                            .find(|p| p["id"].as_str() == Some(global_preset_id))
+                    })
+                    .and_then(|p| p["systemPrompt"].as_str())
+                    .map(|s| s.to_string())
+            };
+
+            if let Some(prompt) = prompt_to_inject {
+                if !prompt.trim().is_empty() {
+                    // 将系统提示词插入到历史记录的最前面
+                    history.insert(
+                        0,
+                        Message {
+                            id: None,
+                            model: None,
+                            role: "system".to_string(),
+                            content: prompt,
+                            reasoning_content: None,
+                            file_metadata: None,
+                            search_metadata: None,
+                            provider: None,
+                            mode: None,
+                            role_id: None,
+                        },
+                    );
+                    println!("✅ [Social] 已注入角色设定或全局预设提示词");
+                }
+            }
+        }
+    }
+
+    // B. 获取配置 (优先使用联系人配置)
+    let provider_id = contact_provider.unwrap_or_else(|| config.default_provider_id.clone());
+    let model = contact_model.unwrap_or_else(|| config.selected_model_id.clone());
+
+    println!("🤖 [Social] 使用提供商: {}, 模型: {}", provider_id, model);
+
     let providers = config.providers.as_array().ok_or("无法读取提供商列表")?;
     let provider_config = providers
         .iter()

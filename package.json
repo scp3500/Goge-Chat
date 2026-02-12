@@ -12,7 +12,7 @@
         "dev": "vite",
         "build": "npm run clean && vite build",
         "preview": "vite preview",
-        "clean": "rimraf dist src-tauri/target/debug/build src-tauri/target/debug/deps src-tauri/target/debug/examples src-tauri/target/debug/incremental src-tauri/target/debug/.fingerprint",
+        "clean": "rimraf dist",
         "l2": "npm run tauri --prefix live2d-standalone -- dev",
         "start": "tauri dev",
         "tauri": "tauri"

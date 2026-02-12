@@ -281,13 +281,17 @@ struct GeminiPart {
 
 #[derive(Serialize)]
 struct GeminiContent {
-    role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role: Option<String>,
     parts: Vec<GeminiPart>,
 }
 
 #[derive(Serialize)]
 struct GeminiRequest {
     contents: Vec<GeminiContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "systemInstruction")]
+    system_instruction: Option<GeminiContent>,
 }
 
 async fn handle_gemini_native(
@@ -321,20 +325,32 @@ async fn handle_gemini_native(
 
     // --- 🌊 流式处理 ---
     // 1. 转换消息格式
-    let contents: Vec<GeminiContent> = messages
-        .into_iter()
-        .map(|m| {
-            let role = if m.role == "user" { "user" } else { "model" };
-            GeminiContent {
-                role: role.to_string(),
+    let mut system_instruction = None;
+    let mut contents = Vec::new();
+
+    for m in messages {
+        if m.role == "system" {
+            system_instruction = Some(GeminiContent {
+                role: None,
                 parts: vec![GeminiPart {
                     text: Some(m.content),
                 }],
-            }
-        })
-        .collect();
+            });
+        } else {
+            let role = if m.role == "user" { "user" } else { "model" };
+            contents.push(GeminiContent {
+                role: Some(role.to_string()),
+                parts: vec![GeminiPart {
+                    text: Some(m.content),
+                }],
+            });
+        }
+    }
 
-    let payload = GeminiRequest { contents };
+    let payload = GeminiRequest {
+        contents,
+        system_instruction,
+    };
 
     // 2. 构造 URL
     let mode = "streamGenerateContent";
