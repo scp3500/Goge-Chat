@@ -6,3 +6,4 @@ pub mod file_cmd;
 pub mod immersive_cmd;
 pub mod memory_cmd;
 pub mod search;
+pub mod tts_cmd;

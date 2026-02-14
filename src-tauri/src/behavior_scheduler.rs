@@ -516,7 +516,7 @@ impl MessageScheduler {
                         let mut stmt = match conn.prepare(
                             "SELECT role, content FROM social_messages 
                              WHERE session_id = ?1 
-                             ORDER BY created_at DESC LIMIT 5",
+                             ORDER BY id DESC LIMIT 5",
                         ) {
                             Ok(s) => s,
                             Err(_) => return,

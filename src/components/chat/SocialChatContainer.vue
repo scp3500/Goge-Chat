@@ -223,6 +223,7 @@ let lastActiveContext = { contact: null, sessionId: null };
 let typingUnlisten = null;
 let retractionUnlisten = null;
 let newMessageUnlisten = null;
+let scrollUnlisten = null;
 
 onMounted(async () => {
     console.log("🟢 [SocialChat] 进入聊天容器");
@@ -285,6 +286,13 @@ onMounted(async () => {
             }
         });
         
+        
+        // 🆕 Listen for social chat scroll requests (e.g. when exiting minimalist mode)
+        scrollUnlisten = await listen('request-social-chat-scroll', (event) => {
+            console.log("📜 [SocialChat] 收到滚动指令:", event.payload);
+            triggerScroll(event.payload.behavior || 'smooth');
+        });
+        
         console.log("🎭 [Immersive] Event listeners registered");
     } catch (e) {
         console.error("Failed to register immersive event listeners:", e);
@@ -302,6 +310,7 @@ onUnmounted(() => {
     if (typingUnlisten) typingUnlisten();
     if (retractionUnlisten) retractionUnlisten();
     if (newMessageUnlisten) newMessageUnlisten();
+    if (scrollUnlisten) scrollUnlisten();
 });
 
 // 2. 深度监控上下文变换：角色 ID 或 会话 ID 任何一个变了，都视为“切换”

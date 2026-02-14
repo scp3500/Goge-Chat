@@ -40,9 +40,26 @@ fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<SenseVoiceRec
             }
         };
 
-        // 2. 检查关键文件是否存在
+        // 2. 检查关键文件是否存在并验证大小
         let encoder_path = resource_path.join("model.int8.onnx");
         let tokens_path = resource_path.join("tokens.txt");
+
+        if !encoder_path.exists() || !tokens_path.exists() {
+            return Err(format!("Missing ASR files in: {:?}", resource_path));
+        }
+
+        // 验证文件大小 (SenseVoice Small int8 应该在 100MB+ 到 200MB+ 之间)
+        let model_size = std::fs::metadata(&encoder_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        println!("[ASR] Model file size: {} bytes", model_size);
+        if model_size < 10_000_000 {
+            // 如果小于10MB，肯定不正确
+            return Err(format!(
+                "ASR model file is too small ({}), possibly corrupted.",
+                model_size
+            ));
+        }
 
         let encoder_path_str = encoder_path
             .to_string_lossy()
@@ -58,7 +75,7 @@ fn get_recognizer(app_handle: &AppHandle) -> Result<&'static Mutex<SenseVoiceRec
         let config = SenseVoiceConfig {
             model: encoder_path_str,
             tokens: tokens_path_str,
-            num_threads: Some(4),
+            num_threads: Some(1), // ✨ 降低线程数以提高 Windows 上的稳定性
             debug: true,
             use_itn: true,
             language: "zh".to_string(),

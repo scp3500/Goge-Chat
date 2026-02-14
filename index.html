@@ -6,6 +6,22 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Goge Chat</title>
+    <style>
+        /* 极简模式全局样式 - 解除裁剪,但不要在根部禁用交互 */
+        html.minimalist-root-active,
+        html.minimalist-root-active body,
+        html.minimalist-root-active #app {
+            overflow: visible !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+    </style>
+    <!-- Live2D 核心库 - 必须在 Vue 应用启动前加载 -->
+    <script src="/lib/live2d.min.js"></script>
+    <script src="/lib/live2dcubismcore.min.js"></script>
 </head>
 
 <body>

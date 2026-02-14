@@ -1,0 +1,12 @@
+{
+  "mm_direct_addr": "0x1b3778270e0",
+  "mm_internal_addr": "0x1b3778270e0",
+  "same_instance": true,
+  "load_result": false,
+  "internal_state_after_load": {
+    "character_to_model": [],
+    "character_model_paths": [],
+    "character_to_language": []
+  },
+  "get_result": "None"
+}

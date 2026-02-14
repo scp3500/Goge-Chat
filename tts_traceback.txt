@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "d:\my-code\Genie-TTS\src\genie_tts\Core\TTSPlayer.py", line 90, in _tts_worker_loop
+    audio_chunk = tts_client.tts(
+        text=sentence,
+    ...<6 lines>...
+        language=gsv_model.LANGUAGE,
+    )
+  File "d:\my-code\Genie-TTS\src\genie_tts\Core\Inference.py", line 47, in tts
+    return vocoder.run(None, {
+           ~~~~~~~~~~~^^^^^^^^
+        "text_seq": text_seq,
+        ^^^^^^^^^^^^^^^^^^^^^
+        "pred_semantic": semantic_tokens,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "ref_audio": prompt_audio.audio_32k
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    })[0]
+    ^^
+  File "C:\Users\33795\AppData\Roaming\Python\Python314\site-packages\onnxruntime\capi\onnxruntime_inference_collection.py", line 296, in run
+    return self._sess.run(output_names, input_feed, run_options)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+onnxruntime.capi.onnxruntime_pybind11_state.Fail: [ONNXRuntimeError] : 1 : FAIL : Non-zero status code returned while running FusedMatMul node. Name:'/vq_model/ref_enc/spectral/spectral.0/fc/MatMul/MatmulTransposeFusion/' Status Message: matmul_helper.h:162 onnxruntime::MatMulComputeHelper::Compute MatMul dimension mismatch

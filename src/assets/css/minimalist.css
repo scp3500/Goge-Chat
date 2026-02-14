@@ -1,0 +1,189 @@
+/* ==========================================================
+ * 🎨 极简模式 (Minimalist Mode) 自定义样式表
+ * 
+ * 这里的样式决定了 Live2D 覆盖层的外观，你可以随意修改。
+ * 修改后保存，界面会自动刷新 (HMR)。
+ * 
+ * 💡 提示：所有坐标都是相对于整个屏幕的 (position: fixed)
+ * ========================================================== */
+
+/* 1. 全局容器 */
+.minimalist-root {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: transparent;
+    z-index: 9999;
+    pointer-events: none;
+    /* 穿透点击，不挡鼠标 */
+    overflow: visible !important;
+}
+
+/* 2. Live2D 模型层 */
+.live2d-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: auto;
+    /* 允许鼠标交互 (视线跟随、触摸) */
+}
+
+/* 3. 字幕区域 (Subtitle Area) */
+.subtitle-area {
+    position: fixed;
+    /* 🔼 垂直位置：距离底部的距离 */
+    bottom: 220px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    /* ↔️ 水平边距：太大可能会导致长句换行 */
+    padding: 0 5%;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 10;
+}
+
+/* 4. 字幕文字样式 */
+.subtitle-text {
+    /* 🎨 颜色：淡橙色 (PeachPuff) */
+    color: #FFDAB9;
+    /* 📏 字号 */
+    font-size: 36px;
+    /* ✒️ 字体 */
+    font-family: 'Lolita', 'Microsoft YaHei', sans-serif;
+    text-align: center;
+    /* ⚫ 阴影：增加文字可读性 */
+    text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.8);
+    transition: all 0.3s ease;
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+.is-typing {
+    opacity: 0.7;
+    font-style: italic;
+    font-size: 24px;
+}
+
+/* 5. 输入框容器 (Input Window) */
+.text-window {
+    position: fixed;
+    width: 80%;
+    max-width: 1600px;
+    height: 100px;
+    background: transparent;
+    user-select: none;
+    z-index: 10000;
+    pointer-events: auto;
+}
+
+.h-layout {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+/* 6. 输入框本体样式 */
+.q-line-edit {
+    flex: 1;
+    /* 🌑 背景色：半透明黑色 */
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: none;
+    /* 📐 圆角：只圆左边 */
+    border-radius: 10px 0px 0px 10px;
+    padding: 10px 25px;
+    font-size: 32px;
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.q-line-edit:focus {
+    /* 💡 聚焦时变亮 */
+    background-color: rgba(30, 30, 30, 0.85);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+/* 7. 拖拽手柄样式 */
+.drag-button {
+    width: 60px;
+    height: 100px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: none;
+    /* 📐 圆角：只圆右边 */
+    border-radius: 0px 10px 10px 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: move;
+    transition: all 0.2s;
+}
+
+.drag-button:hover {
+    background-color: rgba(60, 60, 60, 0.9);
+    color: #ffffff;
+}
+
+.drag-button:active {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+/* 8. 语音按钮样式 */
+.voice-button {
+    width: 60px;
+    height: 100px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: none;
+    border-right: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.voice-button:hover {
+    background-color: rgba(60, 60, 60, 0.9);
+}
+
+.voice-button.recording {
+    background-color: rgba(220, 38, 38, 0.8);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* 9.退出提示文字 */
+.exit-hint {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 12px;
+    pointer-events: auto;
+}

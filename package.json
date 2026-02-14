@@ -18,7 +18,7 @@
         "tauri": "tauri"
     },
     "dependencies": {
-        "@tauri-apps/api": "^2.9.1",
+        "@tauri-apps/api": "2.9.1",
         "@tauri-apps/plugin-dialog": "^2.6.0",
         "@tauri-apps/plugin-fs": "^2.4.5",
         "@tauri-apps/plugin-opener": "^2",
@@ -28,6 +28,8 @@
         "marked": "^17.0.1",
         "marked-highlight": "^2.2.3",
         "pinia": "^3.0.4",
+        "pixi-live2d-display": "^0.5.0-beta",
+        "pixi.js": "^7.4.3",
         "vue": "^3.5.13",
         "vue-cropper": "^1.1.4",
         "vuedraggable": "^4.1.0"

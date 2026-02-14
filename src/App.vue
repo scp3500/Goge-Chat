@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
 import { getCurrentWindow, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
+import { emit as tauriEmit } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { useConfigStore } from './stores/config';
 import { useChatStore } from './stores/chat';
 import { useSettingsStore } from './stores/settings';
@@ -15,6 +17,7 @@ import MainLayout from "./layouts/MainLayout.vue";
 import SocialChatContainer from "./components/chat/SocialChatContainer.vue";
 import SocialContactProfile from "./components/social/SocialContactProfile.vue";
 import AppNavBar from "./components/layout/AppNavBar.vue";
+import MinimalistOverlay from "./components/chat/MinimalistOverlay.vue";
 
 const appWindow = getCurrentWindow();
 const configStore = useConfigStore();
@@ -25,6 +28,8 @@ const isMaximized = ref(false);
 const settingsStore = useSettingsStore();
 
 const activeModule = ref('chat');
+const isMinimalistMode = ref(false);
+const wasMaximizedBeforeMinimalist = ref(false); // 记住进入极简模式前的窗口状态
 
 // 处理打开设置
 const handleOpenSettings = (category) => {
@@ -37,6 +42,49 @@ const handleOpenSettings = (category) => {
 const handleBackToChat = () => {
     settingsStore.closeSettings();
     chatStore.setChatViewActive(true);  // 通知聊天 store 视图已激活
+}; 
+
+// 处理切换最小化模式
+const handleToggleMinimalist = async () => {
+    isMinimalistMode.value = !isMinimalistMode.value;
+    
+    try {
+        if (isMinimalistMode.value) {
+            // 进入极简模式：记住当前状态，然后最大化
+            document.documentElement.classList.add('minimalist-root-active');
+            wasMaximizedBeforeMinimalist.value = await appWindow.isMaximized();
+            if (!wasMaximizedBeforeMinimalist.value) {
+                await appWindow.maximize();
+            }
+            
+            // 🎯 关键修复：启用窗口点击穿透，让桌面和其他应用可以点击
+            await invoke('set_window_ignore_cursor_events', { ignore: true });
+            
+            // 📌 关键补丁：进入极简模式立即置顶
+            await appWindow.setAlwaysOnTop(true);
+        } else {
+            // 退出极简模式：恢复之前的窗口状态
+            document.documentElement.classList.remove('minimalist-root-active');
+            
+            // 🎯 关键修复：禁用窗口点击穿透，恢复正常点击
+            await invoke('set_window_ignore_cursor_events', { ignore: false });
+            
+            // 🔓 关键补丁：退出极简模式取消置顶
+            await appWindow.setAlwaysOnTop(false);
+            
+            // 如果之前不是最大化的，恢复回去
+            if (!wasMaximizedBeforeMinimalist.value) {
+                await appWindow.unmaximize();
+            }
+            
+            // 延迟发射滚动指令，等待主界面渲染完成
+            setTimeout(async () => {
+                await tauriEmit('request-social-chat-scroll', { behavior: 'smooth' });
+            }, 150);
+        }
+    } catch (e) {
+        console.warn("Failed to toggle window state for minimalist mode:", e);
+    }
 }; 
 
 
@@ -142,52 +190,56 @@ onUnmounted(() => {
     class="app-layout" 
     :class="{ 
       'is-maximized': isMaximized,
-      'is-chat-mode': configStore.settings.chatMode.enabled 
+      'is-chat-mode': configStore.settings.chatMode.enabled,
+      'is-minimalist': isMinimalistMode
     }"
     @dragover.prevent
     @drop.prevent
   >
     <!-- Social Mode: Sidebar-first layout -->
     <template v-if="configStore.settings.chatMode.enabled">
-      <AppNavBar 
-        v-model:activeModule="activeModule"
-        :is-collapsed="!uiStore.isLeftSidebarOpen"
-        :is-in-settings="settingsStore.isModalOpen"
-        @toggleCollapse="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
-        @openSettings="handleOpenSettings"
-        @openProfile="handleOpenSettings('profile')"
-        @backHome="handleBackToChat" 
-      />
-      <div class="main-container">
-        <TitleBar 
-          :is-settings="settingsStore.isModalOpen" 
-          @open-settings="handleOpenSettings" 
-          @back-home="handleBackToChat" 
-          @toggle-sidebar="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
-          @toggle-history="uiStore.isHistoryOpen = !uiStore.isHistoryOpen"
+      <div v-show="!isMinimalistMode" class="full-layout-wrapper">
+        <AppNavBar 
+          v-model:activeModule="activeModule"
+          :is-collapsed="!uiStore.isLeftSidebarOpen"
+          :is-in-settings="settingsStore.isModalOpen"
+          @toggleCollapse="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
+          @openSettings="handleOpenSettings"
+          @openProfile="handleOpenSettings('profile')"
+          @backHome="handleBackToChat" 
+          @toggleMinimalist="handleToggleMinimalist"
         />
-        <div class="content-area">
-          <MainLayout 
-            :is-left-sidebar-open="uiStore.isLeftSidebarOpen"
-            :is-history-open="uiStore.isHistoryOpen"
-            :active-module="activeModule"
-            @update:activeModule="(val) => { 
-              activeModule = val; 
-              handleBackToChat(); 
-            }"
-            v-slot="{ activeContact, activeModule: slotActiveModule }"
-          >
-            <SocialContactProfile 
-              v-if="slotActiveModule === 'address_book' && activeContact"
-              :active-contact="activeContact"
-              @startChat="activeModule = 'chat'"
-            />
-            <SocialChatContainer 
-              v-else-if="activeContact"
-              :active-contact="activeContact"
-              @show-profile="activeModule = 'address_book'"
-            />
-          </MainLayout>
+        <div class="main-container">
+          <TitleBar 
+            :is-settings="settingsStore.isModalOpen" 
+            @open-settings="handleOpenSettings" 
+            @back-home="handleBackToChat" 
+            @toggle-sidebar="uiStore.isLeftSidebarOpen = !uiStore.isLeftSidebarOpen"
+            @toggle-history="uiStore.isHistoryOpen = !uiStore.isHistoryOpen"
+          />
+          <div class="content-area">
+            <MainLayout 
+              :is-left-sidebar-open="uiStore.isLeftSidebarOpen"
+              :is-history-open="uiStore.isHistoryOpen"
+              :active-module="activeModule"
+              @update:activeModule="(val) => { 
+                activeModule = val; 
+                handleBackToChat(); 
+              }"
+              v-slot="{ activeContact, activeModule: slotActiveModule }"
+            >
+              <SocialContactProfile 
+                v-if="slotActiveModule === 'address_book' && activeContact"
+                :active-contact="activeContact"
+                @startChat="activeModule = 'chat'"
+              />
+              <SocialChatContainer 
+                v-else-if="activeContact"
+                :active-contact="activeContact"
+                @show-profile="activeModule = 'address_book'"
+              />
+            </MainLayout>
+          </div>
         </div>
       </div>
     </template>
@@ -212,6 +264,13 @@ onUnmounted(() => {
       </div>
     </template>
   </div>
+
+  <!-- 最小化聊天模式覆盖层 - 提升到顶层，不受 app-layout 约束 -->
+  <MinimalistOverlay 
+    :visible="isMinimalistMode && configStore.settings.chatMode?.enabled"
+    @close="handleToggleMinimalist"
+    @send="() => {}"
+  />
 </template>
 
 <style>
@@ -257,6 +316,44 @@ html, body, #app {
 
 .app-layout.is-chat-mode {
   flex-direction: row;
+}
+
+/* 全局极简模式补丁：解除 HTM/App 的所有裁剪限制 */
+:global(html.minimalist-root-active),
+:global(html.minimalist-root-active body),
+:global(html.minimalist-root-active #app) {
+  overflow: visible !important;
+  background: transparent !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: block !important; /* 禁掉 flex 带来的布局限制 */
+}
+
+.app-layout.is-minimalist {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  clip-path: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  z-index: 9998;
+  /* 关键：防止透明的主布局容器拦截点击 */
+  pointer-events: none !important; 
+  transform: none !important;
+}
+
+.full-layout-wrapper {
+  display: flex;
+  flex-direction: inherit;
+  width: 100%;
+  height: 100%;
 }
 
 .main-container {

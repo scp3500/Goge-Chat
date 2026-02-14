@@ -21,7 +21,7 @@ use tauri::Manager;
 // ✨ 【新增导入】：用于多线程安全的红绿灯标志位
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Emitter, State};
 
 // ✨ 【新增导入】：用于 HTTP 请求
 // (Message, Client, etc. moved to title_commands.rs)
@@ -29,6 +29,22 @@ use tauri::State;
 // ✨ 【新增状态】：定义全局中断标志位
 pub struct GoleState {
     pub stop_flag: Arc<AtomicBool>,
+}
+
+// 🎯 [点击穿透] 共享坐标状态 - 改为支持多个区域
+#[derive(serde::Deserialize, Clone, Debug)]
+pub struct InteractionRegion {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+pub struct PassthroughState(pub Arc<Mutex<PassthroughData>>);
+
+pub struct PassthroughData {
+    pub regions: Vec<InteractionRegion>,
+    pub active: bool,
 }
 
 // ✨ 【新增指令 1】：强制变红灯
@@ -42,6 +58,37 @@ async fn stop_ai_generation(state: State<'_, GoleState>) -> Result<(), String> {
 #[tauri::command]
 async fn reset_ai_generation(state: State<'_, GoleState>) -> Result<(), String> {
     state.stop_flag.store(false, Ordering::Relaxed);
+    Ok(())
+}
+
+// ✨ 【新增指令 3】：设置窗口点击穿透
+#[tauri::command]
+async fn set_window_ignore_cursor_events(
+    window: tauri::Window,
+    ignore: bool,
+    passthrough_state: State<'_, PassthroughState>,
+) -> Result<(), String> {
+    // 同时更新 active 状态，方便后台线程决定是否继续检测
+    if let Ok(mut data) = passthrough_state.0.lock() {
+        data.active = ignore;
+    }
+
+    window
+        .set_ignore_cursor_events(ignore)
+        .map_err(|e| format!("Failed to set ignore cursor events: {}", e))?;
+    Ok(())
+}
+
+// ✨ 【新增指令 4】：更新监控区域 (支持多个)
+#[tauri::command]
+async fn start_passthrough_monitor(
+    regions: Vec<InteractionRegion>,
+    passthrough_state: State<'_, PassthroughState>,
+) -> Result<(), String> {
+    if let Ok(mut data) = passthrough_state.0.lock() {
+        data.regions = regions;
+        data.active = true;
+    }
     Ok(())
 }
 
@@ -85,6 +132,68 @@ pub fn run() {
                 stop_flag: Arc::new(AtomicBool::new(false)),
             });
 
+            // --- 🎯 点击穿透监控初始化 (支持多区域渲染项目) ---
+            let passthrough_store = Arc::new(Mutex::new(PassthroughData {
+                regions: Vec::new(),
+                active: false,
+            }));
+            let ps_clone = passthrough_store.clone();
+            app.manage(PassthroughState(passthrough_store));
+
+            let main_window = app.get_webview_window("main").ok_or("找不到主窗口")?;
+            tauri::async_runtime::spawn(async move {
+                let mut last_ignore = false;
+                loop {
+                    // 检查窗口是否仍然有效
+                    if let Err(_) = main_window.is_visible() {
+                        break;
+                    }
+
+                    let (active, regions) = {
+                        let r = ps_clone.lock().unwrap();
+                        (r.active, r.regions.clone())
+                    };
+
+                    if active {
+                        if let Ok(pos) = main_window.cursor_position() {
+                            let sf = main_window.scale_factor().unwrap_or(1.0);
+
+                            // 广播全局坐标给前端 (逻辑坐标)
+                            let _ = main_window.emit(
+                                "global-mouse-move",
+                                serde_json::json!({
+                                    "x": pos.x / sf,
+                                    "y": pos.y / sf
+                                }),
+                            );
+
+                            let mut in_any_area = false;
+                            for reg in regions {
+                                let px = reg.x * sf;
+                                let py = reg.y * sf;
+                                let pw = reg.w * sf;
+                                let ph = reg.h * sf;
+                                if pos.x >= px
+                                    && pos.x <= px + pw
+                                    && pos.y >= py
+                                    && pos.y <= py + ph
+                                {
+                                    in_any_area = true;
+                                    break;
+                                }
+                            }
+
+                            let should_ignore = !in_any_area;
+                            if should_ignore != last_ignore {
+                                let _ = main_window.set_ignore_cursor_events(should_ignore);
+                                last_ignore = should_ignore;
+                            }
+                        }
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(4)).await;
+                }
+            });
+
             // --- Config State Setup (Cache) ---
             let initial_config = tauri::async_runtime::block_on(async {
                 commands::config_cmd::load_config_internal(app_handle).await
@@ -125,6 +234,8 @@ pub fn run() {
             commands::ai::discover_models_raw,
             stop_ai_generation,
             reset_ai_generation,
+            set_window_ignore_cursor_events,
+            start_passthrough_monitor,
             title_commands::generate_title,
             // 数据库 CRUD 指令
             commands::db_cmd::get_sessions,
@@ -154,6 +265,8 @@ pub fn run() {
             commands::file_cmd::upload_user_avatar,
             // 社交数据库指令
             commands::asr_cmd::transcribe_pcm,
+            commands::tts_cmd::generate_tts,
+            commands::tts_cmd::next_tts_request_id,
             social_db::get_social_profile,
             social_db::get_social_contacts,
             social_db::get_social_groups,

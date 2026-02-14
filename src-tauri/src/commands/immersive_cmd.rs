@@ -5,7 +5,7 @@ use crate::models::{ChatRequest, Message};
 use crate::social_db::SocialDbState;
 use futures_util::StreamExt;
 use std::sync::Arc;
-use tauri::{command, AppHandle, Manager, State};
+use tauri::{command, AppHandle, Emitter, Manager, State};
 
 /// 发送沉浸式社交消息
 ///
@@ -145,7 +145,7 @@ pub async fn send_social_message_immersive(
             .prepare(
                 "SELECT role, content FROM social_messages 
                  WHERE session_id = ?1 
-                 ORDER BY created_at DESC LIMIT 21", // 包含刚刚保存的那条
+                 ORDER BY id DESC LIMIT 21", // 包含刚刚保存的那条
             )
             .map_err(|e| e.to_string())?;
 
@@ -311,13 +311,32 @@ pub async fn send_social_message_immersive(
                 if let Some(data) = line.strip_prefix("data: ") {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
+                            // 🚀 [流式传输]：实时同步给前端极简模式
+                            let _ = app.emit(
+                                "social-streaming-chunk",
+                                serde_json::json!({
+                                    "content": content,
+                                    "isFirst": full_content.is_empty()
+                                }),
+                            );
+
                             full_content.push_str(content);
-                            // 这里可以发送中间推理过程(如果有的话), 但目前我们只收集内容
                         }
                     }
                 }
             }
         }
+
+        // 🚀 [流式传输]：发送结束标记
+        let _ = app.emit(
+            "social-streaming-chunk",
+            serde_json::json!({
+                "content": "",
+                "isFirst": false,
+                "isDone": true
+            }),
+        );
+
         full_content
     };
 

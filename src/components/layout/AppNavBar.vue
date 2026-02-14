@@ -8,7 +8,8 @@ import {
   CHEVRON_DOWN_SVG,
   SUN_SVG,
   MOON_SVG,
-  HOME_SVG
+  HOME_SVG,
+  MINIMALIST_CHAT_SVG
 } from '../../constants/icons';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -26,7 +27,7 @@ const props = defineProps({
   isInSettings: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome', 'openProfile']);
+const emit = defineEmits(['update:activeModule', 'toggleCollapse', 'openSettings', 'backHome', 'openProfile', 'toggleMinimalist']);
 
 // No local profile ref needed, use configStore
 const configStore = useConfigStore();
@@ -84,6 +85,15 @@ const modules = [
 
     <div class="nav-bottom">
 
+      <!-- 最小化聊天模式按钮 (仅在沉浸式社交模式启用时显示) -->
+      <button 
+        v-if="configStore.settings.chatMode?.enabled"
+        class="nav-item minimalist-toggle" 
+        @click="emit('toggleMinimalist')" 
+        title="最小化聊天模式"
+      >
+        <div class="icon-wrapper" v-html="MINIMALIST_CHAT_SVG"></div>
+      </button>
 
       <button 
         class="nav-item theme-toggle" 
