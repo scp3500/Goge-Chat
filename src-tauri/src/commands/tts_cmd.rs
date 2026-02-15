@@ -38,6 +38,7 @@ pub fn next_tts_request_id() -> u64 {
 #[command]
 pub async fn generate_tts(
     text: String,
+    text_language: String,
     request_id: u64,
     sequence_id: u32,
     on_event: tauri::ipc::Channel<TtsEvent>, // 🚀 [优化] 使用 Channel 进行二进制直连
@@ -52,8 +53,8 @@ pub async fn generate_tts(
 
     if sequence_id == 0 {
         println!(
-            "[TTS] [开始] 生成 (ID: {}, 序号: {}): [{}]",
-            request_id, sequence_id, text
+            "[TTS] [开始] 生成 (ID: {}, 序号: {}, 语言: {}): [{}]",
+            request_id, sequence_id, text_language, text
         );
     }
 
@@ -61,7 +62,7 @@ pub async fn generate_tts(
     // 显式请求 media_type=raw 以获得最纯粹的 PCM 流，方便前端直接播放
     let params = [
         ("text", text.as_str()),
-        ("text_language", "zh"),
+        ("text_language", text_language.as_str()),
         ("device", "cuda"),
         ("media_type", "raw"),
         ("streaming_mode", "true"), // 🚀 [优化] 开启流式模式，降低首包延迟

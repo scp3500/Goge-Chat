@@ -39,7 +39,7 @@ pub async fn call_ai_backend(
     Ok(content.to_string())
 }
 
-/// 发送原生 Gemini 请求的通用方法
+/// 发送原生 Gemini 请求的通用方法 (非流式)
 pub async fn call_gemini_backend(
     client: &reqwest::Client,
     api_key: &str,
@@ -47,6 +47,26 @@ pub async fn call_gemini_backend(
     model: &str,
     messages: Vec<Message>,
 ) -> Result<String, String> {
+    let mut full_content = String::new();
+    call_gemini_streaming(client, api_key, base_url, model, messages, |chunk| {
+        full_content.push_str(&chunk);
+    })
+    .await?;
+    Ok(full_content)
+}
+
+/// 发送原生 Gemini 请求的通用方法 (流式)
+pub async fn call_gemini_streaming<F>(
+    client: &reqwest::Client,
+    api_key: &str,
+    base_url: &str,
+    model: &str,
+    messages: Vec<Message>,
+    mut on_chunk: F,
+) -> Result<(), String>
+where
+    F: FnMut(String),
+{
     #[derive(serde::Serialize)]
     struct GeminiPart {
         text: String,
@@ -87,8 +107,9 @@ pub async fn call_gemini_backend(
         contents,
         system_instruction,
     };
+
     let url = format!(
-        "{}/v1beta/models/{}:generateContent?key={}",
+        "{}/v1beta/models/{}:streamGenerateContent?key={}",
         base_url.trim_end_matches('/'),
         model,
         api_key
@@ -108,10 +129,54 @@ pub async fn call_gemini_backend(
         return Err(format!("Gemini API Error ({}): {}", status, err_text));
     }
 
-    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-    let content = json["candidates"][0]["content"]["parts"][0]["text"]
-        .as_str()
-        .ok_or("无法解析 Gemini 响应内容")?;
+    use futures_util::StreamExt;
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
 
-    Ok(content.to_string())
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        while let Some(start_idx) = buffer.find('{') {
+            let mut depth = 0;
+            let mut end_idx = None;
+            let bytes = buffer.as_bytes();
+
+            for i in start_idx..bytes.len() {
+                if bytes[i] == b'{' {
+                    depth += 1;
+                } else if bytes[i] == b'}' {
+                    if depth > 0 {
+                        depth -= 1;
+                        if depth == 0 {
+                            end_idx = Some(i);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if let Some(end) = end_idx {
+                let json_str = &buffer[start_idx..=end];
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str) {
+                    if let Some(candidates) = json["candidates"].as_array() {
+                        if let Some(candidate) = candidates.get(0) {
+                            if let Some(parts) = candidate["content"]["parts"].as_array() {
+                                for part in parts {
+                                    if let Some(text) = part["text"].as_str() {
+                                        on_chunk(text.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                buffer.drain(..=end);
+            } else {
+                break;
+            }
+        }
+    }
+
+    Ok(())
 }

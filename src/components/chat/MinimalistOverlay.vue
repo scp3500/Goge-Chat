@@ -79,9 +79,13 @@ const nextAssignIndex = ref(0); // 🚀 [重构] 下一个要分配给文段的�
 const nextToDeliverIndex = ref(0); // 🚀 [重构] 期望入队的音频序号
 const pendingAudioMap = ref(new Map()); // 存储乱序到达的音频 {sequenceIndex: audioItem}
 const sentenceBuffer = ref(''); // 🚀 [V3] 短句合并缓冲区
-const MIN_SENTENCE_LENGTH = 20; // 🚀 [优化] 默认阈值
-const MIN_FIRST_SENTENCE_LENGTH = 4; // 🚀 [极速] 首句阈值 (6->4)
-const MAX_FORCE_SPLIT_LENGTH = 60; // 🚀 [优化] 提升强制切分长度 (35->60)
+const MIN_SENTENCE_LENGTH = 18; // 🚀 [流水线] 目标范围下限 (18-25)
+const MIN_FIRST_SENTENCE_LENGTH = 6; // 🚀 [流水线] 首句目标下限 (6-10)
+const INACTIVITY_TIMEOUT = 300; // 🚀 [流水线] 300ms 停顿强制触发
+const inactivityTimer = ref(null);
+
+// 🚀 [智能分词] 初始化浏览器原生分词器
+const segmenter = new Intl.Segmenter('zh', { granularity: 'word' });
 
 // 🚀 [V6] 并发控制队列
 const MAX_CONCURRENT_TTS = 1; // 🚀 [优化] 串行处理 (Concurrency=1) 以减少显存竞争和切换开销
@@ -150,6 +154,7 @@ const processTTSQueue = async () => {
 
         const result = await invoke('generate_tts', {
             text: sentence,
+            textLanguage: audioItem.language || 'zh',
             requestId: taskId,
             sequenceId: sequenceIndex,
             onEvent: onEventChannel
@@ -512,6 +517,8 @@ onMounted(async () => {
         accumulatedText.value += event.payload.content;
       }
       
+      isStreamingDone.value = !!event.payload.isDone;
+
       // 🚀 [V3] 如果流式传输结束,强制刷新缓冲区
       if (event.payload.isDone) {
         console.log('[TTS] 流传输结束, 刷新缓冲区');
@@ -575,6 +582,7 @@ const handleSend = async () => {
   // 🎤 清空 TTS 队列和累积文本
   stopAllTTS();
   accumulatedText.value = '';
+  isStreamingDone.value = false;
   
   // 🚀 [V3] 重置序列索引与缓冲区
   nextAssignIndex.value = 0;
@@ -738,29 +746,36 @@ const startDragging = (e) => {
   document.addEventListener('mouseup', stopDragging);
 };
 
-// 🚀 [V3] 强制刷新并发送缓冲区中的文本
-const flushSentenceBuffer = () => {
-    // 处理 accumulatedText 中剩余的文本(不一定带标点)
-    if (accumulatedText.value.trim()) {
-        sentenceBuffer.value += accumulatedText.value.trim();
-        accumulatedText.value = '';
-    }
-    
-    if (sentenceBuffer.value.trim()) {
-        console.log('[TTS] 刷新缓冲区:', sentenceBuffer.value);
-        const sequenceIndex = nextAssignIndex.value;
-        nextAssignIndex.value++;
-        generateTTSForSentence(sentenceBuffer.value.trim(), sequenceIndex);
-        sentenceBuffer.value = '';
-    }
+// 🚀 [流水线] 停顿检测器：如果 AI 停止吐字，立即强制读出当前缓存
+const startInactivityTimer = () => {
+    clearTimeout(inactivityTimer.value);
+    inactivityTimer.value = setTimeout(() => {
+        if (accumulatedText.value.trim() || sentenceBuffer.value.trim()) {
+            console.log('[TTS] [流水线] 停顿触发 (300ms 溢出)');
+            flushSentenceBuffer();
+        }
+    }, INACTIVITY_TIMEOUT);
+};
+
+// 🚀 [语言检测辅助] 检测是否包含日文假名
+const detectLanguage = (t) => {
+    // 日文假名范围: 平假名 3040-309F, 片假名 30A0-30FF
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(t)) return 'ja';
+    return 'zh';
 };
 
 // 🎤 [TTS 功能] 检测句子结束并生成 TTS
 const checkAndGenerateTTS = () => {
   let text = accumulatedText.value;
-  // 🚀 [重构] 加入逗号支持，AI 读到一个短句或逗号就发起请求，显著降低前几秒的等待感
-  const sentenceEndRegex = /[。！？!?；，, \n]/;
+  const sentenceEndRegex = /[。！？!?；，, \n、]/;
   
+  // 🚀 [动态阈值计算]
+  const getThreshold = (index) => {
+      if (index === 0) return MIN_FIRST_SENTENCE_LENGTH; // 6
+      return MIN_SENTENCE_LENGTH; // 18
+  };
+
+  // 1. 优先处理强标点符号 (自然断句)
   let match;
   while ((match = text.match(sentenceEndRegex)) !== null) {
     const mark = match[0];
@@ -769,36 +784,71 @@ const checkAndGenerateTTS = () => {
     
     if (sentence.length > 0) {
       sentenceBuffer.value += sentence;
+      const currentThreshold = getThreshold(nextAssignIndex.value);
       
-      // 🚀 [逻辑优化] 动态阈值：首句快，后续稳
-      const currentThreshold = nextAssignIndex.value === 0 ? MIN_FIRST_SENTENCE_LENGTH : MIN_SENTENCE_LENGTH;
-      
-      // 只要有内容就累积，遇到标点或长度足够就开始 TTS
       if (sentenceBuffer.value.length >= currentThreshold || /[。！？!?；,，\n]/.test(mark)) {
-          console.log(`[TTS] [触发] 触发生成 (长度: ${sentenceBuffer.value.length})`);
-          const sequenceIndex = nextAssignIndex.value;
+          console.log(`[TTS] [标点触发] 序号: ${nextAssignIndex.value}, 长度: ${sentenceBuffer.value.length}`);
+          const seqIdx = nextAssignIndex.value;
           nextAssignIndex.value++;
-          generateTTSForSentence(sentenceBuffer.value, sequenceIndex);
+          generateTTSForSentence(sentenceBuffer.value, seqIdx);
           sentenceBuffer.value = '';
-      } else {
-          // console.log('[TTS] Buffered, len:', sentenceBuffer.value.length);
       }
     }
-    
     text = text.substring(endIndex);
   }
   
-  
-  // 🚀 [新增] 强制长句切分逻辑：如果剩余文本太长且没有标点，强制切出一段来播放
-  if (text.length >= MAX_FORCE_SPLIT_LENGTH) {
-      console.log('[TTS] [触发] 强制切分 (长句):', text);
-      const sequenceIndex = nextAssignIndex.value;
-      nextAssignIndex.value++;
-      generateTTSForSentence(text, sequenceIndex);
-      text = '';
+  // 2. 🚀 [语义分词强制切分] 如果没有标点，但累积到一定长度，寻找最近的词边界
+  const threshold = getThreshold(nextAssignIndex.value);
+  if (text.length >= threshold) {
+      const segments = Array.from(segmenter.segment(text));
+      let splitIdx = -1;
+
+      for (const seg of segments) {
+          const segEnd = seg.index + seg.segment.length;
+          // 语义规则：跨过阈值的第一个“词结束”位置就是最佳切分点
+          if (segEnd >= threshold) {
+              splitIdx = segEnd;
+              break;
+          }
+      }
+
+      if (splitIdx !== -1) {
+          // 残留保护：如果切完剩下的字数太少（< 4），且 AI 还在吐字，则暂缓
+          if (text.length - splitIdx < 4 && !isStreamingDone.value) {
+              // 憋着，等下一次
+          } else {
+              const sentence = text.substring(0, splitIdx);
+              console.log(`[TTS] [分词触发] 序号: ${nextAssignIndex.value}, 长度: ${sentence.length}, 触发词: "${sentence.slice(-2)}"`);
+              const seqIdx = nextAssignIndex.value;
+              nextAssignIndex.value++;
+              generateTTSForSentence(sentence, seqIdx);
+              text = text.substring(splitIdx);
+          }
+      }
   }
   
   accumulatedText.value = text;
+  startInactivityTimer();
+};
+
+// 记录流是否结束，方便 checkAndGenerateTTS 判断
+const isStreamingDone = ref(false);
+
+const flushSentenceBuffer = () => {
+    // 1. 合并 residue
+    if (accumulatedText.value.trim()) {
+        sentenceBuffer.value += accumulatedText.value;
+        accumulatedText.value = '';
+    }
+    
+    // 2. 发送
+    if (sentenceBuffer.value.trim()) {
+        const seqIdx = nextAssignIndex.value;
+        nextAssignIndex.value++;
+        generateTTSForSentence(sentenceBuffer.value.trim(), seqIdx);
+        sentenceBuffer.value = '';
+    }
+    clearTimeout(inactivityTimer.value);
 };
 
 // 🎤 [TTS 功能] 为单个句子生成 TTS
@@ -824,7 +874,8 @@ const generateTTSForSentence = async (sentence, sequenceIndex) => {
       sequenceIndex,
       chunks: [],
       isDone: false,
-      sampleRate: 0 // 🚀 [新增] 动态存储探测到的采样率
+      sampleRate: 0, // 🚀 [新增] 动态存储探测到的采样率
+      language: detectLanguage(sentence) // 🚀 [新增] 自动检测语言
     };
 
     // 🚀 [严格交付] 仅在序号对齐时入队
