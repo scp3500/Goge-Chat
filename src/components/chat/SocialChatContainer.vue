@@ -226,7 +226,7 @@ let newMessageUnlisten = null;
 let scrollUnlisten = null;
 
 onMounted(async () => {
-    console.log("🟢 [SocialChat] 进入聊天容器");
+    console.log("[系统] 社交组件已挂载");
     
     // 🎭 Listen for immersive mode events
     try {
@@ -249,22 +249,14 @@ onMounted(async () => {
         newMessageUnlisten = await listen('new-social-message', (event) => {
             const { messageId, contactId, sessionId, role, content, createdAt } = event.payload;
             
-            console.log(`📨 [new-social-message] 收到消息:`, {
-                messageId,
-                contactId,
-                sessionId,
-                role,
-                content: content.substring(0, 50),
-                currentContact: props.activeContact?.id,
-                currentSession: chatStore.activeSocialSessionId
-            });
+            console.log(`[消息] 收到: ${role} (ID: ${messageId})`);
             
             // Only add if it's for the current contact and session
             if (contactId === props.activeContact?.id && sessionId === chatStore.activeSocialSessionId) {
                 // Check if message already exists (avoid duplicates)
                 const exists = messages.value.find(m => m.id === messageId);
                 if (!exists) {
-                    console.log(`✅ [new-social-message] 添加消息到当前会话 (role: ${role})`);
+                    console.log(`[消息] 添加新消息`);
                     // 🔄 强制触发 Vue 响应式更新 - 使用数组解构而不是 push
                     messages.value = [...messages.value, {
                         id: messageId,
@@ -272,17 +264,17 @@ onMounted(async () => {
                         content,
                         created_at: createdAt
                     }];
-                    console.log(`📊 [new-social-message] 消息已添加,当前消息数: ${messages.value.length}`);
+                    // console.log(`[MSG] Count: ${messages.value.length}`);
                     
                     // Auto-scroll to new message
                     nextTick(() => {
                         triggerScroll('smooth');
                     });
                 } else {
-                    console.log(`⚠️ [new-social-message] 消息已存在，跳过`);
+                    console.log(`[消息] [跳过] 重复`);
                 }
             } else {
-                console.log(`❌ [new-social-message] 消息不属于当前会话，忽略`);
+                console.log(`[消息] [跳过] 会话不匹配`);
             }
         });
         
@@ -301,7 +293,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-    console.log("🚪 [SocialChat] 离开聊天容器，执行最后结算...");
+    console.log("[系统] SocialChat 已卸载");
     if (lastActiveContext.contact && lastActiveContext.sessionId) {
         syncCurrentMemoryOnLeave(lastActiveContext.contact, lastActiveContext.sessionId);
     }
@@ -325,14 +317,14 @@ watch(
         // 🎭 取消旧会话的所有待执行行为，防止消息出现在错误的会话中
         try {
             await invoke("cancel_immersive_behaviors", { sessionId: oldCtx.sid });
-            console.log(`🛑 [Session-Switch] 已取消会话 ${oldCtx.sid} 的待执行行为`);
+            console.log(`[系统] 已取消会话 ${oldCtx.sid} 的行为`);
         } catch (e) {
             console.warn("Failed to cancel old session behaviors:", e);
         }
         
         // 🛡️ 核心修复：确保同步时使用“离开那一瞬间”的旧快照 ID 和 旧 Context 
         if (lastActiveContext.contact && String(lastActiveContext.contact.id) === String(oldCtx.cid)) {
-            console.log(`📤 [Sync-Trigger] 正在离开角色: ${lastActiveContext.contact.name} (SID: ${oldCtx.sid})`);
+            console.log(`[上下文] 离开角色: ${lastActiveContext.contact.name} (SID: ${oldCtx.sid})`);
             syncCurrentMemoryOnLeave(lastActiveContext.contact, oldCtx.sid);
             lastActiveContext.sessionId = null; 
         }
@@ -342,14 +334,14 @@ watch(
     if (newCtx.cid) {
       if (newCtx.cid !== oldCtx?.cid) {
           // Case 1: 角色变了，需要先拉取该角色的会话列表，再决定打开哪个 SID
-          console.log(`📥 [Context] 角色变更为: ${newCtx.cid}, 初始化会话...`);
+          console.log(`[上下文] 角色变更: ${newCtx.cid}, 初始化会话...`);
           await initSessions(newCtx.cid);
           // 🚀 [核心修复]：不再 return，确保即便 Session ID 没变也会继续向下执行加载逻辑
       }
       
       // Case 2: 角色没变，但 Session ID 变了 (或者刚初始化完)
       // 继续向下执行加载逻辑，不要 return
-      console.log(`📥 [Context] 确认上下文: ${newCtx.cid} | Session: ${newCtx.sid}`);
+      console.log(`[上下文] 确认: ${newCtx.cid} | Session: ${newCtx.sid}`);
       
       // 更新当前的稳定上下文快照，标记当前为“可信且对齐”的聊天状态
       lastActiveContext = {
@@ -359,7 +351,7 @@ watch(
       
       hasNewMessages.value = false; // 🔄 重置新消息标志位，进入新上下文
       
-      console.log(`🎯 [Context] 上下文锁定: ${lastActiveContext.contact.name} | Session: ${lastActiveContext.sessionId}`);
+      console.log(`[上下文] 锁定: ${lastActiveContext.contact.name} | Session: ${lastActiveContext.sessionId}`);
       
       // 更新 UI (标题和消息)
       try {

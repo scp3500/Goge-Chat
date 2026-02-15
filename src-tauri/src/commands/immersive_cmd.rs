@@ -29,7 +29,7 @@ pub async fn send_social_message_immersive(
     // 3. 检查行为模拟是否启用 (注意: 这里只决定是否启用延迟/拆分等行为)
     // 即使关闭了行为模拟,只要在社交模式下,我们仍然要在这里处理 AI 调用
     let is_behavior_enabled = settings.enabled;
-    println!("🎭 [Social] 行为模拟开启状态: {}", is_behavior_enabled);
+    println!("[社交] 行为启用: {}", is_behavior_enabled);
 
     // --- 🚀 社交模式 (沉浸式) 处理逻辑 ---
     // 注意: 用户消息已经由前端保存,这里不再重复保存
@@ -48,7 +48,7 @@ pub async fn send_social_message_immersive(
     let message_count =
         crate::social_db::increment_message_count(db_state.clone(), contact_id, session_id)?;
 
-    println!("📊 消息计数: {}", message_count);
+    println!("[社交] 消息计数: {}", message_count);
 
     // 检查是否启用状态追踪
     if let Some(ref state_config) = settings.behaviors.character_state_config {
@@ -61,7 +61,7 @@ pub async fn send_social_message_immersive(
                 .await?;
 
             if should_analyze {
-                println!("🔍 触发状态分析...");
+                println!("[状态] 触发分析...");
 
                 // 获取最近的消息历史 (在单独的作用域中,确保锁被释放)
                 let messages = {
@@ -108,7 +108,7 @@ pub async fn send_social_message_immersive(
                 session_context.busy_level = Some(analysis.busy_level);
                 session_context.interest_level = Some(analysis.interest_level);
 
-                println!("✅ 状态分析完成并保存");
+                println!("[状态] 分析已保存");
             } else {
                 // 从数据库加载现有状态
                 if let Some(state) =
@@ -124,8 +124,9 @@ pub async fn send_social_message_immersive(
                         .get("interestLevel")
                         .and_then(|v| v.as_f64())
                         .map(|f| f as f32);
+
                     println!(
-                        "📦 从缓存加载状态: mood={:?}, busy={:?}, interest={:?}",
+                        "[状态] 加载缓存: 心情={:?}, 忙碌={:?}, 兴趣={:?}",
                         session_context.mood,
                         session_context.busy_level,
                         session_context.interest_level
@@ -136,7 +137,7 @@ pub async fn send_social_message_immersive(
     }
 
     // 5. 🤖 调用 AI 获取回答 (内部流式收集)
-    println!("🤖 [Social] 正在请求 AI 响应...");
+    println!("[AI] [开始] 请求响应...");
 
     // A. 获取对话历史 (20条)
     let mut history = {
@@ -235,7 +236,7 @@ pub async fn send_social_message_immersive(
                             role_id: None,
                         },
                     );
-                    println!("✅ [Social] 已注入角色设定或全局预设提示词");
+                    // println!("[Social] Injected system prompt");
                 }
             }
         }
@@ -245,7 +246,7 @@ pub async fn send_social_message_immersive(
     let provider_id = contact_provider.unwrap_or_else(|| config.default_provider_id.clone());
     let model = contact_model.unwrap_or_else(|| config.selected_model_id.clone());
 
-    println!("🤖 [Social] 使用提供商: {}, 模型: {}", provider_id, model);
+    println!("[AI] 提供商: {}, 模型: {}", provider_id, model);
 
     let providers = config.providers.as_array().ok_or("无法读取提供商列表")?;
     let provider_config = providers
@@ -340,10 +341,7 @@ pub async fn send_social_message_immersive(
         full_content
     };
 
-    println!(
-        "✅ AI 响应收集完成: {}...",
-        ai_response.chars().take(20).collect::<String>()
-    );
+    println!("[AI] [完成] 响应收集完成 ({} 字符)", ai_response.len());
 
     // 6. 使用行为引擎生成行为链 (针对 AI 的回答)
     let engine = BehaviorEngine::new(settings.clone());

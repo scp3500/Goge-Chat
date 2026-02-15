@@ -30,7 +30,7 @@ impl BehaviorEngine {
         // 这样可以保证一问一答的基本功能
         if !self.settings.enabled {
             // 沉浸式模式未启用,直接发送(无延迟,无拆分)
-            println!("📢 [BehaviorEngine] 沉浸式模式关闭,直接发送消息");
+            println!("[行为] 沉浸模式未启用, 直接说话");
             return vec![BehaviorAction::Speak(message.to_string())];
         }
 

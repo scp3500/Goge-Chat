@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc, Channel } from '@tauri-apps/api/core';
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event';
 import { useChatStore } from '../../stores/chat';
 import { useConfigStore } from '../../stores/config';
@@ -79,8 +79,93 @@ const nextAssignIndex = ref(0); // 🚀 [重构] 下一个要分配给文段的�
 const nextToDeliverIndex = ref(0); // 🚀 [重构] 期望入队的音频序号
 const pendingAudioMap = ref(new Map()); // 存储乱序到达的音频 {sequenceIndex: audioItem}
 const sentenceBuffer = ref(''); // 🚀 [V3] 短句合并缓冲区
-const MIN_SENTENCE_LENGTH = 15; // 🚀 [优化] 降低阈值，让短语也能及时触发 TTS
-const MAX_FORCE_SPLIT_LENGTH = 35; // 🚀 [新增] 强制切分长度，防止无标点长句憋死
+const MIN_SENTENCE_LENGTH = 20; // 🚀 [优化] 默认阈值
+const MIN_FIRST_SENTENCE_LENGTH = 4; // 🚀 [极速] 首句阈值 (6->4)
+const MAX_FORCE_SPLIT_LENGTH = 60; // 🚀 [优化] 提升强制切分长度 (35->60)
+
+// 🚀 [V6] 并发控制队列
+const MAX_CONCURRENT_TTS = 1; // 🚀 [优化] 串行处理 (Concurrency=1) 以减少显存竞争和切换开销
+const ttsRequestQueue = ref([]);
+const activeTTSRequests = ref(0);
+
+
+const processTTSQueue = async () => {
+    if (activeTTSRequests.value >= MAX_CONCURRENT_TTS || ttsRequestQueue.value.length === 0) {
+        return;
+    }
+
+    const { sentence, taskId, sequenceIndex, audioItem, resolve, reject } = ttsRequestQueue.value.shift();
+    activeTTSRequests.value++;
+
+    try {
+        console.log(`[TTS] [开始] 处理请求 (序号: ${sequenceIndex}), 当前并发: ${activeTTSRequests.value}`);
+        
+        // 🚀 [优化] 定义二进制回调 Channel
+        const onEventChannel = new Channel();
+        onEventChannel.onmessage = (event) => {
+            const { type, data } = event;
+            
+            // 🚀 [性能监测] 记录 TTS 首声耗时
+            if (type === 'metadata' && Number(sequenceIndex) === 0) {
+                 const { backend_prep_ms } = data;
+                 perfMetrics.value.ttsFirstAudioTime = performance.now();
+                 const totalLatency = perfMetrics.value.ttsFirstAudioTime - perfMetrics.value.sendTime;
+                 console.log(`[性能] 延迟统计 (总计: ${totalLatency.toFixed(0)}ms)`);
+                 console.log(`  - 后端推理: ${backend_prep_ms}ms`);
+                 perfMetrics.value.hasTrackedTTS = true;
+            }
+
+            if (type === 'chunk') {
+                let raw = new Uint8Array(data).buffer;
+                
+                // 🚀 [WAV 剥离] 逻辑下移至此
+                if (audioItem.chunks.length === 0 && raw.byteLength >= 44) {
+                    const u8 = new Uint8Array(raw);
+                    if (u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46) {
+                        // 🎧 [动态采样率探测] 从 WAV 头偏移 24 字节处读取采样率 (Little-endian 4-byte)
+                        const sr = u8[24] | (u8[25] << 8) | (u8[26] << 16) | (u8[27] << 24);
+                        if (sr > 8000 && sr < 192000) {
+                            console.log(`[TTS] [探测] 发现 WAV 头, 采样率: ${sr}Hz`);
+                            audioItem.sampleRate = sr;
+                        } else {
+                            console.log('[TTS] [警告] WAV 头采样率异常, 维持默认');
+                        }
+                        raw = raw.slice(44);
+                    }
+                }
+
+                const isMatch = isPlayingAudio.value && Number(currentStreamingSequence.value) === Number(sequenceIndex);
+                if (isMatch) {
+                    schedulePCMChunk(raw, audioItem.sampleRate || 32000);
+                } else {
+                    audioItem.chunks.push(raw);
+                }
+            }
+
+            if (type === 'done') {
+                audioItem.isDone = true;
+                // console.log(`[TTS] [DONE] Sequence ${sequenceIndex} Binary stream complete`);
+            }
+        };
+
+        const result = await invoke('generate_tts', {
+            text: sentence,
+            requestId: taskId,
+            sequenceId: sequenceIndex,
+            onEvent: onEventChannel
+        });
+        // 🚀 [关键修复] Invoke 返回意味着流已经结束。即使没收到 Chunk (比如只有标点)，也要标为 Done。
+        audioItem.isDone = true;
+        console.log(`[TTS] [完成] 请求处理完毕 (序号: ${sequenceIndex})`);
+        resolve(result);
+    } catch (e) {
+        console.error(`[TTS] [错误] 请求处理失败 (序号: ${sequenceIndex}):`, e);
+        reject(e);
+    } finally {
+        activeTTSRequests.value--;
+        processTTSQueue(); // 递归处理下一个
+    }
+};
 
 // 🚀 [V2] 任务锁定与请求 ID
 const currentRequestId = ref(0);
@@ -107,12 +192,13 @@ const perfMetrics = ref({
 
 const initAudioContext = async () => {
     if (!audioCtx.value) {
-        audioCtx.value = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 32000 });
-        console.log('[TTS] AudioContext 已初始化 (32000Hz), State:', audioCtx.value.state);
+        // AudioContext 的采样率设为 48k 作为基础容器即可，具体播放会通过 createBuffer 自动重采样
+        audioCtx.value = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        console.log('[音频] 上下文已初始化 (48000Hz 基础容器), 状态:', audioCtx.value.state);
     }
     if (audioCtx.value.state === 'suspended') {
         return audioCtx.value.resume().then(() => {
-            console.log('[TTS] AudioContext 已恢复');
+            console.log('[音频] 上下文已恢复');
         });
     }
     return Promise.resolve();
@@ -214,7 +300,7 @@ watch(() => props.visible, (newVal) => {
     stopAllTTS();
     
     if (live2dApp.value) {
-        console.log('[MinimalistOverlay] 销毁 Live2D App');
+        console.log('[系统] 销毁 Live2D App');
         live2dApp.value.destroy(false, { children: true, texture: true, baseTexture: true });
         live2dApp.value = null;
         live2dModel.value = null;
@@ -250,17 +336,17 @@ const initLive2D = async () => {
     PIXI.Ticker.shared.maxFPS = 240;
 
     const modelUrl = '/live2d/alice/alice_model3.json';
-    console.log('[MinimalistOverlay] 开始初始化 Live2D...', modelUrl);
+    console.log('[系统] 加载 Live2D 模型...', modelUrl);
     const model = await Live2DModel.from(modelUrl, {
       autoInteract: true,
       idleMotionGroup: 'Idle'
     });
 
     if (!model) {
-        console.error('[MinimalistOverlay] 模型加载失败!');
+        console.error('[系统] [错误] 模型加载失败!');
         throw new Error('模型解析失败');
     }
-    console.log('[MinimalistOverlay] 模型加载成功');
+    console.log('[系统] 模型加载成功');
 
     live2dModel.value = model;
     app.stage.addChild(model);
@@ -406,7 +492,7 @@ onMounted(async () => {
     if (props.visible) {
       // 🚀 [V2 核心修复] 如果我们刚刚发送了消息，但在等第一个 chunk 时收到了旧 chunk，则丢弃
       if (isWaitingForResponse.value && !event.payload.isFirst) {
-        console.log('🚮 [TTS] 丢弃上一条消息的延迟 Chunk');
+        console.log('[TTS] [跳过] 丢弃过时分块');
         return;
       }
 
@@ -415,7 +501,7 @@ onMounted(async () => {
         if (!perfMetrics.value.hasTrackedLLM) {
             perfMetrics.value.llmFirstTokenTime = performance.now();
             const latency = perfMetrics.value.llmFirstTokenTime - perfMetrics.value.sendTime;
-            console.log(`%c[PERF] ⚡ LLM 首字延迟: ${latency.toFixed(2)}ms`, "color: #00ff00; font-weight: bold;");
+            console.log(`[性能] LLM 首字延迟: ${latency.toFixed(2)}ms`);
             perfMetrics.value.hasTrackedLLM = true;
         }
         isWaitingForResponse.value = false; // 收到第一个 chunk，正式开始
@@ -428,7 +514,7 @@ onMounted(async () => {
       
       // 🚀 [V3] 如果流式传输结束,强制刷新缓冲区
       if (event.payload.isDone) {
-        console.log('[TTS] 流式传输结束,刷新缓冲区');
+        console.log('[TTS] 流传输结束, 刷新缓冲区');
         flushSentenceBuffer();
       } else {
         // 🎤 检测句子结束,尝试合并或触发 TTS 生成
@@ -437,61 +523,8 @@ onMounted(async () => {
     }
   });
 
-  // 🚀 [V5] 接收字节流 Chunk 并调度播放
-  unlistenAudioChunk = await listen('tts-audio-chunk', (event) => {
-    const { requestId, sequenceId, chunk, isDone, backendPrepMs } = event.payload;
-    
-    // 🚀 [性能监测] 记录 TTS 首声耗时
-    if (!perfMetrics.value.hasTrackedTTS && chunk && sequenceId === 0) {
-        perfMetrics.value.ttsFirstAudioTime = performance.now();
-        const totalLatency = perfMetrics.value.ttsFirstAudioTime - perfMetrics.value.sendTime;
-        const llmWait = perfMetrics.value.llmFirstTokenTime - perfMetrics.value.sendTime;
-        const ttsSentenceWait = perfMetrics.value.ttsRequestStartTime - perfMetrics.value.llmFirstTokenTime;
-        const ttsFullWait = perfMetrics.value.ttsFirstAudioTime - perfMetrics.value.ttsRequestStartTime;
-        
-        console.log(`%c[PERF-ANALYSIS] 🛠️ 全链路延迟分析 (总计: ${totalLatency.toFixed(0)}ms)`, "background: #222; color: #ffeb3b; padding: 4px; border-radius: 4px; font-weight: bold;");
-        console.log(`  1. LLM 打火 (问->答): ${llmWait.toFixed(0)}ms`);
-        console.log(`  2. TTS 缓冲等待 (答->送): ${ttsSentenceWait.toFixed(0)}ms (等待标点符号)`);
-        console.log(`  3. TTS 后端处理 (送->响): ${ttsFullWait.toFixed(0)}ms (含网络+推理)`);
-        if (backendPrepMs) {
-            console.log(`     └─ 其中 GPT-SoVITS 推理耗时: ${backendPrepMs}ms`);
-        }
-        perfMetrics.value.hasTrackedTTS = true;
-    }
-
-    // 找到对应的音频项 (优先从主队列找，找不到再去暂存区找)
-    let audioItem = audioQueue.value.find(i => Number(i.sequenceIndex) === Number(sequenceId));
-    if (!audioItem) {
-        audioItem = pendingAudioMap.value.get(Number(sequenceId));
-    }
-
-    if (audioItem && audioItem.audioData === 'STREAMING') {
-        if (chunk) {
-            let raw = base64ToArrayBuffer(chunk);
-            
-            // 🚀 [修复] 如果是第一波数据且包含 RIFF (WAV) 头，裁掉前 44 字节
-            if (audioItem.chunks.length === 0 && raw.byteLength >= 44) {
-                const u8 = new Uint8Array(raw);
-                if (u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46) {
-                    console.log('[V5-CHUNK] 检测到 WAV 容器头，已自动剥离 PCM 数据');
-                    raw = raw.slice(44);
-                }
-            }
-
-            const isMatch = isPlayingAudio.value && Number(currentStreamingSequence.value) === Number(sequenceId);
-            
-            if (isMatch) {
-                schedulePCMChunk(raw);
-            } else {
-                audioItem.chunks.push(raw);
-            }
-        }
-        if (isDone) {
-            audioItem.isDone = true;
-            console.log(`[V5] 序列 ${sequenceId} 流结束`);
-        }
-    }
-  });
+  // 🚀 [V5] 接收音频分片 (已废弃全局事件，改用 Channel 直连)
+  // unlistenAudioChunk = await listen('tts-audio-chunk', (event) => { ... });
 });
 
 onUnmounted(() => {
@@ -527,6 +560,9 @@ const handleKeyDown = (e) => {
 const handleSend = async () => {
   const text = inputText.value.trim();
   if (!text || isSending.value) return;
+
+  // 🚀 [优化] 预热音频引擎 (极速模式)
+  initAudioContext();
 
   // 🚀 [性能监测] 记录开始发送时间
   perfMetrics.value.sendTime = performance.now();
@@ -630,7 +666,7 @@ const startRecording = async () => {
     
     mediaRecorder.value.start();
     isRecording.value = true;
-    console.log('[MinimalistOverlay] 开始录音');
+    console.log('[系统] 开始录音');
   } catch (e) {
     console.error('录音失败:', e);
   }
@@ -640,7 +676,7 @@ const stopRecording = () => {
   if (mediaRecorder.value && isRecording.value) {
     mediaRecorder.value.stop();
     isRecording.value = false;
-    console.log('[MinimalistOverlay] 停止录音');
+    console.log('[系统] 停止录音');
   }
 };
 
@@ -654,7 +690,7 @@ const processAudio = async (audioBlob) => {
     const pcmData = audioBuffer.getChannelData(0);
     const samples = Array.from(pcmData);
     
-    console.log('[MinimalistOverlay] 发送音频到ASR, 样本数:', samples.length);
+    console.log('[ASR] 发送音频, 样本数:', samples.length);
     
     const text = await invoke('transcribe_pcm', {
       samples,
@@ -711,7 +747,7 @@ const flushSentenceBuffer = () => {
     }
     
     if (sentenceBuffer.value.trim()) {
-        console.log('[TTS] 强制刷新缓冲区:', sentenceBuffer.value);
+        console.log('[TTS] 刷新缓冲区:', sentenceBuffer.value);
         const sequenceIndex = nextAssignIndex.value;
         nextAssignIndex.value++;
         generateTTSForSentence(sentenceBuffer.value.trim(), sequenceIndex);
@@ -734,15 +770,18 @@ const checkAndGenerateTTS = () => {
     if (sentence.length > 0) {
       sentenceBuffer.value += sentence;
       
-      // 🚀 [逻辑优化] 只要有内容就累积，遇到标点或长度足够就开始 TTS
-      if (sentenceBuffer.value.length >= MIN_SENTENCE_LENGTH || /[。！？!?；,，\n]/.test(mark)) {
-          console.log('[TTS] 触发请求 (Len: ' + sentenceBuffer.value.length + ', Mark: ' + mark + '):', sentenceBuffer.value);
+      // 🚀 [逻辑优化] 动态阈值：首句快，后续稳
+      const currentThreshold = nextAssignIndex.value === 0 ? MIN_FIRST_SENTENCE_LENGTH : MIN_SENTENCE_LENGTH;
+      
+      // 只要有内容就累积，遇到标点或长度足够就开始 TTS
+      if (sentenceBuffer.value.length >= currentThreshold || /[。！？!?；,，\n]/.test(mark)) {
+          console.log(`[TTS] [触发] 触发生成 (长度: ${sentenceBuffer.value.length})`);
           const sequenceIndex = nextAssignIndex.value;
           nextAssignIndex.value++;
           generateTTSForSentence(sentenceBuffer.value, sequenceIndex);
           sentenceBuffer.value = '';
       } else {
-          console.log('[TTS] 已缓冲片段, 当前总长:', sentenceBuffer.value.length);
+          // console.log('[TTS] Buffered, len:', sentenceBuffer.value.length);
       }
     }
     
@@ -752,7 +791,7 @@ const checkAndGenerateTTS = () => {
   
   // 🚀 [新增] 强制长句切分逻辑：如果剩余文本太长且没有标点，强制切出一段来播放
   if (text.length >= MAX_FORCE_SPLIT_LENGTH) {
-      console.log('[TTS] 触发强制切分 (无标点长句):', text);
+      console.log('[TTS] [触发] 强制切分 (长句):', text);
       const sequenceIndex = nextAssignIndex.value;
       nextAssignIndex.value++;
       generateTTSForSentence(text, sequenceIndex);
@@ -773,7 +812,7 @@ const generateTTSForSentence = async (sentence, sequenceIndex) => {
   }
 
   try {
-    console.log(`[V4-CORE] 申请本地生成 (ID: ${taskId}, Seq: ${sequenceIndex}):`, sentence);
+    console.log(`[TTS] [开始] 请求本地 TTS (ID: ${taskId}, 序号: ${sequenceIndex}):`, sentence);
     
     // 🚀 [核心] 调用后端本地 TTS
     // 🚀 [关键修复] 先创建并在队列中预位，再执行 invoke
@@ -784,12 +823,13 @@ const generateTTSForSentence = async (sentence, sequenceIndex) => {
       taskId,
       sequenceIndex,
       chunks: [],
-      isDone: false
+      isDone: false,
+      sampleRate: 0 // 🚀 [新增] 动态存储探测到的采样率
     };
 
     // 🚀 [严格交付] 仅在序号对齐时入队
     if (sequenceIndex === nextToDeliverIndex.value) {
-      console.log(`[V5-STREAM] 序列 ${sequenceIndex} 对齐, 预入队并开始生成`);
+      console.log(`[TTS] 序号 ${sequenceIndex} 对齐, 创建音频项`);
       audioQueue.value.push(audioItem);
       nextToDeliverIndex.value++;
       
@@ -809,16 +849,19 @@ const generateTTSForSentence = async (sentence, sequenceIndex) => {
       pendingAudioMap.value.set(sequenceIndex, audioItem);
     }
 
-    // 现在执行 invoke，它会阻塞直到后端流式推送结束
-    const result = await invoke('generate_tts', { 
-        text: sentence,
-        requestId: taskId,
-        sequenceId: sequenceIndex
+    // 🚀 [V6] 改为入队处理，不再直接 await invoke
+    return new Promise((resolve, reject) => {
+        ttsRequestQueue.value.push({
+            sentence,
+            taskId,
+            sequenceIndex,
+            audioItem,
+            resolve,
+            reject
+        });
+        console.log(`[TTS] [入队] 请求已加入队列 (序号: ${sequenceIndex}), 等待处理...`);
+        processTTSQueue();
     });
-    
-    // 🚀 [关键修复] Invoke 返回意味着流已经结束。即使没收到 Chunk (比如只有标点)，也要标为 Done。
-    audioItem.isDone = true;
-    console.log(`[V5-STREAM] 序列 ${sequenceIndex} Invoke 返回并标记完毕: ${result}`);
 
   } catch (e) {
     console.error('[V5-STREAM] TTS 生成触发失败:', e);
@@ -871,16 +914,16 @@ const playNextAudio = async () => {
         // 🚀 [优化] 衔接逻辑：如果当前时间离上一次调度结束还没超过 0.5 秒，则继续追加调度，实现无缝衔接。
         const now = audioCtx.value.currentTime;
         if (nextChunkTime.value < now || nextChunkTime.value > now + 2.0) {
-            console.log('[V5] 重新校准音频调度时间轴');
-            nextChunkTime.value = now + 0.05;
+            console.log('[V5] 重新校准音频调度时间轴 (极速模式)');
+            nextChunkTime.value = now + 0.01; // 🚀 [优化] 0.05s -> 0.01s 极限低延迟
         } else {
             console.log(`[V5] 沿用现有时间轴，偏移: ${(nextChunkTime.value - now).toFixed(3)}s`);
         }
 
         // 播放现有的缓存 chunks
-        console.log(`[V5] 补播缓存 Chunks: ${audioItem.chunks.length} 个`);
+        console.log(`[V5] 补播缓存 Chunks: ${audioItem.chunks.length} 个, 采样率: ${audioItem.sampleRate || 32000}Hz`);
         while (audioItem.chunks.length > 0) {
-            schedulePCMChunk(audioItem.chunks.shift());
+            schedulePCMChunk(audioItem.chunks.shift(), audioItem.sampleRate || 32000);
         }
 
         // 持续检测是否结束
@@ -989,7 +1032,7 @@ const base64ToArrayBuffer = (base64) => {
 };
 
 // 🚀 [V5] 调度 PCM 采样播放
-const schedulePCMChunk = (arrayBuffer) => {
+const schedulePCMChunk = (arrayBuffer, sampleRate = 32000) => {
     if (!audioCtx.value) {
         console.warn('[TTS] AudioContext 未初始化，放弃调度 Chunk');
         return;
@@ -1031,7 +1074,7 @@ const schedulePCMChunk = (arrayBuffer) => {
         float32Array[i] = int16Array[i] / 32768.0;
     }
     
-    const audioBuffer = audioCtx.value.createBuffer(1, float32Array.length, 32000);
+    const audioBuffer = audioCtx.value.createBuffer(1, float32Array.length, sampleRate);
     audioBuffer.getChannelData(0).set(float32Array);
     
     const source = audioCtx.value.createBufferSource();
@@ -1070,6 +1113,11 @@ const stopAllTTS = () => {
   sentenceBuffer.value = '';
   residualBuffer.value = null; // 清空残留缓冲
   currentStreamingSequence.value = -1;
+  
+  // 🚀 [V6] 清空并发队列
+  ttsRequestQueue.value = [];
+  activeTTSRequests.value = 0; // 重置计数
+  
   console.log('[TTS] 已停止所有播放');
 };
 

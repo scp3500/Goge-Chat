@@ -15,21 +15,32 @@ static REQUEST_COUNTER: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(0));
 
 // --- 数据结构 ---
 
+#[derive(serde::Serialize, Clone)]
+#[serde(tag = "type", content = "data")]
+pub enum TtsEvent {
+    #[serde(rename = "chunk")]
+    Chunk(Vec<u8>),
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "metadata")]
+    Metadata { backend_prep_ms: u64 },
+}
+
 /// 获取下一个请求 ID
 #[command]
 pub fn next_tts_request_id() -> u64 {
     let mut counter = REQUEST_COUNTER.lock().unwrap();
     *counter += 1;
-    println!("🔄 [GenieTTS] 生成新请求 ID: {}", *counter);
+    println!("[TTS] [信息] 新请求 ID: {}", *counter);
     *counter
 }
 
 #[command]
 pub async fn generate_tts(
-    app: tauri::AppHandle, // 🚀 [新增] 传入 AppHandle 用于发射事件
     text: String,
     request_id: u64,
     sequence_id: u32,
+    on_event: tauri::ipc::Channel<TtsEvent>, // 🚀 [优化] 使用 Channel 进行二进制直连
 ) -> Result<String, String> {
     // 检查请求是否过期
     {
@@ -39,10 +50,12 @@ pub async fn generate_tts(
         }
     }
 
-    println!(
-        "🔮 [GenieTTS] >>> 准备生成语音 (Streaming Push): [{}] (ID: {}, Seq: {})",
-        text, request_id, sequence_id
-    );
+    if sequence_id == 0 {
+        println!(
+            "[TTS] [开始] 生成 (ID: {}, 序号: {}): [{}]",
+            request_id, sequence_id, text
+        );
+    }
 
     // 🚀 [关键修复] 适配 api.py，且不再发送参考音频参数，让服务器使用命令行指定的默认值 (-dr, -dt, -dl)
     // 显式请求 media_type=raw 以获得最纯粹的 PCM 流，方便前端直接播放
@@ -51,6 +64,8 @@ pub async fn generate_tts(
         ("text_language", "zh"),
         ("device", "cuda"),
         ("media_type", "raw"),
+        ("streaming_mode", "true"), // 🚀 [优化] 开启流式模式，降低首包延迟
+        ("min_chunk_length", "1"),  // 🚀 [极限] 强制最小包发送
     ];
 
     // 发起 GET 请求
@@ -67,9 +82,6 @@ pub async fn generate_tts(
     }
 
     // 🚀 [真正流式] 处理字节流并实时推送
-    use base64::{engine::general_purpose, Engine as _};
-    use tauri::Emitter;
-
     let mut stream = response.bytes_stream();
     let mut all_audio_bytes = Vec::new();
     let start_time = std::time::Instant::now(); // 🚀 [性能监测] 记录开始接收流的时间
@@ -80,10 +92,7 @@ pub async fn generate_tts(
         {
             let current_id = REQUEST_COUNTER.lock().unwrap();
             if request_id < *current_id {
-                println!(
-                    "🛑 [GenieTTS] 检测到新请求，停止旧流推送: ID {}",
-                    request_id
-                );
+                println!("[TTS] [停止] 过期请求 ID {}", request_id);
                 break;
             }
         }
@@ -94,49 +103,30 @@ pub async fn generate_tts(
         }
 
         // 🚀 [性能监测] 记录首包耗时 (Time to First Byte)
-        let mut backend_prep_ms = 0;
-        if is_first_chunk {
-            backend_prep_ms = start_time.elapsed().as_millis() as u64;
-            println!("⚡ [GenieTTS] TTS 后端打火耗时: {}ms", backend_prep_ms);
+        if is_first_chunk && sequence_id == 0 {
+            let backend_prep_ms = start_time.elapsed().as_millis() as u64;
+            println!("[性能] TTS 后端准备: {}ms", backend_prep_ms);
+            let _ = on_event.send(TtsEvent::Metadata { backend_prep_ms });
             is_first_chunk = false;
         }
 
         // 累积完整音频用于异步存盘
         all_audio_bytes.extend_from_slice(&chunk);
 
-        // 🚀 [关键一步] 立即编码并推送到前端
-        let b64_chunk = general_purpose::STANDARD.encode(&chunk);
-        let _ = app.emit(
-            "tts-audio-chunk",
-            serde_json::json!({
-                "requestId": request_id,
-                "sequenceId": sequence_id,
-                "chunk": b64_chunk,
-                "isDone": false,
-                "backendPrepMs": backend_prep_ms // 仅首包携带
-            }),
-        );
+        // 🚀 [关键一步] 二进制直连传输 (不再使用 Base64)
+        let _ = on_event.send(TtsEvent::Chunk(chunk.to_vec()));
     }
 
     // 发送结束标记
-    let _ = app.emit(
-        "tts-audio-chunk",
-        serde_json::json!({
-            "requestId": request_id,
-            "sequenceId": sequence_id,
-            "chunk": "",
-            "isDone": true
-        }),
-    );
+    let _ = on_event.send(TtsEvent::Done);
 
     // 🏆 [异步静默存盘] 保持不变，用于缓存
     let audio_bytes_clone = all_audio_bytes.clone();
     tokio::spawn(async move {
-        let current_dir = std::env::current_dir().unwrap_or_default();
-        let tts_cache_dir = current_dir
-            .join("src-tauri")
-            .join("target")
-            .join("tts_cache");
+        // 🚀 [路径优化] 将缓存放在 exe 同级目录的 data 文件夹下
+        let exe_path = std::env::current_exe().unwrap_or_default();
+        let exe_dir = exe_path.parent().unwrap_or(&exe_path);
+        let tts_cache_dir = exe_dir.join("data").join("tts_cache");
 
         if !tts_cache_dir.exists() {
             let _ = fs::create_dir_all(&tts_cache_dir);
@@ -153,10 +143,12 @@ pub async fn generate_tts(
         }
     });
 
-    println!(
-        "✅ [GenieTTS] <<< 流式推送完成 (Total Size: {} bytes)",
-        all_audio_bytes.len()
-    );
+    if sequence_id == 0 {
+        println!(
+            "[TTS] [完成] 流传输结束 (大小: {} 字节)",
+            all_audio_bytes.len()
+        );
+    }
 
     // 返回 "STREAMING" 标记，前端知道不用等待返回结果
     Ok("STREAMING".to_string())

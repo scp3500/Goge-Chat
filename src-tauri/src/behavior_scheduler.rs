@@ -102,7 +102,7 @@ impl MessageScheduler {
         for action in chain {
             // 检查是否被取消
             if token.is_cancelled() {
-                println!("🛑 行为链被取消 (session_id: {})", session_id);
+                println!("[调度器] [停止] 已取消 (SID: {})", session_id);
                 // 清除打字状态
                 let _ = app.emit(
                     "typing-status",
@@ -183,7 +183,7 @@ impl MessageScheduler {
                         }),
                     );
 
-                    println!("💬 发送消息: {} (id: {})", content, message_id);
+                    println!("[调度器] 说话: {} (ID: {})", content, message_id);
                 }
 
                 BehaviorAction::Retract(msg_id) => {
@@ -216,7 +216,7 @@ impl MessageScheduler {
                         }),
                     );
 
-                    println!("🔙 撤回消息 (id: {})", target_id);
+                    println!("[调度器] 撤回 (ID: {})", target_id);
 
                     // 清除 last_message_id
                     if Some(target_id) == last_message_id {
@@ -226,17 +226,20 @@ impl MessageScheduler {
 
                 BehaviorAction::Idle => {
                     // 已读不回 - 什么都不做
-                    println!("👀 已读不回 (session_id: {})", session_id);
+                    println!("[调度器] 闲置 (SID: {})", session_id);
                 }
 
                 BehaviorAction::DelayedDecision(delay_ms, original_message) => {
                     // 延迟后重新决策
-                    println!("⏳ 延迟决策: {}ms (session_id: {})", delay_ms, session_id);
+                    println!(
+                        "[Scheduler] Decision Delay: {}ms (SID: {})",
+                        delay_ms, session_id
+                    );
 
                     // 可中断的等待
                     tokio::select! {
                         _ = sleep(Duration::from_millis(delay_ms as u64)) => {
-                            println!("⏰ 延迟决策时间到 (session_id: {})", session_id);
+                            println!("[调度器] 延迟结束, 重新决策 (SID: {})", session_id);
 
                             // 重新获取角色状态并在延迟后重新决策
                             let engine = crate::behavior_engine::BehaviorEngine::new(settings.clone());
@@ -254,7 +257,7 @@ impl MessageScheduler {
                             )).await?;
                         }
                         _ = token.cancelled() => {
-                            println!("🛑 延迟决策被取消 (session_id: {})", session_id);
+                            println!("[调度器] [停止] 延迟已取消 (SID: {})", session_id);
                             return Ok(());
                         }
                     }
@@ -279,7 +282,7 @@ impl MessageScheduler {
         let mut tasks = self.active_tasks.write().await;
         if let Some(token) = tasks.remove(&session_id) {
             token.cancel();
-            println!("🛑 取消会话 {} 的行为链", session_id);
+            println!("[Scheduler] [STOP] Cancelled session {}", session_id);
         }
     }
 
@@ -288,7 +291,7 @@ impl MessageScheduler {
         let mut tasks = self.active_tasks.write().await;
         for (session_id, token) in tasks.drain() {
             token.cancel();
-            println!("🛑 取消会话 {} 的行为链", session_id);
+            println!("[Scheduler] [STOP] Cancelled session {}", session_id);
         }
     }
 
@@ -343,14 +346,14 @@ impl MessageScheduler {
                         Self::check_idle_sessions(app.clone(), activities.clone()).await;
                     }
                     _ = token.cancelled() => {
-                        println!("🛑 IdleMonitor 已停止");
+                        println!("[闲置] 监控已停止");
                         break;
                     }
                 }
             }
         });
 
-        println!("🚀 IdleMonitor 已启动");
+        println!("[闲置] 监控已启动");
     }
 
     /// 检查空闲会话并触发主动消息
@@ -377,10 +380,7 @@ impl MessageScheduler {
             let activities_guard = activities.read().await;
             let db_state = app.state::<SocialDbState>();
 
-            println!(
-                "🔍 [IdleMonitor] 检查空闲会话，当前追踪 {} 个会话",
-                activities_guard.len()
-            );
+            println!("[Idle] Checking {} sessions", activities_guard.len());
 
             for (session_id, activity) in activities_guard.iter() {
                 let session_id = *session_id;
@@ -452,7 +452,7 @@ impl MessageScheduler {
                     engine.get_proactive_parameters(&context);
 
                 println!(
-                    "📊 [IdleMonitor] 会话 {} 空闲 {}秒 (阈值: {}秒, 成功率: {:.1}%, 冷却: {}秒)",
+                    "[闲置] 会话 {} 统计: 闲置={}s (阈值={}s), 成功率={:.1}%, 冷却={}s",
                     session_id,
                     idle_duration.as_secs(),
                     idle_threshold,
@@ -475,7 +475,7 @@ impl MessageScheduler {
 
                         let roll = rng.gen::<f32>();
                         println!(
-                            "🎲 [IdleMonitor] 会话 {} 随机判定: {:.3} < {:.3} = {}",
+                            "[闲置] 会话 {} 投骰子: {:.3} < {:.3} = {}",
                             session_id,
                             roll,
                             success_rate,
@@ -485,10 +485,10 @@ impl MessageScheduler {
                             sessions_to_trigger.push((session_id, context.contact_id, context));
                         }
                     } else {
-                        println!("❄️ [IdleMonitor] 会话 {} 仍在冷却中", session_id);
+                        println!("[闲置] 会话 {} 冷却中", session_id);
                     }
                 } else {
-                    println!("⏱️ [IdleMonitor] 会话 {} 未达到空闲阈值", session_id);
+                    println!("[闲置] 会话 {} 不够闲置", session_id);
                 }
             }
         }
@@ -497,7 +497,7 @@ impl MessageScheduler {
         for (session_id, _contact_id, context) in sessions_to_trigger {
             let mut activities_guard = activities.write().await;
             if let Some(activity) = activities_guard.get_mut(&session_id) {
-                println!("💬 会话 {} 触发动态主动消息 (Fetching AI...)", session_id);
+                println!("[闲置] 会话 {} 触发主动消息", session_id);
                 activity.last_proactive = Some(now);
 
                 // 获取 AI 响应并执行行为链
@@ -656,7 +656,7 @@ impl Drop for MessageScheduler {
     fn drop(&mut self) {
         // 停止 IdleMonitor 后台任务
         self.stop_idle_monitor();
-        println!("🛑 MessageScheduler 已销毁");
+        println!("[调度器] 已丢弃");
     }
 }
 
