@@ -1,11 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { invoke, convertFileSrc, Channel } from '@tauri-apps/api/core';
+import { resolveResource } from '@tauri-apps/api/path';
 import { listen, emit as tauriEmit } from '@tauri-apps/api/event';
 import { useChatStore } from '../../stores/chat';
 import { useConfigStore } from '../../stores/config';
 import * as PIXI from 'pixi.js';
+import ModelDownloadProgress from '../common/ModelDownloadProgress.vue';
 import { Live2DModel, config } from 'pixi-live2d-display';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 // 🎨 引入极简模式专属样式表 (你可以修改 assets/css/minimalist.css)
 import '../../assets/css/minimalist.css';
@@ -46,7 +49,14 @@ const inputText = ref('');
 const inputRef = ref(null);
 const isSending = ref(false);
 const isRecording = ref(false);
+
 const mediaRecorder = ref(null);
+
+// ✨ ASR 模型下载状态
+const isDownloadingModel = ref(false);
+const downloadProgress = ref(0);
+const downloadStatusText = ref('正在准备下载 AI 模型...');
+const downloadDetail = ref(''); // e.g. "15.2 MB / 200.5 MB"
 const audioChunks = ref([]);
 
 // 字幕相关状态
@@ -340,10 +350,19 @@ const initLive2D = async () => {
     app.ticker.maxFPS = 240;
     PIXI.Ticker.shared.maxFPS = 240;
 
-    const modelUrl = '/live2d/alice/alice_model3.json';
-    console.log('[系统] 加载 Live2D 模型...', modelUrl);
+    // 🚀 [手术级修复] 从资源路径加载模型，并手动纠正 URL 编码以支持相对路径解析
+    const resourcePath = await resolveResource('resources/live2d/alice/alice_model3.json');
+    // convertFileSrc 会编码斜杠，我们在这里手动解码斜杠和冒号，
+    // 以便 global-shim 里的 new URL() 能识别目录层级，但又不破坏 Tauri 的 asset 协议。
+    const modelUrl = convertFileSrc(resourcePath)
+        .replace(/%2F/g, '/')
+        .replace(/%5C/g, '/')
+        .replace(/%3A/g, ':');
+    
+    console.log('[系统] 加载 Live2D 模型 (Surgical)...', modelUrl);
     const model = await Live2DModel.from(modelUrl, {
-      autoInteract: true,
+      autoHitTest: true,
+      autoFocus: true,
       idleMotionGroup: 'Idle'
     });
 
@@ -656,27 +675,86 @@ const handleSend = async () => {
 // 语音录制逻辑
 const startRecording = async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioChunks.value = [];
+    // ❓ 0. 预检查 & 确认下载
+    try {
+        const status = await invoke('check_asr_model_status');
+        
+        if (status === 'READY') {
+             // 2. 正式开始录音
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunks.value = [];
+            
+            mediaRecorder.value = new MediaRecorder(stream);
+            mediaRecorder.value.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.value.push(event.data);
+            }
+            };
+            
+            mediaRecorder.value.onstop = async () => {
+            const audioBlob = new Blob(audioChunks.value, { type: 'audio/webm' });
+            await processAudio(audioBlob);
+            stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorder.value.start();
+            isRecording.value = true;
+            console.log('[系统] 开始录音');
+            return;
+        }
+
+        // 如果未就绪，则提示下载
+        const confirmed = await ask(
+            '首次使用语音功能需要下载 AI 模型组件（约 200MB）。\n\n点击“确定”开始下载，下载过程中请保持网络连接。', 
+            { title: '下载确认', kind: 'info', okLabel: '立即下载', cancelLabel: '暂不下载' }
+        );
+        
+        if (!confirmed) return;
+
+    } catch (e) {
+        console.error("Failed to check model status:", e);
+        return;
+    }
+
+    // 1. 检查 ASR 模型是否存在，如果不存在则触发下载
+    isDownloadingModel.value = true;
+    downloadProgress.value = 0;
+    downloadStatusText.value = '正在检查 AI 组件完整性...';
+
+    // 监听进度事件
+    const unlisten = await listen('ASR_DOWNLOAD_PROGRESS', (event) => {
+        const { percent, file, total, downloaded } = event.payload;
+        downloadProgress.value = Math.round(percent);
+        downloadStatusText.value = `正在下载 ${file}...`;
+        
+        // 格式化大小
+        const toMB = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+        if (total > 0) {
+            downloadDetail.value = `${toMB(downloaded)} MB / ${toMB(total)} MB`;
+        } else {
+             downloadDetail.value = `${toMB(downloaded)} MB / ???`;
+        }
+    });
+
+    try {
+        await invoke('download_asr_model');
+    } catch (e) {
+        console.error('Model download failed:', e);
+        downloadStatusText.value = `下载失败: ${e}`;
+        // 停留 3 秒让用户看清错误
+        await new Promise(r => setTimeout(r, 3000));
+        isDownloadingModel.value = false;
+        unlisten();
+        return; 
+    }
+
+    unlisten();
+    isDownloadingModel.value = false;
     
-    mediaRecorder.value = new MediaRecorder(stream);
-    mediaRecorder.value.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        audioChunks.value.push(event.data);
-      }
-    };
-    
-    mediaRecorder.value.onstop = async () => {
-      const audioBlob = new Blob(audioChunks.value, { type: 'audio/webm' });
-      await processAudio(audioBlob);
-      stream.getTracks().forEach(track => track.stop());
-    };
-    
-    mediaRecorder.value.start();
-    isRecording.value = true;
-    console.log('[系统] 开始录音');
+    // 🚀 2. 下载完成，提示用户重新点击 (不再自动开始录音)
+    await message("AI 模型组件已下载完成，请再次点击麦克风开始说话。", { title: "下载成功", kind: 'info' });
   } catch (e) {
-    console.error('录音失败:', e);
+    console.error('录音启动失败:', e);
   }
 };
 
@@ -1186,6 +1264,14 @@ const base64ToBlob = (base64, type) => {
 
 <template>
   <div v-if="visible" class="minimalist-root">
+    <!-- ✨ 模型下载进度遮罩 (使用通用组件) -->
+    <ModelDownloadProgress 
+        :visible="isDownloadingModel"
+        :progress="downloadProgress"
+        :status-text="downloadStatusText"
+        :detail-text="downloadDetail"
+    />
+
     <!-- Live2D Canvas 层 -->
     <canvas id="live2d-canvas" class="live2d-canvas"></canvas>
     

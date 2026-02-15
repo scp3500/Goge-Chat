@@ -4,13 +4,15 @@ import { storeToRefs } from 'pinia';
 import { useChatStore } from "../../stores/chat";
 import { STOP_SVG, SEND_SVG, PAPERCLIP_SVG, BRAIN_SVG, GLOBE_SVG, CLOSE_SVG, ATTACHMENT_SVG, AT_SVG, VOICE_SVG } from '../../constants/icons';
 import { AudioRecorder } from '../../utils/audioRecorder';
-import { message } from '@tauri-apps/plugin-dialog';
+import { message, ask } from '@tauri-apps/plugin-dialog';
 import ModelSelector from './ModelSelector.vue';
 import { useUIStore } from '../../stores/ui';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore } from '../../stores/settings';
 import { useConfigStore } from '../../stores/config';
+import ModelDownloadProgress from '../common/ModelDownloadProgress.vue';
 import SystemPromptWidget from './SystemPromptWidget.vue';
 
 
@@ -32,19 +34,85 @@ const isRecording = ref(false);
 const isTranscribing = ref(false);
 const recorder = new AudioRecorder();
 
+// ✨ ASR 模型下载状态
+const isDownloadingModel = ref(false);
+const downloadProgress = ref(0);
+const downloadStatusText = ref('正在准备下载 AI 模型...');
+const downloadDetail = ref(''); // e.g. "15.2 MB / 200.5 MB"
+
 // --- Explicit Start/Stop Methods ---
 const startRecording = async () => {
     if (isRecording.value || isTranscribing.value) return;
     
-    console.log("[Voice] Starting recorder...");
+    // ❓ 0. 预检查 & 确认下载
     try {
-      await recorder.start();
-      isRecording.value = true;
-      console.log("[Voice] Recording started.");
+        const status = await invoke('check_asr_model_status');
+        console.log("[Voice] Model Status:", status);
+        
+        if (status === 'READY') {
+            // 如果已就绪，直接启动录音 (不走下面的下载流程)
+            console.log("[Voice] Model ready, starting recorder directly...");
+            await recorder.start();
+            isRecording.value = true;
+            console.log("[Voice] Recording started.");
+            return;
+        }
+
+        // 如果未就绪 (status != 'READY')，则提示下载
+        const confirmed = await ask(
+            '首次使用语音功能需要下载 AI 模型组件（约 200MB）。\n\n点击“确定”开始下载，下载过程中请保持网络连接。', 
+            { title: '下载确认', kind: 'info', okLabel: '立即下载', cancelLabel: '暂不下载' }
+        );
+        
+        if (!confirmed) return;
+
     } catch (e) {
-      console.error("[Voice] Failed to start recording:", e);
-      await message("无法开启录音，请检查：\n1. 浏览器是否允许麦克风访问\n2. 设备是否有录音权限\n3. 麦克风连接是否正常", { title: "录音启动失败", type: "error" });
+        console.error("Failed to check model status:", e);
+        // 如果检查失败，保守起见不自动开始，让用户看见错误或者重试
+        return;
     }
+
+    // 🚀 1. 检查 ASR 模型是否存在，如果不存在则触发下载
+    console.log('[DEBUG] Setting isDownloadingModel = TRUE');
+    isDownloadingModel.value = true;
+    downloadProgress.value = 0;
+    downloadStatusText.value = '正在检查 AI 组件完整性...';
+
+    // 监听进度事件
+    const unlisten = await listen('ASR_DOWNLOAD_PROGRESS', (event) => {
+        console.log('[DEBUG] Progress Event:', event.payload);
+        const { percent, file, total, downloaded } = event.payload;
+        downloadProgress.value = Math.round(percent);
+        downloadStatusText.value = `正在下载 ${file}...`;
+        
+        // 格式化大小
+        const toMB = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+        if (total > 0) {
+            downloadDetail.value = `${toMB(downloaded)} MB / ${toMB(total)} MB`;
+        } else {
+             downloadDetail.value = `${toMB(downloaded)} MB / ???`;
+        }
+    });
+
+    try {
+        console.log('[DEBUG] Invoking download_asr_model...');
+        await invoke('download_asr_model');
+        console.log('[DEBUG] download_asr_model completed successfully.');
+    } catch (e) {
+        console.error('[DEBUG] Model download failed:', e);
+        downloadStatusText.value = `下载失败: ${e}`;
+        await new Promise(r => setTimeout(r, 3000));
+        isDownloadingModel.value = false;
+        unlisten();
+        return; 
+    }
+
+    unlisten();
+    console.log('[DEBUG] Setting isDownloadingModel = FALSE');
+    isDownloadingModel.value = false;
+    
+    // 🚀 2. 下载完成，提示用户重新点击 (不再自动开始录音)
+    await message("AI 模型组件已下载完成，请再次点击麦克风开始说话。", { title: "下载成功", kind: 'info' });
 };
 
 const stopRecording = async () => {
@@ -550,6 +618,12 @@ onMounted(() => {
 
     
   </div>
+  <ModelDownloadProgress 
+    :visible="isDownloadingModel"
+    :progress="downloadProgress"
+    :status-text="downloadStatusText"
+    :detail-text="downloadDetail"
+  />
 </template>
 
 

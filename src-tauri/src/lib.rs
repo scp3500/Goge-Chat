@@ -265,6 +265,8 @@ pub fn run() {
             commands::file_cmd::upload_user_avatar,
             // 社交数据库指令
             commands::asr_cmd::transcribe_pcm,
+            commands::asr_cmd::download_asr_model,
+            commands::asr_cmd::check_asr_model_status,
             commands::tts_cmd::generate_tts,
             commands::tts_cmd::next_tts_request_id,
             social_db::get_social_profile,
