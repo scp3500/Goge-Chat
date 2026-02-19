@@ -199,23 +199,92 @@ pub fn run() {
                 commands::config_cmd::load_config_internal(app_handle).await
             })?;
             let config_state = commands::config_cmd::ConfigState(Arc::new(
-                tokio::sync::RwLock::new(initial_config),
+                tokio::sync::RwLock::new(initial_config.clone()),
             ));
             app.manage(config_state);
 
-            // --- HTTP Client Setup ---
-            app.manage(reqwest::Client::new());
+            // --- ⚡ HTTP Client Setup (高性能配置) ---
+            // HTTP/3 客户端需要在 Tokio 运行时中构建
+            let http_client = tauri::async_runtime::block_on(async {
+                reqwest::Client::builder()
+                    // 🚀 连接池优化：增加每个 Host 的最大空闲连接数
+                    .pool_max_idle_per_host(20)
+                    .pool_idle_timeout(std::time::Duration::from_secs(120))
+                    .tcp_keepalive(std::time::Duration::from_secs(60))
+                    .tcp_nodelay(true)
+                    // 🚀 高性能 DNS 与现代协议安全
+                    .hickory_dns(true)
+                    // 🛡️ 兼容性调优：最低支持 TLS 1.2，确保 SiliconFlow 等平台可用
+                    .min_tls_version(reqwest::tls::Version::TLS_1_2)
+                    .connect_timeout(std::time::Duration::from_secs(10))
+                    .timeout(std::time::Duration::from_secs(60))
+                    .brotli(true)
+                    .gzip(true)
+                    .build()
+                    .expect("Failed to build HTTP client")
+            });
+
+            app.manage(http_client.clone());
+
+            // --- 🚀 启动项优化：DNS 预解析 (从配置动态获取) ---
+            let prefetch_client = http_client.clone();
+            let mut domains = Vec::new();
+            if let Some(providers) = initial_config.providers.as_array() {
+                for provider in providers {
+                    // 只预热启用的 Provider
+                    if provider["enabled"].as_bool().unwrap_or(false) {
+                        if let Some(base_url) = provider["baseUrl"].as_str() {
+                            if !base_url.is_empty() {
+                                // 构造一个简单的探测 URL (与指令中的预热逻辑一致)
+                                let url = if base_url.contains("generativelanguage.googleapis.com")
+                                {
+                                    format!("{}/v1beta/models", base_url.trim_end_matches('/'))
+                                } else {
+                                    let base = base_url.trim_end_matches('/');
+                                    if base.ends_with("/v1") {
+                                        format!("{}/models", base)
+                                    } else {
+                                        format!("{}/v1/models", base)
+                                    }
+                                };
+                                domains.push(url);
+                            }
+                        }
+                    }
+                }
+            }
+
+            tauri::async_runtime::spawn(async move {
+                for url in domains {
+                    let _ = prefetch_client
+                        .get(&url)
+                        .timeout(std::time::Duration::from_secs(2))
+                        .send()
+                        .await;
+                }
+                println!("🌐 [DNS] Configured AI domains pre-resolved and cached.");
+            });
 
             // --- Alice Memory Engine Setup (Lazy Loaded) ---
-            let memory_state = memory::processor::MemoryState::new(app_handle)?;
-            // 确保表存在 (1536 是 BGE-Small 的维度，如果是其它模型请调整)
-            // 实际上 bge-small-zh-v1.5 的维度是 512
-            let memory_state = Arc::new(tokio::sync::RwLock::new(memory_state));
+            let raw_memory_state = memory::processor::MemoryState::new(app_handle)?;
+            let memory_state = Arc::new(tokio::sync::RwLock::new(raw_memory_state));
+
+            // 🚀 [启动加速]：预加载 Embedding 模型 (如果启用 RAG)
+            if initial_config.enable_rag {
+                let memory_state_preload = memory_state.clone();
+                tauri::async_runtime::spawn(async move {
+                    println!("🧠 [Memory] Pre-loading embedding engine in background...");
+                    let _ = memory_state_preload.read().await.get_engine().await;
+                });
+            }
+
+            // 确保表存在 (维度 512)
             let ms_clone = memory_state.clone();
             tauri::async_runtime::block_on(async move {
                 let ms = ms_clone.read().await;
                 let _ = ms.db.ensure_table(512).await;
             });
+
             app.manage(memory_state);
 
             // --- Immersive Mode Scheduler Setup ---
@@ -232,6 +301,7 @@ pub fn run() {
             // AI 交互
             commands::ai::ask_ai,
             commands::ai::discover_models_raw,
+            commands::ai::prewarm_connection,
             stop_ai_generation,
             reset_ai_generation,
             set_window_ignore_cursor_events,

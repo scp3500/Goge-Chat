@@ -583,12 +583,35 @@ const handleKeyDown = (e) => {
   }
 };
 
+// 🚀 [连接预热] 只要用户开始输入，就悄悄预热连接
+let prewarmTimer = null;
+watch(inputText, (newVal) => {
+  if (newVal.trim().length >= 1) {
+    if (prewarmTimer) clearTimeout(prewarmTimer);
+    prewarmTimer = setTimeout(async () => {
+      try {
+        const config = configStore.settings;
+        const providerId = config.defaultProvider_id;
+        const provider = config.providers?.find(p => p.id === providerId);
+        if (provider?.baseUrl) {
+          invoke('prewarm_connection', { baseUrl: provider.baseUrl });
+        }
+      } catch (e) {}
+    }, 300);
+  }
+});
+
 const handleSend = async () => {
   const text = inputText.value.trim();
   if (!text || isSending.value) return;
 
-  // 🚀 [优化] 预热音频引擎 (极速模式)
+  // 🚀 [优化] 预热音频引擎 + 网络
   initAudioContext();
+  try {
+     const config = configStore.settings;
+     const provider = config.providers?.find(p => p.id === config.defaultProviderId);
+     if (provider?.baseUrl) invoke('prewarm_connection', { baseUrl: provider.baseUrl });
+  } catch(e) {}
 
   // 🚀 [性能监测] 记录开始发送时间
   perfMetrics.value.sendTime = performance.now();

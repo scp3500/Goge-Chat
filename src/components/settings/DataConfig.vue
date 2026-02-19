@@ -266,140 +266,251 @@ const getModeLabel = (mode) => {
 
 <template>
     <div class="data-config">
-        <!-- Header Controls -->
-        <div class="memory-header">
-            <div class="header-main">
-                <div class="title-area">
-                    <h3>🧠 Antigravity 记忆库</h3>
-                    <p class="subtitle">管理 AI 提取的长期事实和个人偏好</p>
-                </div>
-                <div class="header-actions">
-                    <button class="btn-secondary" @click="optimizeDatabase" :disabled="isLoading" title="合并磁盘冗余文件">
-                        优化清理
-                    </button>
-                    <button class="btn-secondary" @click="showAddForm = !showAddForm">
-                        {{ showAddForm ? '取消添加' : '手动新增' }}
-                    </button>
-                    <button class="btn-danger-outline" @click="clearAll">清空全部</button>
+        <!-- RAG Global Switch Section -->
+        <div class="rag-toggle-card" :class="{ 'is-active': configStore.settings.enableRag }">
+            <div class="toggle-info">
+                <div class="toggle-icon">🧠</div>
+                <div class="toggle-text">
+                    <h4>Antigravity 记忆引擎 (RAG)</h4>
+                    <p>启用后，AI 将能够从对话中提取关键事实并在未来自动找回这些上下文。</p>
                 </div>
             </div>
-
-            <!-- Add Form Panel -->
-            <Transition name="fade-slide">
-                <div v-if="showAddForm" class="add-panel">
-                    <textarea v-model="addForm.content" placeholder="输入你想让 AI 记住的事实..."></textarea>
-                    <div class="form-row">
-                        <div class="input-group">
-                            <label>模式</label>
-                            <select v-model="addForm.mode">
-                                <option value="Standard">普通模式 (通用)</option>
-                                <option value="Social">社交模式 (角色)</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>归属角色</label>
-                            <!-- 标准模式下固定为 global -->
-                            <input v-if="addForm.mode === 'Standard'" value="全局 (global)" disabled />
-                            
-                            <!-- 社交模式下使用下拉框 -->
-                            <select v-else v-model="addForm.role_id">
-                                <option value="global">全局共同记忆 (global)</option>
-                                <option v-for="c in socialContacts" :key="c.id" :value="c.id">
-                                    {{ c.remark ? `${c.name} [${c.remark}]` : c.name }}
-                                </option>
-                            </select>
-                        </div>
-                        <button class="btn-primary" @click="handleAdd" :disabled="!addForm.content.trim()">提交记忆</button>
-                    </div>
-                </div>
-            </Transition>
-
-            <!-- Filters Bar -->
-            <div class="filters-bar">
-                <div class="filter-group">
-                    <span class="filter-label">过滤显示:</span>
-                    <div class="segmented-control">
-                        <button :class="{ active: filterMode === 'all' }" @click="filterMode = 'all'">全部</button>
-                        <button :class="{ active: filterMode === 'Standard' }" @click="filterMode = 'Standard'">普通</button>
-                        <button :class="{ active: filterMode === 'Social' }" @click="filterMode = 'Social'">社交</button>
-                    </div>
-                </div>
-                
-                <div class="role-filter">
-                    <select v-model="filterRole">
-                        <option v-for="opt in roleOptions" :key="opt.id" :value="opt.id">
-                            {{ opt.label }}
-                        </option>
-                    </select>
-                </div>
-
-                <button class="icon-btn-refresh" @click="loadMemories" :disabled="isLoading" title="刷新数据">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" :class="{ 'spinning': isLoading }">
-                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                </button>
-            </div>
+            <label class="switch">
+                <input type="checkbox" :checked="configStore.settings.enableRag" @change="configStore.updateConfig({ enableRag: $event.target.checked })">
+                <span class="slider round"></span>
+            </label>
         </div>
 
-        <!-- Memory List Content -->
-        <div class="memory-container">
-            <div v-if="isLoading && memories.length === 0" class="loading-state">
-                <div class="loader"></div>
-                <span>能量场同步中...</span>
-            </div>
+        <!-- ENABLED CONTENT -->
+        <template v-if="configStore.settings.enableRag">
+            <!-- Header Controls -->
+            <div class="memory-header">
+                <div class="header-main">
+                    <div class="title-area">
+                        <h3>脑回路连接状态</h3>
+                        <p class="subtitle">管理 AI 已持有的长期记忆切片</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn-secondary" @click="optimizeDatabase" :disabled="isLoading" title="合并磁盘冗余文件">
+                            优化清理
+                        </button>
+                        <button class="btn-secondary" @click="showAddForm = !showAddForm">
+                            {{ showAddForm ? '取消添加' : '手动新增' }}
+                        </button>
+                        <button class="btn-danger-outline" @click="clearAll">清空全部</button>
+                    </div>
+                </div>
 
-            <div v-else-if="filteredMemories.length === 0" class="empty-placeholder">
-                <div class="empty-icon">📂</div>
-                <p>暂时没有相关记忆，快去聊天吧！</p>
-            </div>
-
-            <div v-else class="memory-grid">
-                <div v-for="item in filteredMemories" :key="item.id" class="memory-card" :class="{ 'is-editing': editingId === item.id }">
-                    <!-- NORMAL MODE -->
-                    <template v-if="editingId !== item.id">
-                        <div class="card-header">
-                            <div class="badges">
-                                <span class="badge mode" :class="item.mode.toLowerCase()">{{ getModeLabel(item.mode) }}</span>
-                                <span class="badge role">{{ getRoleLabel(item.role_id) }}</span>
-                            </div>
-                            <div class="card-actions">
-                                <button class="action-btn" @click="handleEdit(item)" title="编辑">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                                </button>
-                                <button class="action-btn delete" @click="deleteMemory(item)" title="删除">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            {{ item.content }}
-                        </div>
-                    </template>
-
-                    <!-- EDIT MODE -->
-                    <template v-else>
-                        <div class="edit-fields">
-                            <textarea v-model="editForm.content" class="edit-textarea"></textarea>
-                            <div class="edit-meta">
-                                <select v-model="editForm.mode">
-                                    <option value="Standard">普通</option>
-                                    <option value="Social">社交</option>
+                <!-- Add Form Panel -->
+                <Transition name="fade-slide">
+                    <div v-if="showAddForm" class="add-panel">
+                        <textarea v-model="addForm.content" placeholder="输入你想让 AI 记住的事实..."></textarea>
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label>模式</label>
+                                <select v-model="addForm.mode">
+                                    <option value="Standard">普通模式 (通用)</option>
+                                    <option value="Social">社交模式 (角色)</option>
                                 </select>
-                                <input v-model="editForm.role_id" placeholder="角色ID" />
                             </div>
-                            <div class="edit-btns">
-                                <button class="btn-text" @click="cancelEdit">取消</button>
-                                <button class="btn-primary-small" @click="saveEdit">保存修改</button>
+                            <div class="input-group">
+                                <label>归属角色</label>
+                                <input v-if="addForm.mode === 'Standard'" value="全局 (global)" disabled />
+                                <select v-else v-model="addForm.role_id">
+                                    <option value="global">全局共同记忆 (global)</option>
+                                    <option v-for="c in socialContacts" :key="c.id" :value="c.id">
+                                        {{ c.remark ? `${c.name} [${c.remark}]` : c.name }}
+                                    </option>
+                                </select>
                             </div>
+                            <button class="btn-primary" @click="handleAdd" :disabled="!addForm.content.trim()">提交记忆</button>
                         </div>
-                    </template>
+                    </div>
+                </Transition>
+
+                <!-- Filters Bar -->
+                <div class="filters-bar">
+                    <div class="filter-group">
+                        <span class="filter-label">过滤显示:</span>
+                        <div class="segmented-control">
+                            <button :class="{ active: filterMode === 'all' }" @click="filterMode = 'all'">全部</button>
+                            <button :class="{ active: filterMode === 'Standard' }" @click="filterMode = 'Standard'">普通</button>
+                            <button :class="{ active: filterMode === 'Social' }" @click="filterMode = 'Social'">社交</button>
+                        </div>
+                    </div>
+                    
+                    <div class="role-filter">
+                        <select v-model="filterRole">
+                            <option v-for="opt in roleOptions" :key="opt.id" :value="opt.id">
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <button class="icon-btn-refresh" @click="loadMemories" :disabled="isLoading" title="刷新数据">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" :class="{ 'spinning': isLoading }">
+                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
+
+            <!-- Memory List Grid -->
+            <div class="memory-container">
+                <div v-if="isLoading && memories.length === 0" class="loading-state">
+                    <div class="loader"></div>
+                    <span>能量场同步中...</span>
+                </div>
+
+                <div v-else-if="filteredMemories.length === 0" class="empty-placeholder">
+                    <div class="empty-icon">📂</div>
+                    <p>暂时没有相关记忆，快去聊天吧！</p>
+                </div>
+
+                <div v-else class="memory-grid">
+                    <div v-for="item in filteredMemories" :key="item.id" class="memory-card" :class="{ 'is-editing': editingId === item.id }">
+                        <!-- NORMAL MODE -->
+                        <template v-if="editingId !== item.id">
+                            <div class="card-header">
+                                <div class="badges">
+                                    <span class="badge mode" :class="item.mode.toLowerCase()">{{ getModeLabel(item.mode) }}</span>
+                                    <span class="badge role">{{ getRoleLabel(item.role_id) }}</span>
+                                </div>
+                                <div class="card-actions">
+                                    <button class="action-btn" @click="handleEdit(item)" title="编辑">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                    </button>
+                                    <button class="action-btn delete" @click="deleteMemory(item)" title="删除">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {{ item.content }}
+                            </div>
+                        </template>
+
+                        <!-- EDIT MODE -->
+                        <template v-else>
+                            <div class="edit-fields">
+                                <textarea v-model="editForm.content" class="edit-textarea"></textarea>
+                                <div class="edit-meta">
+                                    <select v-model="editForm.mode">
+                                        <option value="Standard">普通</option>
+                                        <option value="Social">社交</option>
+                                    </select>
+                                    <input v-model="editForm.role_id" placeholder="角色ID" />
+                                </div>
+                                <div class="edit-btns">
+                                    <button class="btn-text" @click="cancelEdit">取消</button>
+                                    <button class="btn-primary-small" @click="saveEdit">保存修改</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- DISABLED ONBOARDING -->
+        <div v-else class="rag-onboarding-card">
+            <div class="onboarding-icon">🔮</div>
+            <h3>记忆引擎尚未开启</h3>
+            <p>Antigravity 能够根据上下文进行自我进化。开启记忆功能后：</p>
+            <ul class="benefits-list">
+                <li><span>✨</span> <b>个性化</b>：AI 会记得你的日常习惯和工作流</li>
+                <li><span>🌍</span> <b>连续性</b>：跨对话的知识点会自动连接</li>
+                <li><span>🔒</span> <b>隐私可控</b>：数据存储在本地，随时可查阅或清空</li>
+            </ul>
+            <button class="btn-primary-ghost" @click="configStore.updateConfig({ enableRag: true })">
+                立即开启记忆引擎
+            </button>
         </div>
     </div>
 </template>
 
 <style scoped>
+/* RAG Toggle Card */
+.rag-toggle-card {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+.rag-toggle-card.is-active {
+    border-color: var(--color-primary);
+    background: var(--bg-chat-island);
+    box-shadow: 0 4px 20px rgba(var(--color-primary-rgb), 0.1);
+}
+
+.toggle-info { display: flex; gap: 16px; align-items: center; }
+.toggle-icon { font-size: 28px; }
+.toggle-text h4 { margin: 0; color: var(--text-color-white); font-size: 16px; }
+.toggle-text p { margin: 4px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.4; max-width: 400px; }
+
+/* Switch Toggle Styling */
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--glass-white-10); transition: .4s; border-radius: 34px; border: 1px solid var(--border-glass); }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+input:checked + .slider { background-color: var(--color-primary); border-color: var(--color-primary); }
+input:focus + .slider { box-shadow: 0 0 1px var(--color-primary); }
+input:checked + .slider:before { transform: translateX(20px); }
+
+/* Onboarding Card */
+.rag-onboarding-card {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 60px 40px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+.onboarding-icon { font-size: 50px; margin-bottom: 10px; }
+.rag-onboarding-card h3 { color: var(--text-color-white); font-size: 20px; margin: 0; }
+.rag-onboarding-card p { color: var(--text-secondary); font-size: 14px; margin: 0; }
+
+.benefits-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: left;
+}
+.benefits-list li {
+    display: flex;
+    gap: 12px;
+    color: var(--text-color);
+    font-size: 14px;
+}
+.benefits-list b { color: var(--color-primary-light); }
+
+.btn-primary-ghost {
+    background: rgba(var(--color-primary-rgb), 0.1);
+    color: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    padding: 12px 30px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-primary-ghost:hover {
+    background: var(--color-primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
 .data-config {
     display: flex;
     flex-direction: column;

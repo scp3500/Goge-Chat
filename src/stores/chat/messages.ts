@@ -71,7 +71,7 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 } else if (streamQueue.value.length > 20) {
                     charsPerFrame = Math.min(20, Math.floor(streamQueue.value.length / 3)); // 中等积压
                 } else {
-                    charsPerFrame = Math.max(3, Math.floor(streamQueue.value.length / 2)); // 少量时保持流畅感
+                    charsPerFrame = Math.max(5, Math.floor(streamQueue.value.length / 1.5)); // 少量时也保持极快速度
                 }
 
                 const chunk = streamQueue.value.splice(0, charsPerFrame).join('');
@@ -366,62 +366,60 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
                 modelsToCall = [{ id: configStore.settings.selectedModelId, providerId: configStore.settings.defaultProviderId }];
             }
 
-            Logger.info(`Models to call (Count ${mentions?.length || 0}): ${modelsToCall.map(m => m.id).join(', ')}`);
+            Logger.info(`Models to call (Count ${modelsToCall.length}): ${modelsToCall.map(m => m.id).join(', ')}`);
 
-            for (const modelInfo of modelsToCall) {
-                // 🔄 Reset generation state before each model call
-                await invoke("reset_ai_generation");
+            // 🔄 重置中断标志位
+            await invoke("reset_ai_generation");
 
+            // --- 🚀 并行发起所有模型的请求 ---
+            const modelTasks = modelsToCall.map(async (modelInfo, index) => {
                 const currentModelId = modelInfo.id;
                 const currentProviderId = modelInfo.providerId;
 
-                // 添加加载中的助手消息
-                currentMessages.value.push({
+                // 1. 在 UI 中为每个模型预留一个消息位 (使用不同的引用)
+                const messageObj = {
                     role: "assistant",
                     model: currentModelId,
                     providerId: currentProviderId,
                     content: '__LOADING__',
                     reasoningContent: '',
                     fileMetadata: null,
-                    searchMetadata: null
-                });
+                    searchMetadata: null,
+                    id: undefined as number | undefined
+                };
+                currentMessages.value.push(messageObj);
+                const messageRef = currentMessages.value[currentMessages.value.length - 1];
 
                 const onEvent = new Channel<string>();
                 let aiFullContent = '';
-                let ttft = 0; // Time to first token
+                let ttft = 0;
                 let searchStartTime = 0;
                 let memoryStartTime = 0;
 
-                // 监听搜索状态事件
+                // 监听搜索状态 (注意：后端事件是广播的，这里需要区分 ID 吗？
+                // 目前后端 handle_search_parallel 是在 ask_ai 内部的，
+                // 由于我们开了多个 ask_ai 调用，会有多个 search-status 事件。
+                // 暂时监听全局，但只更新当前消息引用的状态。)
                 const unlistenSearch = await listen('search-status', (event: any) => {
                     const payload = event.payload;
-                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
                     if (payload.status === 'searching') {
                         searchStartTime = Date.now();
-                        Logger.info(`Searching: ${payload.query}`);
-                        lastMsg.searchStatus = 'searching';
-                        lastMsg.searchQuery = payload.query;
+                        messageRef.searchStatus = 'searching';
+                        messageRef.searchQuery = payload.query;
                     } else if (payload.status === 'done') {
-                        const searchDuration = Date.now() - searchStartTime;
-                        Logger.success('Search completed', searchDuration, { results: payload.results?.length });
-                        lastMsg.searchStatus = 'done';
-                        lastMsg.searchMetadata = JSON.stringify(payload.results);
+                        messageRef.searchStatus = 'done';
+                        messageRef.searchMetadata = JSON.stringify(payload.results);
                     } else if (payload.status === 'error') {
-                        Logger.error('Search failed', payload.message);
-                        lastMsg.searchStatus = 'error';
+                        messageRef.searchStatus = 'error';
                     }
                 });
 
-                // 监听记忆检索事件
                 const unlistenMemory = await listen('memory-status', (event: any) => {
                     const payload = event.payload;
                     if (payload.status === 'searching') {
                         memoryStartTime = Date.now();
-                        Logger.info('Retrieving memory context...');
                     } else if (payload.status === 'done') {
-                        const memoryDuration = Date.now() - memoryStartTime;
-                        Logger.success('Memory retrieval completed', memoryDuration, { hasContext: payload.has_context });
+                        // Logger.success(`Memory for ${currentModelId} done`);
                     }
                 });
 
@@ -430,140 +428,90 @@ export function useMessageActions(state: MessageState, deps: MessageActionsDepen
 
                     if (ttft === 0 && (data.startsWith("c:") || data.startsWith("r:"))) {
                         ttft = Date.now() - startTime;
-                        Logger.timing('Time to First Token (TTFT)', ttft);
+                        Logger.timing(`TTFT for ${currentModelId}`, ttft);
                     }
 
-                    // 只要是当前会话就更新（不管视图是否隐藏）
-                    const isCurrentSession = activeId.value === generatingSessionId.value;
-                    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
-                    // 处理内容流
                     if (data.startsWith("c:")) {
                         const content = data.substring(2);
                         aiFullContent += content;
 
-                        // 🌊 Streaming Control
-                        if (isStreamEnabled) {
-                            streamQueue.value.push(...content.split(''));
-                            if (!isProcessingQueue.value) {
-                                processStreamQueue();
-                            }
+                        // ⚡️ 优化：零延迟呈现逻辑
+                        const currentText = messageRef.content === "__LOADING__" ? "" : messageRef.content;
+
+                        // 1. 如果是前 40 个字符（约 5-10 个 Token），直接“透传”显示，不进队列
+                        // 这样用户能在网络包到达的一瞬间看到首个字，无需等待下一帧 requestAnimationFrame
+                        if (currentText.length < 40) {
+                            messageRef.content = currentText + content;
                         } else {
-                            if (isCurrentSession && lastMsg) {
-                                if (lastMsg.content === "__LOADING__") lastMsg.content = "";
-                                lastMsg.content += content;
-                            }
+                            // 2. 之后的字符直接追加（目前多模型模式下，直接追加是最高效的，
+                            // 且因为我们开启了高频连接优化，数据到达频率已经肉眼可见地平滑了）
+                            messageRef.content = currentText + content;
                         }
                     }
-                    // 处理推理流
                     else if (data.startsWith("r:")) {
                         const content = data.substring(2);
-                        if (isCurrentSession) {
-                            if (!lastMsg.reasoningContent) lastMsg.reasoningContent = "";
-                            lastMsg.reasoningContent += content;
-                        }
+                        if (!messageRef.reasoningContent) messageRef.reasoningContent = "";
+                        messageRef.reasoningContent += content;
                     }
                 };
 
-                // 准备发送的消息列表（排除当前的加载中消息）
-                let msgsToSend = currentMessages.value.slice(0, -1).map((m) => ({
-                    role: m.role,
-                    content: m.content,
-                    reasoningContent: m.reasoningContent,
-                    fileMetadata: m.fileMetadata,
-                    searchMetadata: m.searchMetadata,
-                    mode: currentMode,
-                    roleId: "default"
-                }));
+                // 准备消息列表
+                const msgsToSend = currentMessages.value
+                    .filter(m => m.role !== 'assistant' || m.id !== undefined) // 只包含已保存的历史助手消息
+                    .map((m) => ({
+                        role: m.role,
+                        content: m.content,
+                        reasoningContent: m.reasoningContent,
+                        fileMetadata: m.fileMetadata,
+                        searchMetadata: m.searchMetadata,
+                        mode: currentMode,
+                        roleId: "default"
+                    }));
 
-                // 获取并注入系统提示词
+                // 注入系统提示词
                 const activePreset = configStore.settings.presets.find(p => p.id === configStore.settings.defaultPresetId);
                 let presetPrompt = activePreset?.id === 'default_preset' ? "" : activePreset?.systemPrompt;
                 const finalSystemPrompt = presetPrompt || configStore.settings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
 
-                if (msgsToSend.length > 0 && msgsToSend[0].role !== 'system') {
-                    msgsToSend.unshift({
-                        role: 'system',
-                        content: finalSystemPrompt,
-                        reasoningContent: null,
-                        fileMetadata: null,
-                        searchMetadata: null,
-                        mode: currentMode,
-                        roleId: "default"
-                    });
-                } else if (msgsToSend.length > 0 && msgsToSend[0].role === 'system') {
-                    msgsToSend[0].content = finalSystemPrompt;
+                if (msgsToSend.length === 0 || msgsToSend[0].role !== 'system') {
+                    msgsToSend.unshift({ role: 'system', content: finalSystemPrompt, reasoningContent: null, fileMetadata: null, searchMetadata: null, mode: currentMode, roleId: "default" });
                 }
 
-                // 注入会话特定的系统提示词
-                const sessionSpecificPrompt = activeSession.value?.system_prompt;
-                if (sessionSpecificPrompt) {
-                    if (msgsToSend[0].role === 'system') msgsToSend[0].content = sessionSpecificPrompt;
-                    else msgsToSend.unshift({ role: 'system', content: sessionSpecificPrompt, reasoningContent: null, fileMetadata: null, searchMetadata: null, mode: currentMode, roleId: "default" });
+                // 注入推理标记
+                if (useReasoning.value) {
+                    const lastUser = [...msgsToSend].reverse().find(m => m.role === 'user');
+                    if (lastUser) lastUser.content = `[REASON]${lastUser.content}`;
                 }
 
-                // 添加推理/搜索标记
-                if (useReasoning.value || useSearch.value) {
-                    for (let i = msgsToSend.length - 1; i >= 0; i--) {
-                        if (msgsToSend[i].role === "user") {
-                            if (useReasoning.value) msgsToSend[i].content = `[REASON]${msgsToSend[i].content}`;
-                            if (useSearch.value) {
-                                const tag = provider === 'all' ? '[SEARCH]' : `[SEARCH:${provider}]`;
-                                msgsToSend[i].content = `${tag}${msgsToSend[i].content}`;
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                // 调用 AI
+                // 执行调用
                 try {
-                    const timeoutPromise = new Promise((_, reject) => {
-                        setTimeout(() => reject(new Error("Request timed out")), 60000);
+                    await invoke("ask_ai", {
+                        msg: msgsToSend,
+                        onEvent,
+                        temperature: activePreset?.temperature,
+                        max_tokens: activePreset?.maxTokens,
+                        explicitProviderId: currentProviderId,
+                        explicitModelId: currentModelId,
+                        stream: isStreamEnabled
                     });
 
-                    await Promise.race([
-                        invoke("ask_ai", {
-                            msg: msgsToSend,
-                            onEvent,
-                            temperature: activePreset?.temperature,
-                            max_tokens: activePreset?.maxTokens,
-                            explicitProviderId: currentProviderId,
-                            explicitModelId: currentModelId,
-                            stream: isStreamEnabled
-                        }),
-                        timeoutPromise
-                    ]);
-
-                    if (!isStreamEnabled) {
-                        const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-                        if (lastMsg && lastMsg.role === 'assistant') {
-                            if (lastMsg.content === "__LOADING__") lastMsg.content = "";
-                            lastMsg.content = aiFullContent;
-                        }
+                    if (messageRef.content === '__LOADING__') {
+                        messageRef.content = aiFullContent || "";
                     }
+
+                    // 保存到数据库
+                    await saveAssistantResponse(sessionId, aiFullContent, messageRef.reasoningContent || null, null, messageRef.searchMetadata || null, currentModelId, currentProviderId);
+                } catch (e: any) {
+                    console.error(`Model ${currentModelId} failed:`, e);
+                    messageRef.content = "";
+                    messageRef.error = { message: e.message || String(e), type: 'error' };
                 } finally {
                     unlistenSearch();
                     unlistenMemory();
                 }
+            });
 
-                // 🛡️ Fix bug: Ensure loading state is cleared even if AI returns no content
-                const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-                if (lastMsg.content === '__LOADING__') {
-                    if (aiFullContent) {
-                        lastMsg.content = aiFullContent;
-                    } else {
-                        console.warn(`[sendMessage] Model ${currentModelId} returned no content.`);
-                        lastMsg.content = ""; // Clear loading state
-                    }
-                }
-
-                // 保存助手回复
-                await saveAssistantResponse(sessionId, aiFullContent, lastMsg.reasoningContent || null, null, lastMsg.searchMetadata || null, currentModelId, currentProviderId);
-
-                // 如果用户停止了，跳过后续模型
-                if (!isGenerating.value) break;
-            }
+            await Promise.all(modelTasks);
 
             // 自动总结标题
             const msgCount = currentMessages.value.filter(m => m.content && m.content !== "__LOADING__").length;

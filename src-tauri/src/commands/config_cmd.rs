@@ -100,6 +100,9 @@ pub struct AppConfig {
     #[serde(default = "default_chat_mode", rename = "chatMode")]
     pub chat_mode: ChatModeConfig,
 
+    #[serde(default = "default_false", rename = "enableRag")]
+    pub enable_rag: bool,
+
     // NEW: Immersive Mode (沉浸式模式)
     #[serde(default = "default_immersive_mode", rename = "immersiveMode")]
     pub immersive_mode: ImmersiveSettings,
@@ -419,6 +422,7 @@ impl Default for AppConfig {
             immersive_mode: default_immersive_mode(),
             font_family_english: "".into(),
             font_family_chinese: "".into(),
+            enable_rag: false,
         }
     }
 }

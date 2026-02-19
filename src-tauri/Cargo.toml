@@ -23,8 +23,8 @@ windows-sys = { version = "0.52", features = ["Win32_System_LibraryLoader"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# 新增：用于发起 API 请求
-reqwest = { version = "0.12", features = ["json", "stream"] }
+# 新增：用于发起 API 请求 (启用 HTTP/3 和高性能 DNS)
+reqwest = { version = "0.12", features = ["json", "stream", "multipart", "http3", "hickory-dns", "brotli", "gzip"] }
 tokio = { version = "1", features = ["full"] }  # ← 添加这一行
 futures-util = "0.3" # 处理异步流必备
 rusqlite = { version = "0.38.0", features = ["bundled"] }

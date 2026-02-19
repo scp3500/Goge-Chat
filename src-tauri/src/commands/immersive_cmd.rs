@@ -14,6 +14,7 @@ use tauri::{command, AppHandle, Emitter, Manager, State};
 #[command]
 pub async fn send_social_message_immersive(
     app: AppHandle,
+    state: State<'_, crate::GoleState>, // ✨ 注入全局中断标志
     scheduler: State<'_, Arc<MessageScheduler>>,
     session_id: i64,
     contact_id: i64,
@@ -258,11 +259,61 @@ pub async fn send_social_message_immersive(
     let base_url = provider_config["baseUrl"].as_str().unwrap_or_default();
 
     // C. 执行 AI 调用 (内部流式处理)
+    // C. 执行 AI 调用 (内部流式处理 + ⚡️ 极致优化：20ms 合批同步)
     let client = app.state::<reqwest::Client>();
-    let ai_response = if provider_id == "gemini" {
-        crate::ai_utils::call_gemini_backend(&client, api_key, base_url, &model, history).await?
+    let mut full_content = String::new();
+    let mut pending_content = String::new();
+    let mut last_emit = std::time::Instant::now();
+    let mut emit_count = 0;
+
+    // 定义一个统一的合批发射器
+    let emit_chunk = |app: &AppHandle,
+                          chunk: &str,
+                          full: &mut String,
+                          pending: &mut String,
+                          last: &mut std::time::Instant,
+                          count: &mut i32| {
+        full.push_str(chunk);
+        pending.push_str(chunk);
+
+        // 策略：前 5 次立即发送，后续 20ms 合批
+        if *count < 5 || last.elapsed().as_millis() >= 20 || pending.len() > 100 {
+            if !pending.is_empty() {
+                let _ = app.emit(
+                    "social-streaming-chunk",
+                    serde_json::json!({
+                        "content": pending.clone(),
+                        "isFirst": *count == 0
+                    }),
+                );
+                pending.clear();
+                *count += 1;
+            }
+            *last = std::time::Instant::now();
+        }
+    };
+
+    if provider_id == "gemini" {
+        crate::ai_utils::call_gemini_streaming(
+            &client,
+            api_key,
+            base_url,
+            &model,
+            history,
+            |chunk| {
+                emit_chunk(
+                    &app,
+                    &chunk,
+                    &mut full_content,
+                    &mut pending_content,
+                    &mut last_emit,
+                    &mut emit_count,
+                );
+            },
+        )
+        .await?;
     } else {
-        // OpenAI 兼容流式处理 (虽然后端有 call_ai_backend, 但为了满足用户"内部流式收集"的需求, 这里手动处理)
+        // OpenAI 兼容流式处理
         let payload = ChatRequest {
             model: model.clone(),
             messages: history,
@@ -293,11 +344,15 @@ pub async fn send_social_message_immersive(
             return Err(format!("AI API 错误: {}", err_body));
         }
 
-        let mut full_content = String::new();
         let mut stream = response.bytes_stream();
         let mut buffer = String::new();
 
         while let Some(chunk) = stream.next().await {
+            // ✨ 沉浸模式也支持物理中断
+            if state.stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                return Ok(());
+            }
+
             let chunk = chunk.map_err(|e| e.to_string())?;
             buffer.push_str(&String::from_utf8_lossy(&chunk));
 
@@ -312,34 +367,42 @@ pub async fn send_social_message_immersive(
                 if let Some(data) = line.strip_prefix("data: ") {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
-                            // 🚀 [流式传输]：实时同步给前端极简模式
-                            let _ = app.emit(
-                                "social-streaming-chunk",
-                                serde_json::json!({
-                                    "content": content,
-                                    "isFirst": full_content.is_empty()
-                                }),
+                            emit_chunk(
+                                &app,
+                                content,
+                                &mut full_content,
+                                &mut pending_content,
+                                &mut last_emit,
+                                &mut emit_count,
                             );
-
-                            full_content.push_str(content);
                         }
                     }
                 }
             }
         }
+    }
 
-        // 🚀 [流式传输]：发送结束标记
+    // 🚀 [收尾工作]：发送剩余内容和结束标记
+    if !pending_content.is_empty() {
         let _ = app.emit(
             "social-streaming-chunk",
             serde_json::json!({
-                "content": "",
-                "isFirst": false,
-                "isDone": true
+                "content": pending_content,
+                "isFirst": emit_count == 0
             }),
         );
+    }
 
-        full_content
-    };
+    let _ = app.emit(
+        "social-streaming-chunk",
+        serde_json::json!({
+            "content": "",
+            "isFirst": false,
+            "isDone": true
+        }),
+    );
+
+    let ai_response = full_content;
 
     println!("[AI] [完成] 响应收集完成 ({} 字符)", ai_response.len());
 

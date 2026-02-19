@@ -27,7 +27,6 @@ pub async fn ask_ai(
     // --- 🚀 核心优化：并行执行预处理任务 ---
     let start_total = std::time::Instant::now(); // ⏱️ 开始计时
     let config = config_cmd::load_config(app.clone()).await?;
-    let config_load_time = start_total.elapsed();
 
     // 2. 确定当前使用的模型和提供商
     // 优先使用显式传入的参数，如果没有（旧版前端），则回退到全局配置
@@ -93,12 +92,29 @@ pub async fn ask_ai(
 
     // 创建并发任务
     let memory_state_inner = memory_state.inner().clone();
-    let memory_task =
-        get_relevant_context_parallel(app.clone(), memory_state_inner, query, mode, role_id);
+    let enable_rag = config.enable_rag; // 🚀 检查全局 RAG 开关
+
+    let app_for_memory = app.clone(); // ✨ 为内存任务克隆 AppHandle
+    let memory_task = async move {
+        if enable_rag {
+            get_relevant_context_parallel(app_for_memory, memory_state_inner, query, mode, role_id)
+                .await
+        } else {
+            Ok(None)
+        }
+    };
+
     let search_task = handle_search_parallel(app.clone(), messages_for_search, search_instance_url);
+
     // 并行等待
     let (search_res, memory_res): (Result<Vec<Message>, String>, Result<Option<String>, String>) =
         tokio::join!(search_task, memory_task);
+
+    let pre_processing_time = start_total.elapsed();
+    println!(
+        "⏱️ [性能-分析] 前处理阶段(搜索/记忆/配置)耗时: {}ms",
+        pre_processing_time.as_millis()
+    );
 
     // 处理搜索结果
     let mut clean_msgs = search_res?;
@@ -130,6 +146,32 @@ pub async fn ask_ai(
         temperature.or_else(|| provider_config["temperature"].as_f64().map(|f| f as f32));
     let max_tokens = max_tokens.or_else(|| provider_config["maxTokens"].as_u64().map(|u| u as u32));
 
+    // --- 🧹 极致优化：在发送给 AI 之前抹除所有逻辑标记 ---
+    for m in clean_msgs.iter_mut() {
+        if m.role == "user" {
+            // 剔除 [REASON]
+            m.content = m.content.replace("[REASON]", "");
+            // 剔除 [SEARCH] (支持带参数的格式 [SEARCH:provider])
+            if m.content.contains("[SEARCH") {
+                // 使用简单的正则或字符串处理移除 [SEARCH...]
+                let mut start = 0;
+                while let Some(s_idx) = m.content[start..].find("[SEARCH") {
+                    let absolute_start = start + s_idx;
+                    if let Some(e_idx) = m.content[absolute_start..].find(']') {
+                        m.content
+                            .replace_range(absolute_start..=absolute_start + e_idx, "");
+                        // 替换后字符串变短，从当前位置继续找
+                        start = absolute_start;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            // 最终修剪一下首尾空白
+            m.content = m.content.trim().to_string();
+        }
+    }
+
     // --- ⬇️ Google Gemini Native 支持 ⬇️ ---
     if selected_provider_id == "gemini" {
         return handle_gemini_native(
@@ -142,6 +184,7 @@ pub async fn ask_ai(
             stream.unwrap_or(true),
             &client,
             start_total,
+            pre_processing_time,
         )
         .await;
     }
@@ -201,10 +244,15 @@ pub async fn ask_ai(
         return Ok(());
     }
 
-    // --- 🌊 流式响应处理 ---
+    // --- 🌊 流式响应处理 (⚡️ 极致优化：20ms 微合批减少 IPC 频率) ---
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
     let mut ttft_logged = false;
+
+    let mut pending_content = String::new();
+    let mut pending_reasoning = String::new();
+    let mut last_emit = std::time::Instant::now();
+    let mut emit_count = 0; // 🚀 前几个字不合批，立即发送以获得最快体感速度
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
@@ -212,8 +260,7 @@ pub async fn ask_ai(
         }
 
         let chunk = chunk.map_err(|e| e.to_string())?;
-        let chunk_str = String::from_utf8_lossy(&chunk);
-        buffer.push_str(&chunk_str);
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
 
         while let Some(newline_idx) = buffer.find('\n') {
             let line = buffer.drain(..=newline_idx).collect::<String>();
@@ -221,6 +268,13 @@ pub async fn ask_ai(
 
             if line.is_empty() || line == "data: [DONE]" {
                 if line == "data: [DONE]" {
+                    // 彻底结束前清空缓存
+                    if !pending_content.is_empty() {
+                        let _ = on_event.send(format!("c:{}", pending_content));
+                    }
+                    if !pending_reasoning.is_empty() {
+                        let _ = on_event.send(format!("r:{}", pending_reasoning));
+                    }
                     return Ok(());
                 }
                 continue;
@@ -237,18 +291,16 @@ pub async fn ask_ai(
 
                         if let Some(content) = delta["content"].as_str() {
                             if !ttft_logged {
-                                // 🟢 监测：总耗时（包含加载配置、检索记忆、网路往返）
+                                let network_ttft = start_total.elapsed().as_millis() as i64
+                                    - pre_processing_time.as_millis() as i64;
                                 println!(
-                                    "⏱️ [性能] 首字总响应 (配置加载 {}ms + 其他 {}ms): {:?}",
-                                    config_load_time.as_millis(),
-                                    (start_total.elapsed() - config_load_time).as_millis(),
-                                    start_total.elapsed()
+                                    "⏱️ [性能] 首字总响应: {}ms | 网络等待: {}ms",
+                                    start_total.elapsed().as_millis(),
+                                    network_ttft
                                 );
                                 ttft_logged = true;
                             }
-                            on_event
-                                .send(format!("c:{}", content))
-                                .map_err(|e| e.to_string())?;
+                            pending_content.push_str(content);
                         }
 
                         if let Some(reasoning) = delta["reasoning_content"]
@@ -256,9 +308,24 @@ pub async fn ask_ai(
                             .or_else(|| delta["reasoning"].as_str())
                             .or_else(|| delta["thought"].as_str())
                         {
-                            on_event
-                                .send(format!("r:{}", reasoning))
-                                .map_err(|e| e.to_string())?;
+                            pending_reasoning.push_str(reasoning);
+                        }
+
+                        // ⏱️ 判定：前 5 次下发立即执行 (保证极速 TTFT)，后续切换到 20ms 周期或 100 字符缓冲区
+                        if emit_count < 5
+                            || last_emit.elapsed().as_millis() >= 20
+                            || pending_content.len() > 100
+                        {
+                            if !pending_content.is_empty() {
+                                let _ = on_event.send(format!("c:{}", pending_content));
+                                pending_content.clear();
+                                emit_count += 1;
+                            }
+                            if !pending_reasoning.is_empty() {
+                                let _ = on_event.send(format!("r:{}", pending_reasoning));
+                                pending_reasoning.clear();
+                            }
+                            last_emit = std::time::Instant::now();
                         }
                     } else if let Some(err) = json["error"].as_object() {
                         return Err(format!("Stream Error: {:?}", err));
@@ -266,6 +333,14 @@ pub async fn ask_ai(
                 }
             }
         }
+    }
+
+    // 扫尾
+    if !pending_content.is_empty() {
+        let _ = on_event.send(format!("c:{}", pending_content));
+    }
+    if !pending_reasoning.is_empty() {
+        let _ = on_event.send(format!("r:{}", pending_reasoning));
     }
 
     // println!("✅ AI 生成任务已彻底释放");
@@ -304,6 +379,7 @@ async fn handle_gemini_native(
     stream: bool,
     client: &reqwest::Client,
     start_total: std::time::Instant,
+    pre_processing_time: std::time::Duration,
 ) -> Result<(), String> {
     if !stream {
         // --- 🛑 非流式处理 ---
@@ -352,16 +428,21 @@ async fn handle_gemini_native(
         system_instruction,
     };
 
-    // 2. 构造 URL
+    // 2. 构造 URL (更加鲁棒的判断)
     let mode = "streamGenerateContent";
+    let base = base_url.trim_end_matches('/');
 
-    let url = format!(
-        "{}/v1beta/models/{}:{}?key={}",
-        base_url.trim_end_matches('/'),
-        model,
-        mode,
-        api_key
-    );
+    let url = if base.contains("/models/") {
+        // 如果用户提供了完整路径，只补全 key
+        format!("{}?key={}", base, api_key)
+    } else {
+        // 智能补全版本和路径
+        let version = if base.contains("/v1") { "" } else { "/v1beta" };
+        format!(
+            "{}{}/models/{}:{}?key={}",
+            base, version, model, mode, api_key
+        )
+    };
 
     let response = client
         .post(&url)
@@ -381,6 +462,9 @@ async fn handle_gemini_native(
     let mut stream = response.bytes_stream();
     let mut buffer = String::new();
     let mut ttft_logged = false;
+    let mut pending_content = String::new();
+    let mut last_emit = std::time::Instant::now();
+    let mut emit_count = 0;
 
     while let Some(chunk) = stream.next().await {
         if state.stop_flag.load(Ordering::Relaxed) {
@@ -393,6 +477,9 @@ async fn handle_gemini_native(
         // Gemini 的 stream 数据是一个包含多个 JSON 对象的数组，格式大致为 [ {...}, {...} ]
         // 这里尝试解析完整的 JSON 对象块
         while let Some(start_idx) = buffer.find('{') {
+            if state.stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
             let mut depth = 0;
             let mut end_idx = None;
             let bytes = buffer.as_bytes();
@@ -420,15 +507,31 @@ async fn handle_gemini_native(
                             if let Some(text) = part["text"].as_str() {
                                 if !ttft_logged {
                                     // 🟢 监测：从用户输入到流式输出首字的性能耗时 (Gemini)
+                                    let network_ttft = start_total.elapsed().as_millis() as i64
+                                        - pre_processing_time.as_millis() as i64;
                                     println!(
-                                        "⏱️ [性能] Gemini 模式首字总耗时 (从输入): {:?}",
-                                        start_total.elapsed()
+                                        "⏱️ [性能] 首字总响应 (Gemini): {}ms | 网络等待: {}ms",
+                                        start_total.elapsed().as_millis(),
+                                        network_ttft
                                     );
                                     ttft_logged = true;
                                 }
-                                on_event
-                                    .send(format!("c:{}", text))
-                                    .map_err(|e| e.to_string())?;
+                                pending_content.push_str(text);
+
+                                // ⏱️ Gemini 同样采用：前 5 次极速响应，后续合批策略
+                                if emit_count < 5
+                                    || last_emit.elapsed().as_millis() >= 20
+                                    || pending_content.len() > 100
+                                {
+                                    if !pending_content.is_empty() {
+                                        on_event
+                                            .send(format!("c:{}", pending_content))
+                                            .map_err(|e| e.to_string())?;
+                                        pending_content.clear();
+                                        emit_count += 1;
+                                    }
+                                    last_emit = std::time::Instant::now();
+                                }
                             }
                         }
                     }
@@ -588,4 +691,42 @@ async fn get_relevant_context_parallel(
         );
         Ok(None)
     }
+}
+
+// --- 🚀 连接预热：在用户输入时提前建立连接 ---
+#[tauri::command]
+pub async fn prewarm_connection(
+    base_url: String,
+    client: State<'_, reqwest::Client>,
+) -> Result<(), String> {
+    let start = std::time::Instant::now();
+
+    // 构造一个最小的健康检查请求（通常 /v1/models 端点不需要鉴权）
+    let url = if base_url.contains("generativelanguage.googleapis.com") {
+        // Gemini 使用不同的端点
+        format!("{}/v1beta/models", base_url.trim_end_matches('/'))
+    } else {
+        // OpenAI 兼容端点
+        let base = base_url.trim_end_matches('/');
+        if base.ends_with("/v1") {
+            format!("{}/models", base)
+        } else {
+            format!("{}/v1/models", base)
+        }
+    };
+
+    // 发起预热请求（不关心结果，只为建立连接）
+    let _ = client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
+
+    let elapsed = start.elapsed().as_millis();
+    println!(
+        "🔥 [PREWARM] Connection to {} established in {}ms",
+        base_url, elapsed
+    );
+
+    Ok(())
 }

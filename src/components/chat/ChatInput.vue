@@ -239,10 +239,45 @@ const autoResize = () => {
   element.style.height = element.scrollHeight + 'px';
 };
 
-watch(inputMsg, () => {
+
+// --- 🔥 连接预热逻辑 ---
+let prewarmTimer = null;
+let lastPrewarmedProvider = null;
+
+const prewarmConnection = async () => {
+  const currentProvider = configStore.settings.providers.find(
+    p => p.id === configStore.settings.defaultProviderId
+  );
+  
+  if (!currentProvider || !currentProvider.baseUrl) return;
+  
+  // 避免重复预热同一个 Provider
+  if (lastPrewarmedProvider === currentProvider.id) return;
+  
+  try {
+    await invoke('prewarm_connection', { 
+      baseUrl: currentProvider.baseUrl 
+    });
+    lastPrewarmedProvider = currentProvider.id;
+    console.log(`🔥 [PREWARM] Connection pre-warmed for ${currentProvider.name}`);
+  } catch (e) {
+    // 预热失败不影响正常使用
+    console.warn('[PREWARM] Failed:', e);
+  }
+};
+
+watch(inputMsg, (newVal) => {
   nextTick(() => {
     autoResize();
   });
+  
+  // 🔥 当用户开始输入内容时，立即触发连接预热
+  if (newVal.trim().length >= 1) {
+    if (prewarmTimer) clearTimeout(prewarmTimer);
+    prewarmTimer = setTimeout(() => {
+      prewarmConnection();
+    }, 300); // 稍微缩短防抖时间，更快响应
+  }
 });
 
 const props = defineProps({
